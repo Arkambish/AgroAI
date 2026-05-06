@@ -1,0 +1,81 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+.Python
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- IDE / editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Notebooks ---
+.ipynb_checkpoints/
+*.ipynb
+
+# --- ML/DL artefacts (large, regenerate via main.py) ---
+outputs/models/*.pkl
+outputs/models/*.keras
+outputs/models/*.h5
+# Keep the directory in version control with a .gitkeep
+!outputs/models/.gitkeep
+
+# --- Generated plots and results (regenerate via main.py) ---
+# Keep figures (interim report assets) but exclude the big generated EDA/training/results PNGs.
+outputs/plots/eda/*.png
+outputs/plots/training/*.png
+outputs/plots/results/*.png
+# Keep the figures/ directory (interim report deliverables)
+!outputs/plots/figures/
+
+# --- Result data ---
+# Per-row OOF predictions are large and regenerable; ignore them.
+outputs/results/oof_*.json
+# Keep summary CSVs / JSONs / final_summary.txt — they're small and useful as
+# a frozen snapshot of what `python main.py` produces.
+
+# --- Data: raw/synthetic/processed are generated or sensitive ---
+data/raw/*
+!data/raw/.gitkeep
+data/synthetic/*
+!data/synthetic/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Secrets (precaution) ---
+.env
+.env.local
+*.pem
+*.key
+credentials.json
+service-account*.json
+
+# --- TensorFlow / Keras caches ---
+.keras/
+
+# --- Misc ---
+*.tmp
+.cache/
