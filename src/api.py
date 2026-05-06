@@ -5,6 +5,8 @@ Endpoints:
   POST /predict
   GET  /models/compare
   GET  /feature-importance
+  GET  /context
+  GET  /districts
 """
 
 import json
@@ -17,16 +19,20 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import ALL_FEATURES
+from config import ALL_FEATURES, DISTRICTS, SEASONS
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELS_DIR = os.path.join(ROOT, 'outputs', 'models')
 RESULTS_DIR = os.path.join(ROOT, 'outputs', 'results')
+PROCESSED_DIR = os.path.join(ROOT, 'data', 'processed')
 
 app = Flask(__name__)
 CORS(app)
 
-_state = {'model': None, 'metrics': None, 'model_name': None, 'scaler': None}
+_state = {
+    'model': None, 'metrics': None, 'model_name': None, 'scaler': None,
+    'context_df': None,
+}
 
 
 def _load_state() -> None:
@@ -63,6 +69,14 @@ def _load_state() -> None:
         joblib.load(os.path.join(MODELS_DIR, scaler_file)) if scaler_file else None
     )
     print(f'[api] Loaded {name} (metrics={metrics or "n/a"})')
+
+    # Optional: cache the processed dataset for the /context endpoint.
+    integrated_csv = os.path.join(PROCESSED_DIR, 'integrated_dataset.csv')
+    if os.path.exists(integrated_csv):
+        _state['context_df'] = pd.read_csv(integrated_csv)
+        print(f'[api] Loaded context dataset ({len(_state["context_df"])} rows)')
+    else:
+        print('[api] integrated_dataset.csv not found — /context will return 503.')
 
 
 @app.route('/health', methods=['GET'])
@@ -119,6 +133,69 @@ def feature_importance():
         return jsonify({'error': 'feature_importance.json not found — run SHAP step first.'}), 404
     with open(fi_path) as f:
         return jsonify(json.load(f))
+
+
+@app.route('/context', methods=['GET'])
+def context():
+    """Return the 32 feature values for a given (district, season, year).
+
+    Used by the dashboard to prefill the prediction form. Falls back to
+    the (district, season) historical mean if the exact year is not in
+    the dataset (e.g. user picks a future year).
+    """
+    df = _state.get('context_df')
+    if df is None:
+        return jsonify({'error': 'context dataset not loaded'}), 503
+
+    district = request.args.get('district', type=str)
+    season = request.args.get('season', type=str)
+    year = request.args.get('year', type=int)
+
+    if not district or not season or year is None:
+        return jsonify({'error': 'query params district, season, year are required'}), 400
+
+    feature_cols = [c for c in ALL_FEATURES if c in df.columns]
+    sub = df[(df['District'] == district) & (df['Season'] == season)]
+    if sub.empty:
+        return jsonify({
+            'error': f'no rows for district={district}, season={season}',
+            'district': district, 'season': season, 'year': year,
+        }), 404
+
+    exact = sub[sub['Year'] == year]
+    if not exact.empty:
+        row = exact.iloc[0][feature_cols]
+        source = 'exact'
+    else:
+        # Fall back to the (district, season) mean across all years.
+        row = sub[feature_cols].mean(numeric_only=True)
+        source = 'historical_mean'
+
+    payload = {col: float(row[col]) for col in feature_cols}
+    payload.update({
+        'district': district,
+        'season': season,
+        'year': year,
+        'source': source,
+        'available_years': sorted(int(y) for y in sub['Year'].unique()),
+    })
+    return jsonify(payload)
+
+
+@app.route('/districts', methods=['GET'])
+def list_districts():
+    """Return the four target districts and the two seasons. Lets the
+    frontend keep its dropdowns in sync with backend config."""
+    df = _state.get('context_df')
+    years = (
+        sorted(int(y) for y in df['Year'].unique())
+        if df is not None else []
+    )
+    return jsonify({
+        'districts': list(DISTRICTS),
+        'seasons': list(SEASONS),
+        'years': years,
+    })
 
 
 if __name__ == '__main__':
