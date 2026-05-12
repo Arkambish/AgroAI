@@ -1,7 +1,9 @@
 import axios from "axios";
+import { predictYieldMock } from "./sample-api";
 
 const API_BASE_URL = "http://localhost:5000";
-
+// Toggle this to switch between mock and real API
+const USE_MOCK = true;
 export const api = axios.create({
   baseURL: API_BASE_URL,
 });
@@ -35,8 +37,10 @@ export const getContext = async (district: string, season: string, year: number)
   });
   return response.data;
 };
-
 export const predictYield = async (data: any): Promise<PredictResponse> => {
+  if (USE_MOCK) {
+    return await predictYieldMock(data);
+  }
   const response = await api.post("/predict", data);
   return response.data;
 };
@@ -67,4 +71,29 @@ export const convertSHAPToExplanation = (shapValues: Record<string, number>) => 
       raw: value,
     };
   });
+};
+
+export const mockPredictResponse: PredictResponse = {
+  district: "Matale",
+  season: "Yala",
+  year: 2024,
+
+  predicted_yield_MT_per_Ha: 14.8,
+
+  confidence_lower: 13.2,
+  confidence_upper: 16.1,
+  confidence: "High",
+
+  shap_values: {
+    rainfall: 0.42,
+    temperature: -0.18,
+    humidity: 0.25,
+    soil_ph: 0.12,
+    soil_moisture: 0.33,
+    ndvi: 0.21,
+    solar_radiation: -0.09,
+  },
+
+  model: "XGBoost Regressor (Mock)",
+  model_r2: 0.91,
 };

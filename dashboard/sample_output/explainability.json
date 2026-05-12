@@ -1,0 +1,11 @@
+{
+  "district": "Colombo",
+  "top_features": [
+    {"feature": "rainfall", "contribution": 0.35},
+    {"feature": "temperature", "contribution": 0.30},
+    {"feature": "soil_ph", "contribution": 0.20},
+    {"feature": "fertilizer", "contribution": 0.10},
+    {"feature": "humidity", "contribution": 0.05}
+  ],
+  "explanation": "Rainfall and temperature are the most influential factors for yield prediction in Colombo."
+}
