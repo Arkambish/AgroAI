@@ -15,6 +15,7 @@ import sys
 import numpy as np
 import pandas as pd
 import joblib
+import shap
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -31,7 +32,7 @@ CORS(app)
 
 _state = {
     'model': None, 'metrics': None, 'model_name': None, 'scaler': None,
-    'context_df': None,
+    'context_df': None, 'explainer': None,
 }
 
 
@@ -61,14 +62,24 @@ def _load_state() -> None:
             'No tabular model artefact found. Run `python main.py` first.'
         )
 
-    artefact, scaler_file = candidates[name]
-    _state['model'] = joblib.load(os.path.join(MODELS_DIR, artefact))
-    _state['model_name'] = name
-    _state['metrics'] = metrics
-    _state['scaler'] = (
-        joblib.load(os.path.join(MODELS_DIR, scaler_file)) if scaler_file else None
-    )
-    print(f'[api] Loaded {name} (metrics={metrics or "n/a"})')
+    if name is not None:
+        artefact, scaler_file = candidates[name]
+        _state['model'] = joblib.load(os.path.join(MODELS_DIR, artefact))
+        _state['model_name'] = name
+        _state['metrics'] = metrics
+        _state['scaler'] = (
+            joblib.load(os.path.join(MODELS_DIR, scaler_file)) if scaler_file else None
+        )
+        
+        # Initialize SHAP explainer for tree-based models
+        if name in ['RandomForest', 'XGBoost']:
+            try:
+                _state['explainer'] = shap.TreeExplainer(_state['model'])
+                print(f'[api] Initialized SHAP TreeExplainer for {name}')
+            except Exception as e:
+                print(f'[api] Failed to initialize SHAP: {e}')
+        
+        print(f'[api] Loaded {name} (metrics={metrics or "n/a"})')
 
     # Optional: cache the processed dataset for the /context endpoint.
     integrated_csv = os.path.join(PROCESSED_DIR, 'integrated_dataset.csv')
@@ -106,15 +117,44 @@ def predict():
     else:
         margin = prediction * 0.15
 
-    return jsonify({
+    # Calculate SHAP values for this prediction
+    shap_dict = {}
+    if _state['explainer'] is not None:
+        try:
+            # TreeExplainer expects a 2D array or similar. feature_vec is already (1, N)
+            sv = _state['explainer'].shap_values(feature_vec)
+            # For XGBoost/RF regression, sv is usually (1, N) or (N,)
+            if isinstance(sv, list): sv = sv[0]
+            if len(sv.shape) == 2: sv = sv[0]
+            shap_dict = {f: float(sv[i]) for i, f in enumerate(ALL_FEATURES)}
+        except Exception as e:
+            print(f'[api] SHAP error: {e}')
+
+    # Confidence Label for Farmer-friendly UI
+    confidence_val = "High"
+    if _state['metrics'] and _state['metrics'].get('R2', 0) < 0.7:
+        confidence_val = "Medium"
+    if _state['metrics'] and _state['metrics'].get('R2', 0) < 0.5:
+        confidence_val = "Low"
+
+    response = {
         'district': data.get('district'),
         'season': data.get('season'),
+        'year': data.get('year'),
         'predicted_yield_MT_per_Ha': round(prediction, 2),
         'confidence_lower': round(max(0.0, prediction - margin), 2),
         'confidence_upper': round(prediction + margin, 2),
+        'confidence': confidence_val,
+        'shap_values': shap_dict,
         'model': _state.get('model_name'),
         'model_r2': _state['metrics'].get('R2', None) if _state['metrics'] else None,
-    })
+    }
+
+    # TODO: Implement PostgreSQL storage here
+    # with db_session() as session:
+    #     save_prediction(response)
+
+    return jsonify(response)
 
 
 @app.route('/models/compare', methods=['GET'])
