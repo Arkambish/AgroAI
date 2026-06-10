@@ -1,79 +1,115 @@
 "use client";
 
-import { MapPin } from "lucide-react";
+import { useState } from "react";
+import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 
 interface DistrictMapProps {
   predictions?: Record<string, number>;
 }
 
-export default function DistrictMap({ predictions = {} }: DistrictMapProps) {
-  // Mock districts data for visualization
-  const districts = [
-    { name: "Anuradhapura", yield: predictions["Anuradhapura"] || 12.5, x: 40, y: 35 },
-    { name: "Matale", yield: predictions["Matale"] || 18.2, x: 55, y: 65 },
-    { name: "Polonnaruwa", yield: predictions["Polonnaruwa"] || 14.8, x: 70, y: 50 },
-    { name: "Jaffna", yield: predictions["Jaffna"] || 8.4, x: 30, y: 10 },
-  ];
+const geoUrl =
+  "https://raw.githubusercontent.com/deldersveld/topojson/master/countries/sri-lanka/sri-lanka-districts.json";
 
-  const getColor = (yieldVal: number) => {
-    if (yieldVal > 15) return "fill-emerald-600";
-    if (yieldVal > 10) return "fill-emerald-400";
-    return "fill-emerald-200";
+// Normalize keys to avoid mismatch between GeoJSON and ML output
+const normalize = (str: string) => str.toLowerCase().replace(/\s+/g, "").trim();
+
+export default function DistrictMap({ predictions = {} }: DistrictMapProps) {
+  const [tooltip, setTooltip] = useState<{
+    name: string;
+    val: number;
+  } | null>(null);
+
+  // Color based on yield value
+  const getYieldColor = (val: number) => {
+    if (val > 15) return "#059669";
+    if (val > 10) return "#34d399";
+    if (val > 0) return "#a7f3d0";
+    return "#e2e8f0";
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border bg-white p-6 shadow-md dark:bg-slate-900">
+    <div className="rounded-2xl border bg-white p-6 shadow-md dark:bg-slate-900">
+      {/* Header */}
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Yield by District</h3>
-        <div className="flex space-x-2 text-xs">
-          <div className="flex items-center"><div className="mr-1 h-3 w-3 rounded-full bg-emerald-600"></div> High</div>
-          <div className="flex items-center"><div className="mr-1 h-3 w-3 rounded-full bg-emerald-400"></div> Med</div>
-          <div className="flex items-center"><div className="mr-1 h-3 w-3 rounded-full bg-emerald-200"></div> Low</div>
-        </div>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+          Yield by District
+        </h3>
+
+        {tooltip && (
+          <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            <strong>{tooltip.name}</strong>:{" "}
+            {tooltip.val > 0 ? `${tooltip.val.toFixed(1)} t/ha` : "No data"}
+          </span>
+        )}
       </div>
-      
-      <div className="relative mx-auto h-[400px] w-full max-w-[300px]">
-        {/* Simple stylized map of Sri Lanka */}
-        <svg viewBox="0 0 100 120" className="h-full w-full">
-          <path
-            d="M50 5 L70 20 L80 50 L75 80 L60 110 L40 115 L20 100 L10 70 L15 40 L30 10 Z"
-            className="fill-slate-100 stroke-slate-200 dark:fill-slate-800 dark:stroke-slate-700"
-            strokeWidth="0.5"
-          />
-          
-          {districts.map((d) => (
-            <g key={d.name} className="cursor-pointer transition-opacity hover:opacity-80">
-              <circle
-                cx={d.x}
-                cy={d.y}
-                r="6"
-                className={`${getColor(d.yield)} stroke-white`}
-                strokeWidth="1"
-              />
-              <text
-                x={d.x}
-                y={d.y + 12}
-                textAnchor="middle"
-                className="fill-slate-600 text-[4px] font-bold dark:fill-slate-400"
-              >
-                {d.name}
-              </text>
-              <text
-                x={d.x}
-                y={d.y + 18}
-                textAnchor="middle"
-                className="fill-primary text-[3px] font-bold"
-              >
-                {d.yield} MT/Ha
-              </text>
-            </g>
-          ))}
-        </svg>
-        
-        <div className="absolute bottom-4 left-4 rounded-lg bg-white/90 p-2 text-[10px] shadow-sm dark:bg-slate-800/90">
-          <p className="font-bold text-slate-900 dark:text-white">Quick Fact:</p>
-          <p className="text-slate-600 dark:text-slate-400">Matale leads in current predictions.</p>
-        </div>
+
+      {/* Map */}
+      <div className="h-[420px] w-full overflow-hidden">
+        <ComposableMap
+          projection="geoMercator"
+          projectionConfig={{
+            center: [80.7, 7.9],
+            scale: 2800,
+          }}
+          style={{ width: "100%", height: "100%" }}
+        >
+          <Geographies geography={geoUrl}>
+            {({ geographies }: { geographies: any[] }) =>
+              geographies.map((geo: any) => {
+                const rawName = geo.properties.NAME_2 as string;
+                const key = normalize(rawName);
+
+                const val = predictions[key] ?? 0;
+
+                return (
+                  <Geography
+                    key={geo.rsmKey}
+                    geography={geo}
+                    fill={getYieldColor(val)}
+                    stroke="#ffffff"
+                    strokeWidth={0.5}
+                    style={{
+                      default: { outline: "none" },
+                      hover: {
+                        outline: "none",
+                        opacity: 0.8,
+                        cursor: "pointer",
+                      },
+                      pressed: { outline: "none" },
+                    }}
+                    onMouseEnter={() =>
+                      setTooltip({
+                        name: rawName,
+                        val,
+                      })
+                    }
+                    onMouseLeave={() => setTooltip(null)}
+                  />
+                );
+              })
+            }
+          </Geographies>
+        </ComposableMap>
+      </div>
+
+      {/* Legend */}
+      <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-500">
+        <span className="font-medium">Yield (t/ha):</span>
+
+        {[
+          { color: "#059669", label: "> 15" },
+          { color: "#34d399", label: "10 – 15" },
+          { color: "#a7f3d0", label: "1 – 10" },
+          { color: "#e2e8f0", label: "No data" },
+        ].map(({ color, label }) => (
+          <span key={label} className="flex items-center gap-1.5">
+            <span
+              className="inline-block h-3 w-3 rounded-sm"
+              style={{ backgroundColor: color }}
+            />
+            {label}
+          </span>
+        ))}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { predictYieldMock } from "./sample-api";
+import { ExplanationItem } from "@/app/[locale]/explain/page";
 
 const API_BASE_URL = "http://localhost:5000";
 // Toggle this to switch between mock and real API
@@ -46,31 +47,32 @@ export const predictYield = async (data: any): Promise<PredictResponse> => {
 };
 
 // Helper to convert SHAP to simple language
-export const convertSHAPToExplanation = (shapValues: Record<string, number>) => {
-  const features = Object.entries(shapValues)
+export const convertSHAPToExplanation = (
+  shapValues: Record<string, number>,
+  lang: "en" | "ta" | "si" = "en"
+) => {  const features = Object.entries(shapValues)
     .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
     .slice(0, 5);
 
-  return features.map(([name, value]) => {
-    const isPositive = value > 0;
-    const impact = Math.abs(value);
-    
-    let description = "";
-    if (name.includes("rainfall")) description = "Rainfall";
-    else if (name.includes("temp")) description = "Temperature";
-    else if (name.includes("humidity")) description = "Humidity";
-    else if (name.includes("soil_ph")) description = "Soil pH";
-    else if (name.includes("ndvi")) description = "Vegetation health (NDVI)";
-    else if (name.includes("solar")) description = "Solar radiation";
-    else description = name.replace(/_/g, " ");
+ return features.map(([name, value]): ExplanationItem => {
+  const isPositive = value > 0;
 
-    return {
-      name: description,
-      impact: isPositive ? "Positive" : "Negative",
-      color: isPositive ? "text-emerald-600" : "text-red-600",
-      raw: value,
-    };
-  });
+  let description = "";
+  if (name.includes("rainfall")) description = "Rainfall";
+  else if (name.includes("temp")) description = "Temperature";
+  else if (name.includes("humidity")) description = "Humidity";
+  else if (name.includes("soil_ph")) description = "Soil pH";
+  else if (name.includes("ndvi")) description = "Vegetation health (NDVI)";
+  else if (name.includes("solar")) description = "Solar radiation";
+  else description = name.replace(/_/g, " ");
+
+  return {
+    name: description,
+    impact: isPositive ? "Positive" : "Negative",
+    color: isPositive ? "text-emerald-600" : "text-red-600",
+    raw: value,
+  };
+});
 };
 
 export const mockPredictResponse: PredictResponse = {
@@ -97,3 +99,4 @@ export const mockPredictResponse: PredictResponse = {
   model: "XGBoost Regressor (Mock)",
   model_r2: 0.91,
 };
+
