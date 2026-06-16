@@ -11,11 +11,11 @@ interface StatCardProps {
 
 export default function StatCard({ label, value, icon: Icon, trend, trendType, color = "bg-primary" }: StatCardProps) {
   return (
-    <div className="rounded-2xl border bg-white p-6 shadow-md transition-all hover:shadow-lg dark:bg-slate-900">
+    <div className="rounded-2xl border bg-white p-6 shadow-md transition-all hover:shadow-lg">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
-          <h3 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{value}</h3>
+          <p className="text-sm font-medium text-slate-500">{label}</p>
+          <h3 className="mt-1 text-2xl font-bold text-slate-900">{value}</h3>
           {trend && (
             <p className={`mt-1 text-xs font-medium ${
               trendType === "up" ? "text-emerald-600" : 

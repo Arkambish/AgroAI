@@ -38,15 +38,15 @@ export default function DistrictMap({ predictions = {} }: DistrictMapProps) {
   };
 
   return (
-    <div className="rounded-2xl border bg-white p-6 shadow-md dark:bg-slate-900">
+    <div className="rounded-2xl border bg-white p-6 shadow-md">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+        <h3 className="text-lg font-bold text-slate-900">
           Yield by District
         </h3>
 
         {tooltip && (
-          <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+          <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm text-slate-700">
             <strong>{tooltip.name}</strong>:{" "}
             {tooltip.val > 0 ? `${tooltip.val.toFixed(1)} t/ha` : "No data"}
           </span>
@@ -140,11 +140,11 @@ export default function DistrictMap({ predictions = {} }: DistrictMapProps) {
 
       {/* Selected district panel */}
       {selected && (
-        <div className="mt-4 rounded-lg bg-slate-100 p-3 dark:bg-slate-800">
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+        <div className="mt-4 rounded-lg bg-slate-100 p-3">
+          <p className="text-sm font-semibold text-slate-900">
             Selected District
           </p>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
+          <p className="text-sm text-slate-600">
             {selected}
           </p>
         </div>

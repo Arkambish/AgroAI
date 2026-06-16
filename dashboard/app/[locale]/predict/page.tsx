@@ -111,11 +111,11 @@ export default function PredictPage() {
     <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
           {t("predict.title")}
         </h1>
 
-        <p className="text-slate-500 dark:text-slate-400">
+        <p className="text-slate-500">
           {t("predict.subtitle")}
         </p>
       </div>
@@ -124,12 +124,12 @@ export default function PredictPage() {
         {/* ========================= */}
         {/* Left Side - Input Form */}
         {/* ========================= */}
-        <section className="rounded-2xl border bg-white p-8 shadow-md dark:bg-slate-900">
+        <section className="rounded-2xl border bg-white p-8 shadow-md">
           <form className="space-y-6">
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               {/* District */}
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-bold text-slate-700">
                   {t("form.district")}
                 </label>
 
@@ -137,8 +137,7 @@ export default function PredictPage() {
                   name="district"
                   value={formData.district}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
-                >
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                   {districts.map((district) => (
                     <option key={district} value={district}>
                       {district}
@@ -149,7 +148,7 @@ export default function PredictPage() {
 
               {/* Season */}
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-bold text-slate-700">
                   {t("form.season")}
                 </label>
 
@@ -157,7 +156,7 @@ export default function PredictPage() {
                   name="season"
                   value={formData.season}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
                 >
                   {seasons.map((season) => (
                     <option key={season} value={season}>
@@ -169,7 +168,7 @@ export default function PredictPage() {
 
               {/* Year */}
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-bold text-slate-700">
                   {t("form.year")}
                 </label>
 
@@ -177,7 +176,7 @@ export default function PredictPage() {
                   name="year"
                   value={formData.year}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
                 >
                   {years.map((year) => (
                     <option key={year} value={year}>
@@ -189,7 +188,7 @@ export default function PredictPage() {
 
               {/* Rainfall */}
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-bold text-slate-700">
                   {t("form.rainfall")}
                 </label>
 
@@ -199,13 +198,13 @@ export default function PredictPage() {
                   value={formData.rainfall}
                   onChange={handleInputChange}
                   required
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
                 />
               </div>
 
               {/* Temperature */}
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-bold text-slate-700">
                   {t("form.temperature")}
                 </label>
 
@@ -215,13 +214,13 @@ export default function PredictPage() {
                   value={formData.temperature}
                   onChange={handleInputChange}
                   required
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
                 />
               </div>
 
               {/* Humidity */}
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-bold text-slate-700">
                   {t("form.humidity")}
                 </label>
 
@@ -231,13 +230,13 @@ export default function PredictPage() {
                   value={formData.humidity}
                   onChange={handleInputChange}
                   required
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
                 />
               </div>
 
               {/* Soil Moisture */}
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-bold text-slate-700">
                   {t("form.soilMoisture")}
                 </label>
 
@@ -247,13 +246,13 @@ export default function PredictPage() {
                   value={formData.soil_moisture}
                   onChange={handleInputChange}
                   required
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
                 />
               </div>
 
               {/* Soil pH */}
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                <label className="text-sm font-bold text-slate-700">
                   {t("form.soilPh")}
                 </label>
 
@@ -264,7 +263,7 @@ export default function PredictPage() {
                   value={formData.soil_ph}
                   onChange={handleInputChange}
                   required
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
                 />
               </div>
             </div>
@@ -293,30 +292,30 @@ export default function PredictPage() {
         {/* ========================= */}
         <section className="space-y-6">
           {!result ? (
-            <div className="flex h-full min-h-[400px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-900/50">
-              <div className="rounded-full bg-slate-100 p-4 dark:bg-slate-800">
+            <div className="flex h-full min-h-[400px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+              <div className="rounded-full bg-slate-100 p-4">
                 <Info size={40} className="text-slate-400" />
               </div>
 
-              <h3 className="mt-4 text-xl font-bold text-slate-900 dark:text-white">
+              <h3 className="mt-4 text-xl font-bold text-slate-900">
                 {t("predict.waiting")}
               </h3>
 
-              <p className="mt-2 max-w-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-2 max-w-xs text-slate-500">
                 {t("predict.waitingDescription")}
               </p>
             </div>
           ) : (
             <div className="space-y-6">
               {/* Prediction Card */}
-              <div className="overflow-hidden rounded-3xl border border-emerald-100 bg-emerald-50 p-8 shadow-lg dark:border-emerald-900/30 dark:bg-emerald-900/20">
+              <div className="overflow-hidden rounded-3xl border border-emerald-100 bg-emerald-50 p-8 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    <p className="text-sm font-bold uppercase tracking-wider text-emerald-600">
                       {t("predict.expectedYield")}
                     </p>
 
-                    <h2 className="mt-2 text-5xl font-black text-emerald-900 dark:text-white">
+                    <h2 className="mt-2 text-5xl font-black text-emerald-900">
                       {result.predicted_yield_MT_per_Ha}
 
                       <span className="ml-2 text-2xl font-normal">
@@ -332,7 +331,7 @@ export default function PredictPage() {
               </div>
 
               {/* Confidence */}
-              <div className="flex items-center justify-between rounded-2xl border bg-white p-6 shadow-md dark:bg-slate-900">
+              <div className="flex items-center justify-between rounded-2xl border bg-white p-6 shadow-md">
                 <div className="flex items-center space-x-3">
                   <div
                     className={clsx(
@@ -345,12 +344,12 @@ export default function PredictPage() {
                     )}
                   />
 
-                  <span className="text-lg font-bold text-slate-900 dark:text-white">
+                  <span className="text-lg font-bold text-slate-900">
                     {result.confidence} {t("predict.confidence")}
                   </span>
                 </div>
 
-                <div className="text-sm text-slate-500 dark:text-slate-400">
+                <div className="text-sm text-slate-500">
                   Range: {result.confidence_lower} -{" "}
                   {result.confidence_upper} MT/Ha
                 </div>
@@ -358,22 +357,22 @@ export default function PredictPage() {
 
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900">
-                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                  <p className="text-xs font-bold text-slate-500">
                     {t("predict.previousSeason")}
                   </p>
 
                   <div className="mt-2 flex items-center space-x-2">
                     <History size={18} className="text-slate-400" />
 
-                    <span className="text-xl font-bold text-slate-900 dark:text-white">
+                    <span className="text-xl font-bold text-slate-900">
                       13.5 MT/Ha
                     </span>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900">
-                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                  <p className="text-xs font-bold text-slate-500">
                     {t("predict.change")}
                   </p>
 
@@ -388,7 +387,7 @@ export default function PredictPage() {
               </div>
 
               {/* Success Card */}
-              <div className="rounded-2xl bg-slate-900 p-6 text-white shadow-xl dark:bg-emerald-950">
+              <div className="rounded-2xl bg-slate-900 p-6 text-white shadow-xl">
                 <h4 className="flex items-center space-x-2 font-bold">
                   <CheckCircle2 size={18} className="text-emerald-400" />
 

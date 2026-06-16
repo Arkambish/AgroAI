@@ -41,7 +41,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md dark:bg-slate-900/80">
+    <nav className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 justify-between">
           <div className="flex items-center">
@@ -49,8 +49,8 @@ export default function Navbar() {
               <div className="rounded-lg bg-primary p-1.5 text-white">
                 <Sprout size={24} />
               </div>
-              <span className="hidden text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:block">
-                AgroAI <span className="text-primary">Dashboard</span>
+              <span className="hidden text-xl font-bold tracking-tight text-slate-900 sm:block">
+                Agri <span className="text-primary">Sense</span>
               </span>
             </Link>
           </div>
@@ -65,7 +65,7 @@ export default function Navbar() {
                   "flex items-center space-x-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   pathname === getLocaleHref(item.href)
                     ? "bg-primary/10 text-primary"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 )}
               >
                 <item.icon size={18} />
@@ -102,7 +102,7 @@ export default function Navbar() {
                   "flex items-center space-x-3 rounded-lg px-3 py-3 text-base font-medium transition-colors",
                   pathname === item.href
                     ? "bg-primary/10 text-primary"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 )}
               >
                 <item.icon size={20} />

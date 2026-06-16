@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "AgroAI Dashboard | Onion Yield Prediction",
+  title: "AgriSense Dashboard | Onion Yield Prediction",
   description: "Farmer-friendly Explainable AI decision support system for big onion yield prediction.",
 };
 

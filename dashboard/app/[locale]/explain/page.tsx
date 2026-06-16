@@ -40,11 +40,11 @@ export default function ExplainPage() {
   if (!prediction) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center space-y-4 text-center">
-        <div className="rounded-full bg-slate-100 p-6 dark:bg-slate-800">
+        <div className="rounded-full bg-slate-100 p-6">
           <Brain size={64} className="text-slate-300" />
         </div>
 
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+        <h2 className="text-2xl font-bold text-slate-900">
           {t("noPrediction")}
         </h2>
 
@@ -67,11 +67,11 @@ export default function ExplainPage() {
 
       {/* Header */}
       <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
           {t("title")}
         </h1>
 
-        <p className="text-slate-500 dark:text-slate-400">
+        <p className="text-slate-500">
           {t("subtitle")} {prediction.predicted_yield_MT_per_Ha} MT/Ha
         </p>
       </div>
@@ -80,7 +80,7 @@ export default function ExplainPage() {
 
         {/* Left */}
         <section className="space-y-6">
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">
+          <h2 className="text-xl font-bold text-slate-800">
             {t("keyFactors")}
           </h2>
 
@@ -88,7 +88,7 @@ export default function ExplainPage() {
             {explanations.map((item, index) => (
               <div
                 key={index}
-                className="flex justify-between rounded-xl border bg-white p-4 dark:bg-slate-900"
+                className="flex justify-between rounded-xl border bg-white p-4"
               >
                 <div>
                   <p className="font-bold">{item.name}</p>
@@ -111,11 +111,11 @@ export default function ExplainPage() {
 
         {/* Right */}
         <section className="space-y-6">
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">
+          <h2 className="text-xl font-bold text-slate-800">
             {t("summary")}
           </h2>
 
-          <div className="rounded-xl border bg-white p-6 dark:bg-slate-900">
+          <div className="rounded-xl border bg-white p-6">
 
             <p>
               {t("basedOn")}{" "}
@@ -135,7 +135,7 @@ export default function ExplainPage() {
               ))}
             </ul>
 
-            <div className="mt-6 rounded bg-amber-50 p-4 dark:bg-amber-900/10">
+            <div className="mt-6 rounded bg-amber-50 p-4">
               <AlertTriangle className="text-amber-500" />
               <p className="mt-2 font-bold">
                 {t("keyInsight")}

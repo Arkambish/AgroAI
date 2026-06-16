@@ -35,11 +35,11 @@ export default function RecommendationPage() {
   if (!prediction) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center space-y-4 text-center">
-        <div className="rounded-full bg-slate-100 p-6 dark:bg-slate-800">
+        <div className="rounded-full bg-slate-100 p-6">
           <Lightbulb size={64} className="text-slate-300" />
         </div>
 
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+        <h2 className="text-2xl font-bold text-slate-900">
           {t("recommend.noTitle") || "No Recommendations Yet"}
         </h2>
 
@@ -115,11 +115,11 @@ export default function RecommendationPage() {
     <div className="space-y-10">
       {/* Header */}
       <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
           {t("recommend.title")}
         </h1>
 
-        <p className="text-slate-500 dark:text-slate-400">
+        <p className="text-slate-500">
           {t("recommend.subtitle")}
         </p>
       </div>
@@ -127,7 +127,7 @@ export default function RecommendationPage() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* LEFT */}
         <div className="lg:col-span-2 space-y-6">
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">
+          <h2 className="text-xl font-bold text-slate-800">
             {t("recommend.strategyTitle")}
           </h2>
 
@@ -135,17 +135,17 @@ export default function RecommendationPage() {
             {getStrategies().map((strategy, index) => (
               <div
                 key={index}
-                className="rounded-3xl border bg-white p-6 shadow-md dark:bg-slate-900"
+                className="rounded-3xl border bg-white p-6 shadow-md"
               >
-                <div className="mb-4 inline-flex rounded-2xl bg-lime-100 p-4 text-lime-600 dark:bg-lime-900/30">
+                <div className="mb-4 inline-flex rounded-2xl bg-lime-100 p-4 text-lime-600">
                   <strategy.icon size={28} />
                 </div>
 
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                <h3 className="text-xl font-bold text-slate-900">
                   {strategy.title}
                 </h3>
 
-                <p className="mt-2 text-slate-600 dark:text-slate-400">
+                <p className="mt-2 text-slate-600">
                   {strategy.description}
                 </p>
 
@@ -174,7 +174,7 @@ export default function RecommendationPage() {
 
         {/* RIGHT */}
         <div className="space-y-6">
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">
+          <h2 className="text-xl font-bold text-slate-800">
             {t("recommend.riskTitle")}
           </h2>
 
@@ -197,10 +197,10 @@ export default function RecommendationPage() {
           ].map((risk, index) => (
             <div
               key={index}
-              className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"
+              className="rounded-2xl border bg-white p-5 shadow-sm"
             >
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-slate-900 dark:text-white">
+                <h4 className="font-bold text-slate-900">
                   {risk.title}
                 </h4>
 
@@ -218,14 +218,14 @@ export default function RecommendationPage() {
                 </span>
               </div>
 
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-2 text-sm text-slate-500">
                 <span className="font-bold">{t("recommend.action")}:</span>{" "}
                 {risk.action}
               </p>
             </div>
           ))}
 
-          <div className="rounded-2xl bg-slate-900 p-6 text-white dark:bg-slate-800">
+          <div className="rounded-2xl bg-slate-900 p-6 text-white">
             <h4 className="font-bold">{t("recommend.expertTitle")}</h4>
 
             <p className="mt-2 text-sm text-slate-400">
