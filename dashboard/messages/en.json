@@ -1,6 +1,7 @@
 {
   "title": {
     "home": "Welcome to AgroAI",
+    "description": "Intelligent spatial decision support for big onion farmers. Predict your yield, understand the reasons, and get expert recommendations.",
     "predict": "Predict Onion Yield",
     "recommend": "Recommendations",
     "explain": "Why This Prediction?"

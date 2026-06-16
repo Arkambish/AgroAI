@@ -10,8 +10,16 @@ interface DistrictMapProps {
 const geoUrl =
   "https://raw.githubusercontent.com/deldersveld/topojson/master/countries/sri-lanka/sri-lanka-districts.json";
 
-// Normalize keys to avoid mismatch between GeoJSON and ML output
+// normalize GeoJSON names
 const normalize = (str: string) => str.toLowerCase().replace(/\s+/g, "").trim();
+
+// OPTIONAL: map GeoJSON names → your ML keys (IMPORTANT for 4 districts)
+const districtMap: Record<string, string> = {
+  colombo: "colombo",
+  gampaha: "gampaha",
+  kalutara: "kalutara",
+  kandy: "kandy",
+};
 
 export default function DistrictMap({ predictions = {} }: DistrictMapProps) {
   const [tooltip, setTooltip] = useState<{
@@ -19,12 +27,14 @@ export default function DistrictMap({ predictions = {} }: DistrictMapProps) {
     val: number;
   } | null>(null);
 
-  // Color based on yield value
+  const [selected, setSelected] = useState<string | null>(null);
+
+  // 🎨 Yield-based color scale
   const getYieldColor = (val: number) => {
-    if (val > 15) return "#059669";
-    if (val > 10) return "#34d399";
-    if (val > 0) return "#a7f3d0";
-    return "#e2e8f0";
+    if (val > 15) return "#059669"; // dark green
+    if (val > 10) return "#34d399"; // green
+    if (val > 0) return "#a7f3d0"; // light green
+    return "#e2e8f0"; // grey
   };
 
   return (
@@ -55,24 +65,36 @@ export default function DistrictMap({ predictions = {} }: DistrictMapProps) {
         >
           <Geographies geography={geoUrl}>
             {({ geographies }: { geographies: any[] }) =>
-              geographies.map((geo: any) => {
+              geographies.map((geo) => {
                 const rawName = geo.properties.NAME_2 as string;
-                const key = normalize(rawName);
 
-                const val = predictions[key] ?? 0;
+                const key = normalize(rawName);
+                const mappedKey = districtMap[key] ?? key;
+
+                const val = predictions[mappedKey] ?? 0;
+
+                const isActive = predictions[mappedKey] !== undefined;
+
+                const isSelected = selected === rawName;
 
                 return (
                   <Geography
                     key={geo.rsmKey}
                     geography={geo}
-                    fill={getYieldColor(val)}
-                    stroke="#ffffff"
-                    strokeWidth={0.5}
+                    fill={
+                      !isActive
+                        ? "#e2e8f0" // inactive grey
+                        : isSelected
+                          ? "#f59e0b" // selected highlight
+                          : getYieldColor(val)
+                    }
+                    stroke={isSelected ? "#000000" : "#ffffff"}
+                    strokeWidth={isSelected ? 1.5 : 0.5}
                     style={{
                       default: { outline: "none" },
                       hover: {
                         outline: "none",
-                        opacity: 0.8,
+                        opacity: 0.85,
                         cursor: "pointer",
                       },
                       pressed: { outline: "none" },
@@ -84,6 +106,10 @@ export default function DistrictMap({ predictions = {} }: DistrictMapProps) {
                       })
                     }
                     onMouseLeave={() => setTooltip(null)}
+                    onClick={() => {
+                      setSelected(rawName);
+                      console.log("Selected district:", rawName);
+                    }}
                   />
                 );
               })
@@ -111,6 +137,18 @@ export default function DistrictMap({ predictions = {} }: DistrictMapProps) {
           </span>
         ))}
       </div>
+
+      {/* Selected district panel */}
+      {selected && (
+        <div className="mt-4 rounded-lg bg-slate-100 p-3 dark:bg-slate-800">
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+            Selected District
+          </p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            {selected}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

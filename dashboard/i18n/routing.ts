@@ -12,8 +12,8 @@ export function getSafeLocale(locale: string | undefined): AppLocale {
 }
 
 export function mergeMessages(
-  fallbackMessages: Record<string, string>,
-  localeMessages: Record<string, string>,
+  fallbackMessages: Record<string, unknown>,
+  localeMessages: Record<string, unknown>,
 ) {
   return {
     ...fallbackMessages,

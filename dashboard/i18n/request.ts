@@ -5,17 +5,17 @@ export default getRequestConfig(async ({ requestLocale }) => {
   const requestedLocale = await requestLocale;
   const locale = getSafeLocale(requestedLocale);
 
-  const fallbackMessages = (await import("../messages/en.json")).default;
+  const fallbackMessages = (await import("../messages/en.json")).default as Record<string, any>;
   const localeMessages =
     locale === "en"
       ? fallbackMessages
-      : (await import(`../messages/${locale}.json`)).default;
+      : ((await import(`../messages/${locale}.json`)).default as Record<string, any>);
 
   return {
     locale,
     messages: mergeMessages(fallbackMessages, localeMessages),
     getMessageFallback({ key }) {
-      return fallbackMessages[key as keyof typeof fallbackMessages] ?? key;
+      return fallbackMessages[key] ?? key;
     },
   };
 });
