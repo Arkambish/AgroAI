@@ -124,6 +124,23 @@
     "limitingFactor": "முக்கிய கட்டுப்படுத்தும் காரணம்",
 
     "district": "மாவட்டம்",
-    "yield": "விளைச்சல்"
+    "yield": "விளைச்சல்",
+    "features": {
+      "rainfall": "மழை",
+      "temperature": "வெப்பநிலை",
+      "humidity": "ஈரப்பதம்",
+      "soil_moisture": "மண் ஈரப்பதம்",
+      "soil_ph": "மண் pH"
+    }
+  },
+  "districts": {
+    "matale": "மாத்தளை",
+    "anuradhapura": "அனுராதபுரம்",
+    "polonnaruwa": "பொலன்னறுவை",
+    "kurunegala": "குருநாகல்"
+  },
+  "seasons": {
+    "yala": "யாளா",
+    "maha": "மஹா"
   }
 }

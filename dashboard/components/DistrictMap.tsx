@@ -1,154 +1,164 @@
 "use client";
 
-import { useState } from "react";
-import { ComposableMap, Geographies, Geography } from "react-simple-maps";
+import * as React from "react";
+import dynamic from "next/dynamic";
+import type { Feature, FeatureCollection, Geometry } from "geojson";
+import "leaflet/dist/leaflet.css";
+import { useEffect } from "react";
 
-interface DistrictMapProps {
+import { clamp, formatNumber } from "@/lib/utils";
+
+const MapContainer = dynamic(
+  () => import("react-leaflet").then((m) => m.MapContainer),
+  { ssr: false }
+);
+
+const TileLayer = dynamic(
+  () => import("react-leaflet").then((m) => m.TileLayer),
+  { ssr: false }
+);
+
+const GeoJSON = dynamic(
+  () => import("react-leaflet").then((m) => m.GeoJSON),
+  { ssr: false }
+);
+
+const GEOJSON_URL = "/sri-lanka-target-districts-only.geojson";
+
+interface Props {
   predictions?: Record<string, number>;
+  height?: number | string;
 }
 
-const geoUrl =
-  "https://raw.githubusercontent.com/deldersveld/topojson/master/countries/sri-lanka/sri-lanka-districts.json";
+// 🎨 color scale
+function getColor(v?: number) {
+  if (v === undefined) return "#e2e8f0";
 
-// normalize GeoJSON names
-const normalize = (str: string) => str.toLowerCase().replace(/\s+/g, "").trim();
+  const t = clamp((v - 4) / 20, 0, 1);
 
-// OPTIONAL: map GeoJSON names → your ML keys (IMPORTANT for 4 districts)
-const districtMap: Record<string, string> = {
-  colombo: "colombo",
-  gampaha: "gampaha",
-  kalutara: "kalutara",
-  kandy: "kandy",
-};
+  const colors = [
+    "#440154",
+    "#3b528b",
+    "#21918c",
+    "#5ec962",
+    "#fde725",
+  ];
 
-export default function DistrictMap({ predictions = {} }: DistrictMapProps) {
-  const [tooltip, setTooltip] = useState<{
-    name: string;
-    val: number;
-  } | null>(null);
+  const i = Math.floor(t * (colors.length - 1));
+  return colors[i];
+}
 
-  const [selected, setSelected] = useState<string | null>(null);
+export default function DistrictMap({
+  predictions = {},
+  height = 420,
+}: Props) {
 
-  // 🎨 Yield-based color scale
-  const getYieldColor = (val: number) => {
-    if (val > 15) return "#059669"; // dark green
-    if (val > 10) return "#34d399"; // green
-    if (val > 0) return "#a7f3d0"; // light green
-    return "#e2e8f0"; // grey
+  const setDistrict = (name: string) => {
+    console.log("Selected district:", name);
   };
 
+  const [geo, setGeo] = React.useState<FeatureCollection | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // ✅ SAFE GEO LOAD
+  useEffect(() => {
+    let ignore = false;
+
+    fetch(GEOJSON_URL)
+      .then((r) => {
+        if (!r.ok) throw new Error("GeoJSON failed to load");
+        return r.json();
+      })
+      .then((data) => {
+        if (!ignore) {
+          setGeo(data);
+          setLoading(false);
+        }
+      })
+      .catch((e) => {
+        if (!ignore) {
+          setError(String(e));
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const style = React.useCallback(
+    (feature?: Feature<Geometry, any>) => {
+      const name = feature?.properties?.name;
+      const value = name ? predictions[name] : undefined;
+
+      return {
+        color: "#334155",
+        weight: 1,
+        fillColor: getColor(value),
+        fillOpacity: value !== undefined ? 0.75 : 0.3,
+      };
+    },
+    [predictions]
+  );
+
+  const onEachFeature = React.useCallback(
+    (feature: Feature<any>, layer: any) => {
+      const name = feature.properties?.name;
+      const value = predictions[name];
+
+      layer.bindTooltip(
+        value !== undefined
+          ? `<b>${name}</b><br/>${formatNumber(value, 2)} MT/Ha`
+          : `<b>${name}</b><br/>No prediction`
+      );
+
+      layer.on("click", () => {
+        if (name) setDistrict(name);
+      });
+    },
+    [predictions]
+  );
+
+  if (error) {
+    return (
+      <div className="h-[420px] grid place-items-center text-sm text-red-500">
+        Map failed to load: {error}
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="h-[420px] grid place-items-center text-sm text-slate-500">
+        Loading map...
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-2xl border bg-white p-6 shadow-md">
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-bold text-slate-900">
-          Yield by District
-        </h3>
+    <div className="relative" style={{ height }}>
+      <MapContainer
+        key="district-map"   // 🔥 CRITICAL FIX
+        center={[7.9, 80.7]}
+        zoom={7}
+        scrollWheelZoom={false}
+        style={{ height: "100%", width: "100%" }}
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution="© OpenStreetMap"
+        />
 
-        {tooltip && (
-          <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm text-slate-700">
-            <strong>{tooltip.name}</strong>:{" "}
-            {tooltip.val > 0 ? `${tooltip.val.toFixed(1)} t/ha` : "No data"}
-          </span>
+        {geo && (
+          <GeoJSON data={geo} style={style} onEachFeature={onEachFeature} />
         )}
+      </MapContainer>
+
+      <div className="absolute bottom-3 right-3 bg-white/90 p-2 text-xs rounded shadow">
+        Yield Map (MT/Ha)
       </div>
-
-      {/* Map */}
-      <div className="h-[420px] w-full overflow-hidden">
-        <ComposableMap
-          projection="geoMercator"
-          projectionConfig={{
-            center: [80.7, 7.9],
-            scale: 2800,
-          }}
-          style={{ width: "100%", height: "100%" }}
-        >
-          <Geographies geography={geoUrl}>
-            {({ geographies }: { geographies: any[] }) =>
-              geographies.map((geo) => {
-                const rawName = geo.properties.NAME_2 as string;
-
-                const key = normalize(rawName);
-                const mappedKey = districtMap[key] ?? key;
-
-                const val = predictions[mappedKey] ?? 0;
-
-                const isActive = predictions[mappedKey] !== undefined;
-
-                const isSelected = selected === rawName;
-
-                return (
-                  <Geography
-                    key={geo.rsmKey}
-                    geography={geo}
-                    fill={
-                      !isActive
-                        ? "#e2e8f0" // inactive grey
-                        : isSelected
-                          ? "#f59e0b" // selected highlight
-                          : getYieldColor(val)
-                    }
-                    stroke={isSelected ? "#000000" : "#ffffff"}
-                    strokeWidth={isSelected ? 1.5 : 0.5}
-                    style={{
-                      default: { outline: "none" },
-                      hover: {
-                        outline: "none",
-                        opacity: 0.85,
-                        cursor: "pointer",
-                      },
-                      pressed: { outline: "none" },
-                    }}
-                    onMouseEnter={() =>
-                      setTooltip({
-                        name: rawName,
-                        val,
-                      })
-                    }
-                    onMouseLeave={() => setTooltip(null)}
-                    onClick={() => {
-                      setSelected(rawName);
-                      console.log("Selected district:", rawName);
-                    }}
-                  />
-                );
-              })
-            }
-          </Geographies>
-        </ComposableMap>
-      </div>
-
-      {/* Legend */}
-      <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-500">
-        <span className="font-medium">Yield (t/ha):</span>
-
-        {[
-          { color: "#059669", label: "> 15" },
-          { color: "#34d399", label: "10 – 15" },
-          { color: "#a7f3d0", label: "1 – 10" },
-          { color: "#e2e8f0", label: "No data" },
-        ].map(({ color, label }) => (
-          <span key={label} className="flex items-center gap-1.5">
-            <span
-              className="inline-block h-3 w-3 rounded-sm"
-              style={{ backgroundColor: color }}
-            />
-            {label}
-          </span>
-        ))}
-      </div>
-
-      {/* Selected district panel */}
-      {selected && (
-        <div className="mt-4 rounded-lg bg-slate-100 p-3">
-          <p className="text-sm font-semibold text-slate-900">
-            Selected District
-          </p>
-          <p className="text-sm text-slate-600">
-            {selected}
-          </p>
-        </div>
-      )}
     </div>
   );
 }

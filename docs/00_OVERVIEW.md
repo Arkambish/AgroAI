@@ -17,7 +17,7 @@ This is your project explained from the ground up. You said you don't know Pytho
 
 ## What this project does, in one paragraph
 
-It predicts how much **big onion** (Allium cepa) will be harvested per hectare in four Sri Lankan districts (Matale, Anuradhapura, Polonnaruwa, Jaffna) for both growing seasons (Yala and Maha). Instead of waiting for the harvest and counting tons, the model looks at *upstream signals* — rainfall, temperature, satellite vegetation greenness (NDVI), soil pH, and previous years' yields — and outputs a number like "**16.5 metric tons per hectare**" months before harvest. That early forecast helps the government plan onion imports, helps farmers price their crop, and helps researchers understand what drives yield.
+It predicts how much **big onion** (Allium cepa) will be harvested per hectare in four Sri Lankan districts (Matale, Anuradhapura, Polonnaruwa, Kurunegala) for both growing seasons (Yala and Maha). Instead of waiting for the harvest and counting tons, the model looks at *upstream signals* — rainfall, temperature, satellite vegetation greenness (NDVI), soil pH, and previous years' yields — and outputs a number like "**16.5 metric tons per hectare**" months before harvest. That early forecast helps the government plan onion imports, helps farmers price their crop, and helps researchers understand what drives yield.
 
 ## What's the research contribution?
 

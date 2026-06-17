@@ -39,7 +39,7 @@ export default function ExplainPage() {
 
   if (!prediction) {
     return (
-      <div className="flex min-h-[400px] flex-col items-center justify-center space-y-4 text-center">
+      <div className="flex min-h-100 flex-col items-center justify-center space-y-4 text-center">
         <div className="rounded-full bg-slate-100 p-6">
           <Brain size={64} className="text-slate-300" />
         </div>
@@ -48,9 +48,7 @@ export default function ExplainPage() {
           {t("noPrediction")}
         </h2>
 
-        <p className="max-w-md text-slate-500">
-          {t("noDescription")}
-        </p>
+        <p className="max-w-md text-slate-500">{t("noDescription")}</p>
 
         <a
           href="/predict"
@@ -64,7 +62,6 @@ export default function ExplainPage() {
 
   return (
     <div className="space-y-10">
-
       {/* Header */}
       <div className="flex flex-col space-y-2">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">
@@ -77,7 +74,6 @@ export default function ExplainPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-
         {/* Left */}
         <section className="space-y-6">
           <h2 className="text-xl font-bold text-slate-800">
@@ -91,7 +87,7 @@ export default function ExplainPage() {
                 className="flex justify-between rounded-xl border bg-white p-4"
               >
                 <div>
-                  <p className="font-bold">{item.name}</p>
+                  <p className="font-bold">{t(`features.${item.name}`)}</p>
                   <p className={clsx(item.color)}>
                     {item.impact} {t("relative")}
                   </p>
@@ -111,16 +107,11 @@ export default function ExplainPage() {
 
         {/* Right */}
         <section className="space-y-6">
-          <h2 className="text-xl font-bold text-slate-800">
-            {t("summary")}
-          </h2>
+          <h2 className="text-xl font-bold text-slate-800">{t("summary")}</h2>
 
           <div className="rounded-xl border bg-white p-6">
-
             <p>
-              {t("basedOn")}{" "}
-              <b>{prediction.district}</b>{" "}
-              {t("expected")}{" "}
+              {t("basedOn")} <b>{prediction.district}</b> {t("expected")}{" "}
               <b>{prediction.predicted_yield_MT_per_Ha} MT/Ha</b>
             </p>
 
@@ -128,23 +119,17 @@ export default function ExplainPage() {
               {explanations.map((item, i) => (
                 <li key={i}>
                   <b>{item.name}</b>{" "}
-                  {item.impact === "Positive"
-                    ? t("positive")
-                    : t("negative")}
+                  {item.impact === "Positive" ? t("positive") : t("negative")}
                 </li>
               ))}
             </ul>
 
             <div className="mt-6 rounded bg-amber-50 p-4">
               <AlertTriangle className="text-amber-500" />
-              <p className="mt-2 font-bold">
-                {t("keyInsight")}
-              </p>
+              <p className="mt-2 font-bold">{t("keyInsight")}</p>
             </div>
-
           </div>
         </section>
-
       </div>
     </div>
   );

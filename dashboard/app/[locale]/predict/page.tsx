@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Sprout,
-  CheckCircle2,
-  TrendingUp,
-  History,
-  Info,
-} from "lucide-react";
+import { Sprout, CheckCircle2, TrendingUp, History, Info } from "lucide-react";
 
 import { useTranslations, useLocale } from "next-intl";
 
@@ -33,9 +27,16 @@ export default function PredictPage() {
     soil_ph: 6.5,
   });
 
-  const districts = ["Matale", "Anuradhapura", "Polonnaruwa", "Jaffna"];
-
-  const seasons = ["Yala", "Maha"];
+  const districts = [
+    { value: "matale", label: t("districts.matale") },
+    { value: "anuradhapura", label: t("districts.anuradhapura") },
+    { value: "polonnaruwa", label: t("districts.polonnaruwa") },
+    { value: "kurunegala", label: t("districts.kurunegala") },
+  ];
+  const seasons = ["yala", "maha"].map((s) => ({
+    value: s,
+    label: t(`seasons.${s}`),
+  }));
 
   const currentYear = new Date().getFullYear();
 
@@ -115,9 +116,7 @@ export default function PredictPage() {
           {t("predict.title")}
         </h1>
 
-        <p className="text-slate-500">
-          {t("predict.subtitle")}
-        </p>
+        <p className="text-slate-500">{t("predict.subtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -137,10 +136,11 @@ export default function PredictPage() {
                   name="district"
                   value={formData.district}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  {districts.map((district) => (
-                    <option key={district} value={district}>
-                      {district}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                >
+                  {districts.map((d) => (
+                    <option key={d.value} value={d.value}>
+                      {d.label}
                     </option>
                   ))}
                 </select>
@@ -159,8 +159,8 @@ export default function PredictPage() {
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
                 >
                   {seasons.map((season) => (
-                    <option key={season} value={season}>
-                      {season}
+                    <option key={season.value} value={season.value}>
+                      {season.label}
                     </option>
                   ))}
                 </select>
@@ -318,9 +318,7 @@ export default function PredictPage() {
                     <h2 className="mt-2 text-5xl font-black text-emerald-900">
                       {result.predicted_yield_MT_per_Ha}
 
-                      <span className="ml-2 text-2xl font-normal">
-                        MT/Ha
-                      </span>
+                      <span className="ml-2 text-2xl font-normal">MT/Ha</span>
                     </h2>
                   </div>
 
@@ -350,8 +348,8 @@ export default function PredictPage() {
                 </div>
 
                 <div className="text-sm text-slate-500">
-                  Range: {result.confidence_lower} -{" "}
-                  {result.confidence_upper} MT/Ha
+                  Range: {result.confidence_lower} - {result.confidence_upper}{" "}
+                  MT/Ha
                 </div>
               </div>
 

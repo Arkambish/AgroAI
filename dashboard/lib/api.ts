@@ -58,12 +58,13 @@ export const convertSHAPToExplanation = (
   const isPositive = value > 0;
 
   let description = "";
-  if (name.includes("rainfall")) description = "Rainfall";
-  else if (name.includes("temp")) description = "Temperature";
-  else if (name.includes("humidity")) description = "Humidity";
-  else if (name.includes("soil_ph")) description = "Soil pH";
-  else if (name.includes("ndvi")) description = "Vegetation health (NDVI)";
-  else if (name.includes("solar")) description = "Solar radiation";
+  if (name.includes("rainfall")) description = "rainfall";
+  else if (name.includes("temp")) description = "temperature";
+  else if (name.includes("humidity")) description = "humidity";
+  else if (name.includes("soil_ph")) description = "soil_ph";
+  else if (name.includes("soil_moisture")) description = "soil_moisture";
+  else if (name.includes("ndvi")) description = "ndvi";
+  else if (name.includes("solar")) description = "solar_radiation";
   else description = name.replace(/_/g, " ");
 
   return {

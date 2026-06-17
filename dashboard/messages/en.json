@@ -100,7 +100,7 @@
     "pestDesc": "Monitor and control pests during critical growth stages."
   },
 
-    "explain": {
+  "explain": {
     "title": "Why This Prediction?",
     "subtitle": "Understand what factors influenced your yield prediction",
 
@@ -126,6 +126,23 @@
     "limitingFactor": "Main limiting factor",
 
     "district": "District",
-    "yield": "Yield"
+    "yield": "Yield",
+    "features": {
+      "rainfall": "Rainfall",
+      "temperature": "Temperature",
+      "humidity": "Humidity",
+      "soil_ph": "Soil pH",
+      "soil_moisture": "Soil Moisture"
+    }
+  },
+  "districts": {
+    "matale": "Matale",
+    "anuradhapura": "Anuradhapura",
+    "polonnaruwa": "Polonnaruwa",
+    "kurunegala": "Kurunegala"
+  },
+  "seasons": {
+    "yala": "Yala",
+    "maha": "Maha"
   }
 }

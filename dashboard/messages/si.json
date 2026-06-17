@@ -123,6 +123,23 @@
     "limitingFactor": "ප්‍රධාන සීමාකාරී සාධකය",
 
     "district": "දිස්ත්‍රික්කය",
-    "yield": "අස්වැන්න"
+    "yield": "අස්වැන්න",
+    "features": {
+      "rainfall": "වර්ෂාපතනය",
+      "temperature": "උෂ්ණත්වය",
+      "humidity": "ආර්ද්‍රතාවය",
+      "soil_ph": "පස pH",
+      "soil_moisture": "පස තෙතමනය"
+    }
+  },
+  "districts": {
+    "matale": "මාතලේ",
+    "anuradhapura": "අනුරාධපුරය",
+    "polonnaruwa": "පොළොන්නරුව",
+    "kurunegala": "කුරුණෑගල"
+  },
+  "seasons": {
+    "yala": "යාලා",
+    "maha": "මහ"
   }
 }
