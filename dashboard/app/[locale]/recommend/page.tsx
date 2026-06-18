@@ -158,7 +158,7 @@ export default function RecommendationPage() {
           </div>
 
           {/* WHAT IF */}
-          <div className="rounded-3xl bg-gradient-to-br from-emerald-600 to-lime-600 p-8 text-white shadow-xl">
+          <div className="rounded-3xl bg-linear-to-br from-emerald-600 to-lime-600 p-8 text-white shadow-xl">
             <h3 className="text-2xl font-bold">
               {t("recommend.whatIfTitle")}
             </h3>

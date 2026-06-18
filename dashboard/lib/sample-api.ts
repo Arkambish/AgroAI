@@ -17,7 +17,7 @@ export const predictYieldMock = async (payload: any): Promise<PredictResponse> =
       soil_moisture: 0.05,
       soil_ph: 0.09,
     },
-    model: "XGBoost (Mock)",
+    model: "XGBoost",
     model_r2: 0.91,
   };
 };

@@ -30,6 +30,22 @@ interface Props {
   height?: number | string;
 }
 
+function normalizeDistrictKey(value?: string) {
+  return value?.toLowerCase().replace(/[^a-z0-9]/g, "") || "";
+}
+
+function getFeatureDistrictName(feature?: Feature<Geometry, any>) {
+  if (!feature?.properties) return "";
+
+  return (
+    feature.properties.shapeName ||
+    feature.properties.name ||
+    feature.properties.district ||
+    feature.properties.District ||
+    ""
+  );
+}
+
 // 🎨 color scale
 function getColor(v?: number) {
   if (v === undefined) return "#e2e8f0";
@@ -52,7 +68,6 @@ export default function DistrictMap({
   predictions = {},
   height = 420,
 }: Props) {
-
   const setDistrict = (name: string) => {
     console.log("Selected district:", name);
   };
@@ -60,6 +75,19 @@ export default function DistrictMap({
   const [geo, setGeo] = React.useState<FeatureCollection | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+
+  const normalizedPredictions = React.useMemo(() => {
+    const normalized: Record<string, number> = {};
+
+    Object.entries(predictions).forEach(([key, value]) => {
+      const normalizedKey = normalizeDistrictKey(key);
+      if (normalizedKey) {
+        normalized[normalizedKey] = value;
+      }
+    });
+
+    return normalized;
+  }, [predictions]);
 
   // ✅ SAFE GEO LOAD
   useEffect(() => {
@@ -90,8 +118,12 @@ export default function DistrictMap({
 
   const style = React.useCallback(
     (feature?: Feature<Geometry, any>) => {
-      const name = feature?.properties?.name;
-      const value = name ? predictions[name] : undefined;
+      const name = getFeatureDistrictName(feature);
+      const normalizedName = normalizeDistrictKey(name);
+      const value =
+        normalizedName && normalizedPredictions[normalizedName] !== undefined
+          ? normalizedPredictions[normalizedName]
+          : undefined;
 
       return {
         color: "#334155",
@@ -100,13 +132,17 @@ export default function DistrictMap({
         fillOpacity: value !== undefined ? 0.75 : 0.3,
       };
     },
-    [predictions]
+    [normalizedPredictions]
   );
 
   const onEachFeature = React.useCallback(
     (feature: Feature<any>, layer: any) => {
-      const name = feature.properties?.name;
-      const value = predictions[name];
+      const name = getFeatureDistrictName(feature);
+      const normalizedName = normalizeDistrictKey(name);
+      const value =
+        normalizedName && normalizedPredictions[normalizedName] !== undefined
+          ? normalizedPredictions[normalizedName]
+          : undefined;
 
       layer.bindTooltip(
         value !== undefined
@@ -118,7 +154,7 @@ export default function DistrictMap({
         if (name) setDistrict(name);
       });
     },
-    [predictions]
+    [normalizedPredictions]
   );
 
   if (error) {
@@ -140,7 +176,7 @@ export default function DistrictMap({
   return (
     <div className="relative" style={{ height }}>
       <MapContainer
-        key="district-map"   // 🔥 CRITICAL FIX
+        key="district-map"
         center={[7.9, 80.7]}
         zoom={7}
         scrollWheelZoom={false}
