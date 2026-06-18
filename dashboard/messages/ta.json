@@ -14,7 +14,13 @@
     "temperature": "வெப்பநிலை (°C)",
     "humidity": "ஈரப்பதம் (%)",
     "soilMoisture": "மண் ஈரப்பதம் (%)",
-    "soilPh": "மண் pH"
+    "soilPh": "மண் pH",
+    "solarRad": "சூரிய கதிர்வீச்சு (MJ/m²)",
+    "ndvi": "NDVI (தாவர குறியீடு)",
+    "evi": "EVI (தாவர குறியீடு)",
+    "clay": "களிமண் (%)",
+    "sand": "மணல் (%)",
+    "organicCarbon": "கரிம கார்பன் (%)"
   },
   "button": {
     "predict": "கணிப்பு செய்க",

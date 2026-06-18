@@ -2,12 +2,18 @@ import axios from "axios";
 import { predictYieldMock } from "./sample-api";
 import { ExplanationItem } from "@/app/[locale]/explain/page";
 
-const API_BASE_URL = "http://localhost:5000";
-// Toggle this to switch between mock and real API
-const USE_MOCK = true;
+// Real model API by default. macOS port 5000 is AirPlay, so Flask runs on 5050.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:5050";
+// Set NEXT_PUBLIC_USE_MOCK=true to fall back to sample data.
+const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true";
 export const api = axios.create({
   baseURL: API_BASE_URL,
 });
+
+// The form supplies district/season in lowercase; the model + /context expect
+// Title-case (e.g. "matale" → "Matale", "yala" → "Yala").
+const titleCase = (s: string): string =>
+  s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
 
 export interface PredictResponse {
   district: string;
@@ -42,7 +48,33 @@ export const predictYield = async (data: any): Promise<PredictResponse> => {
   if (USE_MOCK) {
     return await predictYieldMock(data);
   }
-  const response = await api.post("/predict", data);
+
+  // The form only collects a few fields. Enrich the payload with the full
+  // 32-feature context for that district/season/year so the model receives a
+  // complete, realistic feature vector (otherwise missing features default to 0).
+  const district = titleCase(String(data?.district ?? ""));
+  const season = titleCase(String(data?.season ?? ""));
+  const parsedYear = Number(data?.year);
+  const year = Number.isFinite(parsedYear) ? parsedYear : undefined;
+
+  let payload: Record<string, unknown> = { ...data, district, season };
+  if (district && season && year !== undefined) {
+    try {
+      const ctx = await getContext(district, season, year);
+      // /context returns all 32 features flat; user-entered values override them.
+      payload = { ...ctx, ...data, district, season, year };
+    } catch {
+      // Context unavailable (e.g. future year / API down) — use the raw payload.
+    }
+  }
+
+  // Keep interaction features consistent with the (possibly user-edited) inputs.
+  const num = (k: string) => Number(payload[k]) || 0;
+  payload["rainfall_x_ndvi"] = num("season_total_rainfall") * num("season_mean_ndvi");
+  payload["temp_x_humidity"] = num("season_avg_temp") * num("season_avg_humidity");
+  payload["ndvi_x_lst"] = num("season_mean_ndvi") * num("season_mean_lst_day");
+
+  const response = await api.post("/predict", payload);
   return response.data;
 };
 
