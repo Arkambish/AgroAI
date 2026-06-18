@@ -31,9 +31,7 @@ from visualizer import actual_vs_predicted, residual_plot, feature_importance_pl
 warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
 
-MODELS_DIR = 'outputs/models'
-RESULTS_DIR = 'outputs/results'
-PLOTS_DIR = 'outputs/plots/results'
+from config import MODELS_DIR, RESULTS_DIR, PLOTS_DIR  # variant-aware (synthetic|real)
 
 
 def _tune_with_gridsearch(estimator_factory, param_grid, X, y):

@@ -13,6 +13,7 @@ import pandas as pd
 
 from config import (
     DISTRICTS, SEASONS, RANDOM_STATE, TARGET_COLUMN,
+    DATA_VARIANT, COLLECTED_FILE, ALL_FEATURES,
 )
 
 REQUIRED_FILES = {
@@ -47,8 +48,11 @@ def generate_synthetic_data():
     }
     soil_ph_base = {'Matale': 6.2, 'Anuradhapura': 6.5, 'Polonnaruwa': 6.8, 'Jaffna': 7.1}
 
+    # Iterate the generator's OWN districts (not config.DISTRICTS, which is a
+    # superset that also includes real-only districts like Kurunegala).
+    synth_districts = list(district_params.keys())
     for year in range(2004, 2024):
-        for district in DISTRICTS:
+        for district in synth_districts:
             params = district_params[district]
             climate_shock = rng.normal(0, 0.5)
             for season in SEASONS:
@@ -105,7 +109,7 @@ def generate_synthetic_data():
     df = pd.DataFrame(rows).sort_values(['District', 'Season', 'Year']).reset_index(drop=True)
 
     # Historical yield features per (district, season)
-    for district in DISTRICTS:
+    for district in synth_districts:
         for season in SEASONS:
             mask = (df['District'] == district) & (df['Season'] == season)
             yields = df.loc[mask, TARGET_COLUMN]
@@ -147,10 +151,133 @@ def load_real_data():
     return df
 
 
+MONTH_TO_NUM = {
+    'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6,
+    'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12,
+}
+DISTRICT_FIXES = {'Polannaruwa': 'Polonnaruwa'}
+
+
+def load_collected_data():
+    """Adapter for the real collected dataset.
+
+    The collected CSV is MONTHLY (one row per year-month-district), Yala-only,
+    with ~8 measured columns. We aggregate it to the seasonal (Year, District,
+    Season) grain and map/derive everything into the canonical 32-feature schema
+    (config.ALL_FEATURES) so the rest of the pipeline runs unchanged. Genuinely
+    unmeasured features are derived from physical proxies where sensible, else
+    median/neutral-filled (these show ~0 SHAP importance — honest by design).
+    """
+    print(f'\n→ DATA_VARIANT=real → loading collected real dataset:\n  {COLLECTED_FILE}')
+    raw = pd.read_csv(COLLECTED_FILE)
+    raw['district'] = raw['district'].astype(str).str.strip().str.title().replace(DISTRICT_FIXES)
+    raw['season'] = raw['season'].astype(str).str.strip().str.title()
+    raw['month_num'] = raw['month'].astype(str).str.strip().str.title().map(MONTH_TO_NUM)
+    raw = raw.sort_values(['district', 'season', 'year', 'month_num'])
+    if 'source' in raw.columns:
+        print(f'  rows: {len(raw)} (source mix: {raw["source"].value_counts().to_dict()})')
+
+    rows = []
+    for (year, district, season), g in raw.groupby(['year', 'district', 'season']):
+        g = g.sort_values('month_num')
+        temp = g['temperature_c'].astype(float)
+        rain = g['rainfall'].astype(float)
+        hum = g['humidity_pct'].astype(float)
+        ndvi = g['ndvi_i'].astype(float)
+        evi = g['evi_i'].astype(float)
+        n = len(g)
+
+        order = np.arange(n)
+        ndvi_growth = float(np.polyfit(order, ndvi.values, 1)[0]) if n > 1 else 0.0
+        peak_pos = int(np.argmax(ndvi.values))
+        time_to_peak = float((g['month_num'].values[peak_pos] - g['month_num'].min()) * 30)
+        avg_temp = float(temp.mean())
+
+        rows.append({
+            'Year': int(year), 'Season': season, 'District': district,
+            TARGET_COLUMN: float(g['yield_mt_per_ha'].astype(float).mean()),
+            'season_indicator': 1 if season == 'Yala' else 0,
+            # Weather — measured + physically derived
+            'season_avg_temp': round(avg_temp, 3),
+            'season_total_rainfall': round(float(rain.sum()), 3),
+            'season_avg_humidity': round(float(hum.mean()), 3),
+            'season_avg_solar_rad': 18.0,                       # not measured → constant
+            'growing_degree_days': round(float(np.clip(temp - 10.0, 0, None).sum() * 30.0), 1),
+            'heat_stress_days': int((temp > 32.0).sum()),
+            'drought_index_spi': np.nan,                        # standardised below
+            'temp_range': round(float(temp.max() - temp.min()), 3),
+            'max_daily_rainfall': round(float(rain.max()), 3),
+            # Satellite — measured + derived
+            'season_mean_ndvi': round(float(ndvi.mean()), 4),
+            'season_max_ndvi': round(float(ndvi.max()), 4),
+            'season_min_ndvi': round(float(ndvi.min()), 4),
+            'ndvi_std': round(float(ndvi.std(ddof=0)), 4),
+            'ndvi_anomaly': np.nan,                             # vs district mean below
+            'time_to_peak_ndvi': round(time_to_peak, 1),
+            'ndvi_growth_rate': round(ndvi_growth, 5),
+            'season_mean_evi': round(float(evi.mean()), 4),
+            'season_mean_ndwi': 0.1,                            # not measured → constant
+            'season_mean_lst_day': round(avg_temp + 6.0, 2),    # LST ≈ air temp + ~6°C
+            'season_mean_lst_night': round(avg_temp - 6.0, 2),
+            # Soil — SoilGrids stores ×10 (ph 58→5.8, clay 276→27.6%)
+            'soil_ph': round(float(g['ph_0_5cm'].astype(float).mean()) / 10.0, 3),
+            'organic_carbon': np.nan,                           # filled below
+            'clay_pct': round(float(g['clay_0_5cm'].astype(float).mean()) / 10.0, 2),
+            'sand_pct': round(float(g['sand_0_5cm'].astype(float).mean()) / 10.0, 2),
+            # Historical — filled below
+            'prev_season_yield': np.nan, 'prev_year_yield': np.nan,
+            'yield_3yr_avg': np.nan, 'extent_prev_season': np.nan,
+        })
+
+    df = pd.DataFrame(rows).sort_values(['District', 'Season', 'Year']).reset_index(drop=True)
+
+    # NDVI anomaly + standardised drought index vs each district-season climatology.
+    df['ndvi_anomaly'] = (df['season_mean_ndvi']
+                          - df.groupby(['District', 'Season'])['season_mean_ndvi'].transform('mean')).round(4)
+    grp = df.groupby(['District', 'Season'])['season_total_rainfall']
+    df['drought_index_spi'] = ((df['season_total_rainfall'] - grp.transform('mean'))
+                               / grp.transform('std').replace(0, np.nan)).fillna(0.0).round(3)
+
+    # Historical yield lags per (district, season), ordered by year (df already sorted).
+    for district in df['District'].unique():
+        for season in df['Season'].unique():
+            mask = (df['District'] == district) & (df['Season'] == season)
+            yields = df.loc[mask, TARGET_COLUMN]
+            df.loc[mask, 'prev_season_yield'] = yields.shift(1)
+            df.loc[mask, 'prev_year_yield'] = yields.shift(1)
+            df.loc[mask, 'yield_3yr_avg'] = yields.shift(1).rolling(3, min_periods=1).mean()
+
+    df['organic_carbon'] = df['organic_carbon'].fillna(1.8)             # SoilGrids soc not in file
+    df['extent_prev_season'] = df['extent_prev_season'].fillna(400.0)   # DCS extent not in file
+
+    df['rainfall_x_ndvi'] = df['season_total_rainfall'] * df['season_mean_ndvi']
+    df['temp_x_humidity'] = df['season_avg_temp'] * df['season_avg_humidity']
+    df['ndvi_x_lst'] = df['season_mean_ndvi'] * df['season_mean_lst_day']
+
+    # Guarantee the full canonical schema; median-fill residual gaps (e.g. first-year lags).
+    for col in ALL_FEATURES:
+        if col not in df.columns:
+            df[col] = np.nan
+        if df[col].isna().any():
+            med = df[col].median()
+            df[col] = df[col].fillna(med if pd.notna(med) else 0.0)
+
+    df = df[['Year', 'Season', 'District', TARGET_COLUMN] + ALL_FEATURES].reset_index(drop=True)
+
+    out_path = 'data/collected/processed_real_seasonal.csv'
+    df.to_csv(out_path, index=False)
+    print(f'  ✓ Real seasonal dataset: {len(df)} observations, {len(ALL_FEATURES)} features → {out_path}')
+    print(f'    districts={sorted(df.District.unique())} | seasons={sorted(df.Season.unique())} '
+          f'| years={int(df.Year.min())}-{int(df.Year.max())}')
+    return df
+
+
 def load_data():
     print('\n' + '=' * 60)
     print('STEP 1: DATA LOADING')
     print('=' * 60)
+    if DATA_VARIANT == 'real':
+        return load_collected_data(), 'real'
     print('Checking data availability...')
     available = check_data_availability()
     if all(available.values()):

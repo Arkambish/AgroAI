@@ -15,10 +15,7 @@ warnings.filterwarnings('ignore')
 import shap
 
 from config import ALL_FEATURES
-
-RESULTS_DIR = 'outputs/results'
-PLOTS_DIR = 'outputs/plots/results'
-MODELS_DIR = 'outputs/models'
+from config import RESULTS_DIR, PLOTS_DIR, MODELS_DIR  # variant-aware (synthetic|real)
 
 
 def _load_best_tree_model():

@@ -1,11 +1,34 @@
 """Project-wide configuration. Tweak hyperparameters here, not inside model files."""
 
+import os
+
 RANDOM_STATE = 42
 
-DISTRICTS = ['Matale', 'Anuradhapura', 'Polonnaruwa', 'Jaffna']
+# ---------------------------------------------------------------------------
+# Data variant: 'synthetic' (default) or 'real'. Selected via the DATA_VARIANT
+# env var (set automatically by `python main.py --real`). It only changes WHERE
+# artifacts are read/written so the synthetic demo stays untouched as a fallback.
+# ---------------------------------------------------------------------------
+DATA_VARIANT = os.environ.get('DATA_VARIANT', 'synthetic')
+_VARIANT_SUFFIX = '' if DATA_VARIANT == 'synthetic' else f'_{DATA_VARIANT}'
+
+MODELS_DIR = f'outputs/models{_VARIANT_SUFFIX}'
+RESULTS_DIR = f'outputs/results{_VARIANT_SUFFIX}'
+PROCESSED_DIR = f'data/processed{_VARIANT_SUFFIX}'
+PLOTS_DIR = f'outputs/plots{_VARIANT_SUFFIX}/results'
+TRAIN_PLOTS_DIR = f'outputs/plots{_VARIANT_SUFFIX}/training'
+EDA_PLOTS_DIR = f'outputs/plots{_VARIANT_SUFFIX}/eda'
+
+# Real collected dataset (monthly, Yala-only). Aggregated to the seasonal grain
+# by data_loader.load_collected_data().
+COLLECTED_FILE = 'data/collected/FYP data(manual) - onion_unique_per_key.csv'
+
+# Superset of districts across synthetic (Jaffna) and real (Kurunegala) data so
+# the preprocessor accepts both. The synthetic generator iterates its own dict.
+DISTRICTS = ['Matale', 'Anuradhapura', 'Polonnaruwa', 'Jaffna', 'Kurunegala']
 SEASONS = ['Yala', 'Maha']
 TARGET_COLUMN = 'Avg_Yield_MT_per_Ha'
-YEAR_RANGE = (2004, 2023)
+YEAR_RANGE = (2004, 2025)
 
 YALA_MONTHS = [4, 5, 6, 7, 8]
 MAHA_MONTHS = [10, 11, 12, 1, 2, 3]

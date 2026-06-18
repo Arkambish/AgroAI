@@ -1,0 +1,77 @@
+[
+  {
+    "rank": 1,
+    "name": "temp_x_humidity",
+    "mean_abs_shap": 1.4040413599162969
+  },
+  {
+    "rank": 2,
+    "name": "season_mean_evi",
+    "mean_abs_shap": 0.48411488021919474
+  },
+  {
+    "rank": 3,
+    "name": "drought_index_spi",
+    "mean_abs_shap": 0.14784168345705248
+  },
+  {
+    "rank": 4,
+    "name": "rainfall_x_ndvi",
+    "mean_abs_shap": 0.14101822983929083
+  },
+  {
+    "rank": 5,
+    "name": "prev_year_yield",
+    "mean_abs_shap": 0.12344217467964201
+  },
+  {
+    "rank": 6,
+    "name": "temp_range",
+    "mean_abs_shap": 0.11944555438614787
+  },
+  {
+    "rank": 7,
+    "name": "season_mean_ndvi",
+    "mean_abs_shap": 0.08670687879922605
+  },
+  {
+    "rank": 8,
+    "name": "max_daily_rainfall",
+    "mean_abs_shap": 0.08239248717830217
+  },
+  {
+    "rank": 9,
+    "name": "season_mean_lst_night",
+    "mean_abs_shap": 0.07898584965783709
+  },
+  {
+    "rank": 10,
+    "name": "season_mean_lst_day",
+    "mean_abs_shap": 0.07558436447700433
+  },
+  {
+    "rank": 11,
+    "name": "ndvi_anomaly",
+    "mean_abs_shap": 0.07455539108848579
+  },
+  {
+    "rank": 12,
+    "name": "prev_season_yield",
+    "mean_abs_shap": 0.07319799380953426
+  },
+  {
+    "rank": 13,
+    "name": "ndvi_growth_rate",
+    "mean_abs_shap": 0.07098349810374441
+  },
+  {
+    "rank": 14,
+    "name": "season_total_rainfall",
+    "mean_abs_shap": 0.07019910535218052
+  },
+  {
+    "rank": 15,
+    "name": "yield_3yr_avg",
+    "mean_abs_shap": 0.0640229203726628
+  }
+]
