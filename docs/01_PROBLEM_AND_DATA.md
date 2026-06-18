@@ -22,7 +22,7 @@ Right now, big onion yield is estimated by **agricultural officers walking throu
 | **Matale** | The Dambulla region produces ~50% of national big onion supply. The big one. |
 | **Anuradhapura** | Major dry-zone producer, similar climate to Matale. |
 | **Polonnaruwa** | Adjacent dry zone, slightly wetter. |
-| **Jaffna** | Northern peninsula, very different climate (drier, sandier soil, higher pH). Tests if the model generalises across Sri Lanka. |
+| **Kurunegala** | Represents the intermediate climatic zone, allowing assessment of the model's robustness and generalisation across varying agro-climatic conditions in Sri Lanka. |
 
 ## The data sources
 

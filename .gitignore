@@ -88,3 +88,13 @@ frontend/tsconfig.tsbuildinfo
 # --- Misc ---
 *.tmp
 .cache/
+
+# root dependencies
+node_modules/
+
+# dashboard Next.js
+dashboard/node_modules/
+dashboard/.next/
+dashboard/out/
+dashboard/next-env.d.ts
+dashboard/*.tsbuildinfo

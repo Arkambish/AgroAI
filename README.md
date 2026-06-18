@@ -1,6 +1,6 @@
 # Big Onion Yield Prediction — Agro AI
 
-End-to-end system for predicting big onion (Allium cepa) harvest yield across four Sri Lankan districts (Matale, Anuradhapura, Polonnaruwa, Jaffna) for the Yala and Maha seasons.
+End-to-end system for predicting big onion (Allium cepa) harvest yield across four Sri Lankan districts (Matale, Anuradhapura, Polonnaruwa, Kurunegala) for the Yala and Maha seasons.
 
 University of Moratuwa, Faculty of Information Technology, FYP 2026.
 

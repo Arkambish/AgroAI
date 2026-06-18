@@ -1,0 +1,148 @@
+{
+  "title": {
+    "home": "Welcome to AgriSense",
+    "description": "Intelligent spatial decision support for big onion farmers. Predict your yield, understand the reasons, and get expert recommendations.",
+    "predict": "Predict Onion Yield",
+    "recommend": "Recommendations",
+    "explain": "Why This Prediction?"
+  },
+
+  "form": {
+    "district": "District",
+    "season": "Season",
+    "year": "Year",
+    "rainfall": "Rainfall (mm)",
+    "temperature": "Temperature (°C)",
+    "humidity": "Humidity (%)",
+    "soilMoisture": "Soil Moisture (%)",
+    "soilPh": "Soil pH"
+  },
+
+  "button": {
+    "predict": "Predict Yield",
+    "start": "Start Prediction",
+    "go_to_predict": "Go to Prediction"
+  },
+
+  "dashboard": {
+    "current_season": "Current Season",
+    "expected_yield": "Expected Yield",
+    "waiting": "Waiting for Prediction",
+    "fill_form": "Fill out the form and click Predict Yield to see the AI analysis.",
+    "no_prediction": "No Prediction Found",
+    "no_recommendation": "No Recommendations Yet",
+    "make_prediction": "Please make a prediction first to see personalized agricultural advice.",
+    "best_district": "Best District",
+    "weather_summary": "Weather Summary"
+  },
+
+  "predict": {
+    "title": "Predict Onion Yield",
+    "subtitle": "Enter soil and weather conditions to predict yield",
+    "waiting": "Waiting for Prediction",
+    "waitingDescription": "Fill in the form and click Predict Yield to get AI analysis",
+    "expectedYield": "Expected Yield",
+    "confidence": "Confidence",
+    "previousSeason": "Previous Season",
+    "change": "Change",
+    "success": "Prediction Completed",
+    "successDescription": "AI has successfully generated yield prediction",
+    "whyPrediction": "Why this prediction?"
+  },
+
+  "recommend": {
+    "title": "Actionable Advice",
+    "subtitle": "Steps you can take to improve your yield based on AI analysis",
+
+    "noTitle": "No Recommendations Yet",
+    "noDescription": "Please make a prediction first to see personalized agricultural advice.",
+    "start": "Start Now",
+
+    "strategyTitle": "Strategies for Improvement",
+    "learnHow": "Learn how",
+
+    "whatIfTitle": "If conditions improve...",
+    "whatIfText": "Our simulations show your yield could increase from {current} MT/Ha to {improved} MT/Ha.",
+
+    "riskTitle": "Risk Prevention",
+
+    "heatRisk": "Heat Wave Alert",
+    "soilRisk": "Soil Erosion",
+    "pestRisk": "Pest Infestation",
+
+    "heatAction": "Increase irrigation",
+    "soilAction": "Monitor drainage",
+    "pestAction": "Early spray recommended",
+
+    "riskModerate": "Moderate Risk",
+    "riskLow": "Low Risk",
+    "riskHigh": "High Risk",
+
+    "action": "Action",
+
+    "expertTitle": "Expert Support",
+    "expertDesc": "Need more specific advice? Connect with a local agriculture officer.",
+    "findOfficer": "Find Officer",
+
+    "irrigationTitle": "Optimize Irrigation",
+    "irrigationDesc": "Increase water supply during dry periods to stabilize yield.",
+
+    "heatTitle": "Heat Management",
+    "heatDesc": "Use mulching or shade techniques to reduce heat stress.",
+
+    "phTitle": "Adjust Soil pH",
+    "phDesc": "Balance soil pH using lime or sulfur for optimal growth.",
+
+    "nutrientTitle": "Nutrient Boost",
+    "nutrientDesc": "Apply balanced NPK fertilizer for better bulb development.",
+
+    "pestTitle": "Pest Monitoring",
+    "pestDesc": "Monitor and control pests during critical growth stages."
+  },
+
+  "explain": {
+    "title": "Why This Prediction?",
+    "subtitle": "Understand what factors influenced your yield prediction",
+
+    "noPrediction": "No Prediction Found",
+    "noDescription": "Please make a prediction first to see explanation.",
+    "goPredict": "Go to Prediction",
+
+    "keyFactors": "Key Factors",
+    "summary": "Summary for Farmers",
+    "reasoning": "AI Explanation",
+
+    "basedOn": "Based on your inputs for",
+    "expected": "we expect a yield of",
+
+    "relative": "Relative Influence",
+
+    "positive": "helped increase",
+    "negative": "reduced",
+
+    "keyInsight": "Key Insight",
+    "overallGood": "Overall conditions are favorable",
+    "overallMedium": "Overall conditions are moderate",
+    "limitingFactor": "Main limiting factor",
+
+    "district": "District",
+    "yield": "Yield",
+    "features": {
+      "rainfall": "Rainfall",
+      "temperature": "Temperature",
+      "humidity": "Humidity",
+      "soil_ph": "Soil pH",
+      "soil_moisture": "Soil Moisture"
+    }
+  },
+  "districts": {
+    "matale": "Matale",
+    "anuradhapura": "Anuradhapura",
+    "polonnaruwa": "Polonnaruwa",
+    "kurunegala": "Kurunegala"
+  },
+  "seasons": {
+    "yala": "Yala",
+    "maha": "Maha"
+  }
+}

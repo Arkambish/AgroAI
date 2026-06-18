@@ -1,0 +1,9 @@
+{
+  "feature_importance": [
+    {"feature": "rainfall", "importance": 0.32},
+    {"feature": "temperature", "importance": 0.25},
+    {"feature": "humidity", "importance": 0.18},
+    {"feature": "soil_ph", "importance": 0.15},
+    {"feature": "fertilizer", "importance": 0.10}
+  ]
+}
