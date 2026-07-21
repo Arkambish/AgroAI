@@ -22,22 +22,6 @@ export interface PredictResponse {
   model_r2: number | null;
 }
 
-export const getHealth = async () => {
-  const response = await api.get("/health");
-  return response.data;
-};
-
-export const getDistricts = async () => {
-  const response = await api.get("/districts");
-  return response.data;
-};
-
-export const getContext = async (district: string, season: string, year: number) => {
-  const response = await api.get("/context", {
-    params: { district, season, year },
-  });
-  return response.data;
-};
 export const predictYield = async (data: any): Promise<PredictResponse> => {
   if (USE_MOCK) {
     return await predictYieldMock(data);
@@ -74,30 +58,5 @@ export const convertSHAPToExplanation = (
     raw: value,
   };
 });
-};
-
-export const mockPredictResponse: PredictResponse = {
-  district: "Matale",
-  season: "Yala",
-  year: 2024,
-
-  predicted_yield_MT_per_Ha: 14.8,
-
-  confidence_lower: 13.2,
-  confidence_upper: 16.1,
-  confidence: "High",
-
-  shap_values: {
-    rainfall: 0.42,
-    temperature: -0.18,
-    humidity: 0.25,
-    soil_ph: 0.12,
-    soil_moisture: 0.33,
-    ndvi: 0.21,
-    solar_radiation: -0.09,
-  },
-
-  model: "XGBoost Regressor (Mock)",
-  model_r2: 0.91,
 };
 
