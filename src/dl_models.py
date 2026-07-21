@@ -30,10 +30,7 @@ from visualizer import actual_vs_predicted, learning_curve_plot
 tf.random.set_seed(RANDOM_STATE)
 np.random.seed(RANDOM_STATE)
 
-MODELS_DIR = 'outputs/models'
-RESULTS_DIR = 'outputs/results'
-PLOTS_DIR = 'outputs/plots/results'
-TRAIN_PLOTS_DIR = 'outputs/plots/training'
+from config import MODELS_DIR, RESULTS_DIR, PLOTS_DIR, TRAIN_PLOTS_DIR  # variant-aware
 
 
 # ---------- Model builders ---------------------------------------------------

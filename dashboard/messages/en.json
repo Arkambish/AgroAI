@@ -15,7 +15,13 @@
     "temperature": "Temperature (°C)",
     "humidity": "Humidity (%)",
     "soilMoisture": "Soil Moisture (%)",
-    "soilPh": "Soil pH"
+    "soilPh": "Soil pH",
+    "solarRad": "Solar Radiation (MJ/m²)",
+    "ndvi": "NDVI (vegetation index)",
+    "evi": "EVI (vegetation index)",
+    "clay": "Clay (%)",
+    "sand": "Sand (%)",
+    "organicCarbon": "Organic Carbon (%)"
   },
 
   "button": {

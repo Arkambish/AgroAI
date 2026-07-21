@@ -23,8 +23,13 @@ export default function PredictPage() {
     rainfall: 120,
     temperature: 30,
     humidity: 65,
-    soil_moisture: 45,
+    solar: 18,
+    ndvi: 0.55,
+    evi: 0.35,
     soil_ph: 6.5,
+    clay: 30,
+    sand: 45,
+    organic_carbon: 1.8,
   });
 
   const districts = [
@@ -62,8 +67,13 @@ export default function PredictPage() {
         "rainfall",
         "temperature",
         "humidity",
-        "soil_moisture",
+        "solar",
+        "ndvi",
+        "evi",
         "soil_ph",
+        "clay",
+        "sand",
+        "organic_carbon",
         "year",
       ].includes(name)
         ? Number(value)
@@ -83,15 +93,18 @@ export default function PredictPage() {
         season: formData.season,
         year: formData.year,
 
-        rainfall: formData.rainfall,
-        temperature: formData.temperature,
-        humidity: formData.humidity,
-        soil_moisture: formData.soil_moisture,
-        soil_ph: formData.soil_ph,
-
+        // Map UI fields to the model's real feature names. Remaining features
+        // are auto-filled from /context inside predictYield().
         season_total_rainfall: formData.rainfall,
         season_avg_temp: formData.temperature,
         season_avg_humidity: formData.humidity,
+        season_avg_solar_rad: formData.solar,
+        season_mean_ndvi: formData.ndvi,
+        season_mean_evi: formData.evi,
+        soil_ph: formData.soil_ph,
+        clay_pct: formData.clay,
+        sand_pct: formData.sand,
+        organic_carbon: formData.organic_carbon,
       };
 
       const res = await predictYield(payload);
@@ -234,16 +247,102 @@ export default function PredictPage() {
                 />
               </div>
 
-              {/* Soil Moisture */}
+              {/* Solar Radiation */}
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700">
-                  {t("form.soilMoisture")}
+                  {t("form.solarRad")}
                 </label>
 
                 <input
                   type="number"
-                  name="soil_moisture"
-                  value={formData.soil_moisture}
+                  step="0.1"
+                  name="solar"
+                  value={formData.solar}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                />
+              </div>
+
+              {/* NDVI (vegetation index — top predictor) */}
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">
+                  {t("form.ndvi")}
+                </label>
+
+                <input
+                  type="number"
+                  step="0.01"
+                  name="ndvi"
+                  value={formData.ndvi}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                />
+              </div>
+
+              {/* EVI (vegetation index) */}
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">
+                  {t("form.evi")}
+                </label>
+
+                <input
+                  type="number"
+                  step="0.01"
+                  name="evi"
+                  value={formData.evi}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                />
+              </div>
+
+              {/* Clay % */}
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">
+                  {t("form.clay")}
+                </label>
+
+                <input
+                  type="number"
+                  step="0.1"
+                  name="clay"
+                  value={formData.clay}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                />
+              </div>
+
+              {/* Sand % */}
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">
+                  {t("form.sand")}
+                </label>
+
+                <input
+                  type="number"
+                  step="0.1"
+                  name="sand"
+                  value={formData.sand}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                />
+              </div>
+
+              {/* Organic Carbon */}
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">
+                  {t("form.organicCarbon")}
+                </label>
+
+                <input
+                  type="number"
+                  step="0.1"
+                  name="organic_carbon"
+                  value={formData.organic_carbon}
                   onChange={handleInputChange}
                   required
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"

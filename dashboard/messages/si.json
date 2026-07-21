@@ -14,7 +14,13 @@
     "temperature": "උෂ්ණත්වය (°C)",
     "humidity": "ආර්ද්‍රතාව (%)",
     "soilMoisture": "බිම් ආර්ද්‍රතාව (%)",
-    "soilPh": "බිම් pH"
+    "soilPh": "බිම් pH",
+    "solarRad": "සූර්ය විකිරණ (MJ/m²)",
+    "ndvi": "NDVI (ශාක දර්ශකය)",
+    "evi": "EVI (ශාක දර්ශකය)",
+    "clay": "මැටි (%)",
+    "sand": "වැලි (%)",
+    "organicCarbon": "කාබනික කාබන් (%)"
   },
   "button": {
     "predict": "අනාවැකි කරන්න",

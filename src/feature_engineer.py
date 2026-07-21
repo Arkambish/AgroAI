@@ -13,6 +13,7 @@ import pandas as pd
 from config import (
     ALL_FEATURES, WEATHER_FEATURES, SATELLITE_FEATURES,
     SEQUENCE_LENGTH, RANDOM_STATE, TARGET_COLUMN, N_WEATHER_PER_STEP,
+    PROCESSED_DIR,
 )
 
 
@@ -74,11 +75,11 @@ def engineer_features(df: pd.DataFrame):
     X_season = df['season_indicator'].astype(np.float32).values.reshape(-1, 1)
 
     # Persist.
-    os.makedirs('data/processed', exist_ok=True)
+    os.makedirs(PROCESSED_DIR, exist_ok=True)
     pd.DataFrame(X_tabular, columns=feature_names).assign(
         Year=df['Year'].values, Season=df['Season'].values,
         District=df['District'].values, **{TARGET_COLUMN: y},
-    ).to_csv('data/processed/features_tabular.csv', index=False)
+    ).to_csv(os.path.join(PROCESSED_DIR, 'features_tabular.csv'), index=False)
 
     seq_payload = {
         'weather_seq': weather_seqs,
@@ -91,12 +92,12 @@ def engineer_features(df: pd.DataFrame):
         'satellite_feature_names': sat_cols,
         'weather_step_features': ['temp', 'rainfall', 'humidity', 'solar_rad'],
     }
-    with open('data/processed/features_sequential.pkl', 'wb') as f:
+    with open(os.path.join(PROCESSED_DIR, 'features_sequential.pkl'), 'wb') as f:
         pickle.dump(seq_payload, f)
 
     print(f'  Tabular X: {X_tabular.shape} | y: {y.shape} | features: {len(feature_names)}')
     print(f'  Weather sequences: {weather_seqs.shape}')
     print(f'  Satellite tensor: {X_satellite.shape}')
-    print('  Saved → data/processed/features_tabular.csv, features_sequential.pkl')
+    print(f'  Saved → {PROCESSED_DIR}/features_tabular.csv, features_sequential.pkl')
 
     return X_tabular, y, feature_names, seq_payload

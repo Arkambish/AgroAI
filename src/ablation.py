@@ -23,8 +23,7 @@ from config import (
 
 warnings.filterwarnings('ignore')
 
-RESULTS_DIR = 'outputs/results'
-PLOTS_DIR = 'outputs/plots/results'
+from config import RESULTS_DIR, PLOTS_DIR  # variant-aware (synthetic|real)
 
 EXPERIMENTS = [
     ('A_Weather_only',     WEATHER_FEATURES),

@@ -20,12 +20,15 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import ALL_FEATURES, DISTRICTS, SEASONS
+from config import ALL_FEATURES, DISTRICTS, SEASONS, DATA_VARIANT
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODELS_DIR = os.path.join(ROOT, 'outputs', 'models')
-RESULTS_DIR = os.path.join(ROOT, 'outputs', 'results')
-PROCESSED_DIR = os.path.join(ROOT, 'data', 'processed')
+# Serve the variant selected by DATA_VARIANT (default 'synthetic'). Set
+# DATA_VARIANT=real to serve the models trained on the real collected data.
+_SUFFIX = '' if DATA_VARIANT == 'synthetic' else f'_{DATA_VARIANT}'
+MODELS_DIR = os.path.join(ROOT, 'outputs', f'models{_SUFFIX}')
+RESULTS_DIR = os.path.join(ROOT, 'outputs', f'results{_SUFFIX}')
+PROCESSED_DIR = os.path.join(ROOT, 'data', f'processed{_SUFFIX}')
 
 app = Flask(__name__)
 CORS(app)
