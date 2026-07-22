@@ -1,0 +1,7 @@
+Experiment,N_features,RMSE,MAE,R2
+A_Weather_only,9,5.4972,4.608,-0.8044
+B_Satellite_only,11,5.2825,4.386,-0.6662
+C_Historical_only,5,5.6024,4.5058,-0.8741
+D_Soil_only,4,4.5877,3.5251,-0.2567
+E_Weather+Satellite,20,5.6643,4.8029,-0.9158
+F_All_features,32,4.2567,3.5314,-0.0819

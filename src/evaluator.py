@@ -12,9 +12,7 @@ from scipy import stats
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from config import TARGET_R2, DISTRICTS, TARGET_COLUMN
-
-RESULTS_DIR = 'outputs/results'
-PLOTS_DIR = 'outputs/plots/results'
+from config import RESULTS_DIR, PLOTS_DIR  # variant-aware (synthetic|real)
 
 ML_NAMES = {'RandomForest', 'XGBoost', 'SVR'}
 DL_NAMES = {'LSTM', 'BiLSTM', 'CNN', 'CNN_LSTM_Hybrid'}

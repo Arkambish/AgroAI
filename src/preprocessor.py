@@ -4,7 +4,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from config import ALL_FEATURES, DISTRICTS, SEASONS, TARGET_COLUMN
+from config import ALL_FEATURES, DISTRICTS, SEASONS, TARGET_COLUMN, PROCESSED_DIR
 
 
 def preprocess(df: pd.DataFrame) -> pd.DataFrame:
@@ -55,8 +55,8 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     df[TARGET_COLUMN] = df[TARGET_COLUMN].clip(lo, hi)
 
     # Persist.
-    os.makedirs('data/processed', exist_ok=True)
-    out_path = 'data/processed/integrated_dataset.csv'
+    os.makedirs(PROCESSED_DIR, exist_ok=True)
+    out_path = os.path.join(PROCESSED_DIR, 'integrated_dataset.csv')
     df.to_csv(out_path, index=False)
 
     print(f'  Rows in: {n0} → Rows out: {len(df)}')

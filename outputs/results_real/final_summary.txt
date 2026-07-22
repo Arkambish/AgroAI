@@ -1,0 +1,12 @@
+BIG ONION YIELD PREDICTION — RESEARCH FINDINGS
+============================================================
+
+1. Best performing model: RandomForest with R²=0.020, RMSE=4.051 MT/Ha
+2. Does DL outperform ML? NO (Wilcoxon p=0.0000)
+3. Does CNN-LSTM hybrid beat standalone CNN/LSTM? NO
+4. Top 3 most important features: temp_x_humidity, season_mean_evi, drought_index_spi
+5. Ablation Δ R² (Weather → Weather+Satellite): -11.14 percentage points
+6. RMSE Yala=4.051, Maha=?
+7. Easiest district to predict: Anuradhapura (R²=0.109)
+8. Hardest district to predict: Kurunegala (R²=-0.917)
+9. Reaches target R² > 0.75? NO

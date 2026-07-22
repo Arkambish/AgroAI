@@ -15,23 +15,30 @@ import time
 # Make src/ importable for the bare `from config import *` style used inside.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
 
+# Select the data variant BEFORE importing config-dependent modules so the
+# variant-aware output dirs (outputs/*_real) resolve correctly.
+if '--real' in sys.argv:
+    os.environ['DATA_VARIANT'] = 'real'
+
 from data_loader import load_data
 from preprocessor import preprocess
 from feature_engineer import engineer_features
+import config
 
 
 def main(args: argparse.Namespace) -> None:
     start = time.time()
 
     for d in (
-        'outputs/models', 'outputs/plots/eda', 'outputs/plots/training',
-        'outputs/plots/results', 'outputs/results',
+        config.MODELS_DIR, config.EDA_PLOTS_DIR, config.TRAIN_PLOTS_DIR,
+        config.PLOTS_DIR, config.RESULTS_DIR,
     ):
         os.makedirs(d, exist_ok=True)
 
     print('\n' + '=' * 60)
     print('  AGRO AI — BIG ONION YIELD PREDICTION PIPELINE')
     print('  Arkam B.H.M. (214019K) | University of Moratuwa')
+    print(f'  DATA VARIANT: {config.DATA_VARIANT}  →  artifacts in {config.MODELS_DIR}, {config.RESULTS_DIR}')
     print('=' * 60)
 
     df = load_data()[0]
@@ -72,6 +79,10 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--real', action='store_true',
+                        help='Train on the real collected dataset (data/collected/) and write '
+                             'artifacts to outputs/*_real/. Without this flag the synthetic '
+                             'pipeline runs and writes to outputs/* (unchanged).')
     parser.add_argument('--skip-eda', action='store_true')
     parser.add_argument('--skip-ml', action='store_true')
     parser.add_argument('--skip-dl', action='store_true')
