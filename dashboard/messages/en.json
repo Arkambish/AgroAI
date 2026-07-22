@@ -48,6 +48,7 @@
     "success": "Prediction Completed",
     "successDescription": "AI has successfully generated yield prediction",
     "whyPrediction": "Why this prediction?"
+    ,"error": "Prediction failed — backend unavailable. Please try again later."
   },
 
   "recommend": {

@@ -26,8 +26,14 @@ export const predictYield = async (data: any): Promise<PredictResponse> => {
   if (USE_MOCK) {
     return await predictYieldMock(data);
   }
-  const response = await api.post("/predict", data);
-  return response.data;
+  try {
+    const response = await api.post("/predict", data);
+    return response.data;
+  } catch (err) {
+    console.error("Predict API error:", err);
+    // Normalize network/backend errors so callers can show a user-friendly message
+    throw new Error("NetworkError");
+  }
 };
 
 // Helper to convert SHAP to simple language
