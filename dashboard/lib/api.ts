@@ -28,20 +28,26 @@ export interface PredictResponse {
   model_r2: number | null;
 }
 
+export const getHealth = async () => {
+  const response = await api.get("/health");
+  return response.data;
+};
+
+export const getDistricts = async () => {
+  const response = await api.get("/districts");
+  return response.data;
+};
+
+export const getContext = async (district: string, season: string, year: number) => {
+  const response = await api.get("/context", {
+    params: { district, season, year },
+  });
+  return response.data;
+};
 export const predictYield = async (data: any): Promise<PredictResponse> => {
   if (USE_MOCK) {
     return await predictYieldMock(data);
   }
-<<<<<<< HEAD
-  try {
-    const response = await api.post("/predict", data);
-    return response.data;
-  } catch (err) {
-    console.error("Predict API error:", err);
-    // Normalize network/backend errors so callers can show a user-friendly message
-    throw new Error("NetworkError");
-  }
-=======
 
   // The form only collects a few fields. Enrich the payload with the full
   // 32-feature context for that district/season/year so the model receives a
@@ -70,7 +76,6 @@ export const predictYield = async (data: any): Promise<PredictResponse> => {
 
   const response = await api.post("/predict", payload);
   return response.data;
->>>>>>> 8622ab3d065c12bde1444942f772f2c1f30364ab
 };
 
 // Helper to convert SHAP to simple language
@@ -103,3 +108,27 @@ export const convertSHAPToExplanation = (
 });
 };
 
+export const mockPredictResponse: PredictResponse = {
+  district: "Matale",
+  season: "Yala",
+  year: 2024,
+
+  predicted_yield_MT_per_Ha: 14.8,
+
+  confidence_lower: 13.2,
+  confidence_upper: 16.1,
+  confidence: "High",
+
+  shap_values: {
+    rainfall: 0.42,
+    temperature: -0.18,
+    humidity: 0.25,
+    soil_ph: 0.12,
+    soil_moisture: 0.33,
+    ndvi: 0.21,
+    solar_radiation: -0.09,
+  },
+
+  model: "XGBoost Regressor (Mock)",
+  model_r2: 0.91,
+};
