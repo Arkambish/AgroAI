@@ -136,7 +136,14 @@
       "temperature": "උෂ්ණත්වය",
       "humidity": "ආර්ද්‍රතාවය",
       "soil_ph": "පස pH",
-      "soil_moisture": "පස තෙතමනය"
+      "soil_moisture": "පස තෙතමනය",
+      "ndvi": "NDVI",
+      "solar_radiation": "සූර්ය විකිරණය",
+      "evi": "EVI",
+      "clay": "ක්ලේ",
+      "sand": "රන්",
+      "organic_carbon": "ආයාචක කාබනය",
+      "yield 3yr avg": "3-වසර සහතික අස්වැන්න"
     }
   },
   "districts": {

@@ -137,7 +137,14 @@
       "temperature": "வெப்பநிலை",
       "humidity": "ஈரப்பதம்",
       "soil_moisture": "மண் ஈரப்பதம்",
-      "soil_ph": "மண் pH"
+      "soil_ph": "மண் pH",
+      "ndvi": "NDVI",
+      "solar_radiation": "சூரிய கதிர்வீச்சு",
+      "evi": "EVI",
+      "clay": "களிமண்",
+      "sand": "மணல்",
+      "organic_carbon": "கரிம கார்பன்",
+      "yield 3yr avg": "3-ஆண்டு சராசரி விளைச்சல்"
     }
   },
   "districts": {

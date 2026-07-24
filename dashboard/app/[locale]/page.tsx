@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
 import {
   Calendar,
   TrendingUp,
@@ -28,7 +29,12 @@ const DEFAULT_PAYLOAD = {
 
 export default function Home() {
   const t = useTranslations();
-  const [dashboardData, setDashboardData] = useState<PredictResponse | null>(null);
+  const params = useParams();
+
+  const locale = params.locale as string;
+  const [dashboardData, setDashboardData] = useState<PredictResponse | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,7 +70,7 @@ export default function Home() {
           setError(
             err instanceof Error
               ? err.message
-              : "Unable to load dashboard data."
+              : "Unable to load dashboard data.",
           );
         }
       } finally {
@@ -173,7 +179,7 @@ export default function Home() {
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
-                href={`/${typeof window !== "undefined" ? window.location.pathname.split("/")[1] : "en"}/predict`}
+                href={`/${locale}/predict`}
                 className="flex items-center space-x-2 rounded-xl text-white px-6 py-3 font-bold bg-emerald-600 transition-transform hover:scale-105"
               >
                 <span>{t("button.start")}</span>
@@ -213,7 +219,13 @@ export default function Home() {
             value={yieldValue}
             icon={TrendingUp}
             trend={yieldTrend}
-            trendType={dashboardData?.confidence === "High" ? "up" : dashboardData?.confidence === "Low" ? "down" : "neutral"}
+            trendType={
+              dashboardData?.confidence === "High"
+                ? "up"
+                : dashboardData?.confidence === "Low"
+                  ? "down"
+                  : "neutral"
+            }
             color="bg-lime-500"
           />
         </motion.div>
@@ -232,7 +244,13 @@ export default function Home() {
             value={weatherValue}
             icon={CloudSun}
             trend={weatherTrend}
-            trendType={dashboardData?.confidence === "High" ? "up" : dashboardData?.confidence === "Low" ? "down" : "neutral"}
+            trendType={
+              dashboardData?.confidence === "High"
+                ? "up"
+                : dashboardData?.confidence === "Low"
+                  ? "down"
+                  : "neutral"
+            }
             color="bg-lime-500"
           />
         </motion.div>
