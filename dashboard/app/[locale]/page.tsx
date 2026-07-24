@@ -1,39 +1,36 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   Calendar,
   TrendingUp,
   MapPin,
-  CloudSun,
+  BarChart3,
   ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import DistrictMap from "@/components/DistrictMap";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
-import { predictYield, type PredictResponse } from "@/lib/api";
-
-const DEFAULT_PAYLOAD = {
-  district: "Matale",
-  season: "Yala",
-  year: new Date().getFullYear(),
-  rainfall: 120,
-  temperature: 30,
-  humidity: 65,
-  soil_moisture: 45,
-  soil_ph: 6.5,
-};
+import {
+  predictYieldsForAllDistricts,
+  type BatchPredictionResult,
+  getYieldCategory,
+} from "@/lib/api";
 
 export default function Home() {
   const t = useTranslations();
   const params = useParams();
-
   const locale = params.locale as string;
-  const [dashboardData, setDashboardData] = useState<PredictResponse | null>(
-    null,
+
+  const [batchResult, setBatchResult] = useState<BatchPredictionResult | null>(
+    null
+  );
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(
+    "Matale"
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,22 +52,28 @@ export default function Home() {
   useEffect(() => {
     let mounted = true;
 
-    const fetchDashboardData = async () => {
+    const fetchMultiDistrictData = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        const response = await predictYield(DEFAULT_PAYLOAD);
+        const result = await predictYieldsForAllDistricts(
+          "Yala",
+          new Date().getFullYear()
+        );
 
         if (mounted) {
-          setDashboardData(response);
+          setBatchResult(result);
+          if (result.bestDistrict) {
+            setSelectedDistrict(result.bestDistrict);
+          }
         }
       } catch (err) {
         if (mounted) {
           setError(
             err instanceof Error
               ? err.message
-              : "Unable to load dashboard data.",
+              : "Unable to load multi-district yield predictions."
           );
         }
       } finally {
@@ -80,74 +83,62 @@ export default function Home() {
       }
     };
 
-    fetchDashboardData();
+    fetchMultiDistrictData();
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  const predictionMap = useMemo(() => {
-    if (!dashboardData) {
-      return {};
-    }
+  const districtPredictions = batchResult?.districtYields || {};
 
-    return {
-      [dashboardData.district]: dashboardData.predicted_yield_MT_per_Ha,
-    };
-  }, [dashboardData]);
-
+  const currentYear = new Date().getFullYear();
   const seasonValue = loading
     ? "Loading..."
-    : dashboardData
-      ? `${dashboardData.season} ${dashboardData.year}`
-      : error
-        ? "Unavailable"
-        : "--";
+    : batchResult
+    ? `Yala ${currentYear}`
+    : error
+    ? "Unavailable"
+    : "--";
 
-  const yieldValue = loading
+  const averageYieldValue = loading
     ? "Loading..."
-    : dashboardData
-      ? `${dashboardData.predicted_yield_MT_per_Ha.toFixed(1)} MT/Ha`
-      : error
-        ? "Unavailable"
-        : "--";
+    : batchResult
+    ? `${batchResult.averageYield.toFixed(2)} MT/Ha`
+    : error
+    ? "Unavailable"
+    : "--";
 
   const bestDistrictValue = loading
     ? "Loading..."
-    : dashboardData
-      ? dashboardData.district
-      : error
-        ? "Unavailable"
-        : "--";
+    : batchResult
+    ? batchResult.bestDistrict
+    : error
+    ? "Unavailable"
+    : "--";
 
-  const weatherValue = loading
+  const highestYieldValue = loading
     ? "Loading..."
-    : dashboardData
-      ? dashboardData.confidence
-      : error
-        ? "Unavailable"
-        : "--";
+    : batchResult
+    ? `${batchResult.highestYield.toFixed(2)} MT/Ha`
+    : error
+    ? "Unavailable"
+    : "--";
 
-  const yieldTrend = dashboardData
-    ? `${dashboardData.confidence_lower.toFixed(1)} - ${dashboardData.confidence_upper.toFixed(1)} MT/Ha`
-    : "Checking forecast";
+  const yieldTrend = batchResult
+    ? `Min: ${batchResult.lowestYield.toFixed(
+        1
+      )} — Max: ${batchResult.highestYield.toFixed(1)} MT/Ha`
+    : "Calculating multi-district forecast";
 
-  const seasonTrend = dashboardData
-    ? `${dashboardData.model}`
-    : "Preparing data";
+  const bestDistrictTrend = batchResult
+    ? `${batchResult.highestYield.toFixed(1)} MT/Ha potential`
+    : "Ranking target districts";
 
-  const bestDistrictTrend = dashboardData
-    ? "Highest predicted potential"
-    : "Checking district ranking";
-
-  const weatherTrend = dashboardData
-    ? dashboardData.confidence === "High"
-      ? "Strong forecast confidence"
-      : dashboardData.confidence === "Medium"
-        ? "Moderate forecast confidence"
-        : "Lower forecast confidence"
-    : "Checking conditions";
+  const selectedPrediction =
+    selectedDistrict && batchResult?.predictions[selectedDistrict]
+      ? batchResult.predictions[selectedDistrict]
+      : null;
 
   return (
     <div className="space-y-10">
@@ -159,41 +150,108 @@ export default function Home() {
 
       {/* Top Section: Intro Left, Map Right */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* Intro Section - Left */}
-        <section className="relative overflow-hidden rounded-3xl text-emerald-600 px-8 py-12 bg-white shadow-xl">
-          <div className="relative z-10">
-            <h1 className="text-4xl font-extrabold tracking-tight md:text-5xl">
-              {t("title.home")
-                .split("AgriSense")
-                .map((part, index, arr) => (
-                  <span key={`${part}-${index}`}>
-                    {part}
-                    {index < arr.length - 1 && (
-                      <span className="text-emerald-900">AgriSense</span>
-                    )}
-                  </span>
-                ))}
-            </h1>
-            <p className="mt-4 text-lg text-emerald-900 text-opacity-90">
-              {t("title.description")}
-            </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                href={`/${locale}/predict`}
-                className="flex items-center space-x-2 rounded-xl text-white px-6 py-3 font-bold bg-emerald-600 transition-transform hover:scale-105"
-              >
-                <span>{t("button.start")}</span>
-                <ArrowRight size={20} />
-              </Link>
+        {/* Intro & Target District Overview - Left */}
+        <div className="space-y-6 flex flex-col justify-between">
+          <section className="relative overflow-hidden rounded-3xl bg-white p-8 text-emerald-950 shadow-xl border border-emerald-50">
+            <div className="relative z-10">
+              <div className="inline-flex items-center space-x-2 rounded-full bg-emerald-100/80 px-3 py-1 text-xs font-bold text-emerald-800 mb-4">
+                <Sparkles size={14} />
+                <span>Sri Lanka Big Onion Prediction</span>
+              </div>
+
+              <h1 className="text-4xl font-extrabold tracking-tight md:text-5xl">
+                {t("title.home")
+                  .split("AgriSense")
+                  .map((part, index, arr) => (
+                    <span key={`${part}-${index}`}>
+                      {part}
+                      {index < arr.length - 1 && (
+                        <span className="text-emerald-600">AgriSense</span>
+                      )}
+                    </span>
+                  ))}
+              </h1>
+
+              <p className="mt-4 text-base text-slate-600 leading-relaxed">
+                {t("title.description")}
+              </p>
+
+              <div className="mt-6 flex flex-wrap gap-4">
+                <Link
+                  href={`/${locale}/predict`}
+                  className="flex items-center space-x-2 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-lg transition-transform hover:scale-105 hover:bg-emerald-700"
+                >
+                  <span>{t("button.start")}</span>
+                  <ArrowRight size={20} />
+                </Link>
+              </div>
             </div>
-          </div>
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-500 opacity-20 blur-3xl"></div>
-          <div className="absolute -bottom-20 right-20 h-64 w-64 rounded-full bg-lime-400 opacity-20 blur-3xl"></div>
-        </section>
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-400 opacity-15 blur-3xl" />
+            <div className="absolute -bottom-20 right-20 h-64 w-64 rounded-full bg-lime-300 opacity-20 blur-3xl" />
+          </section>
+
+          {/* Selected District Details Card */}
+          {selectedPrediction ? (
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-md transition-all">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    District Focus
+                  </span>
+                  <h3 className="text-2xl font-black text-slate-900">
+                    {selectedPrediction.district}
+                  </h3>
+                </div>
+                <div
+                  className={`rounded-xl px-3 py-1 text-xs font-bold text-white ${
+                    getYieldCategory(
+                      selectedPrediction.predicted_yield_MT_per_Ha
+                    ).bgClass
+                  }`}
+                >
+                  {
+                    getYieldCategory(
+                      selectedPrediction.predicted_yield_MT_per_Ha
+                    ).label
+                  } Yield
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div className="rounded-2xl bg-emerald-50/70 p-4 border border-emerald-100">
+                  <p className="text-xs font-semibold text-emerald-700">
+                    Predicted Yield
+                  </p>
+                  <p className="mt-1 text-2xl font-black text-emerald-900">
+                    {selectedPrediction.predicted_yield_MT_per_Ha.toFixed(2)}{" "}
+                    <span className="text-xs font-normal">MT/Ha</span>
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                  <p className="text-xs font-semibold text-slate-500">
+                    Confidence Range
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-slate-800">
+                    {selectedPrediction.confidence_lower.toFixed(1)} –{" "}
+                    {selectedPrediction.confidence_upper.toFixed(1)} MT/Ha
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+              Click any highlighted district on the map to view yield insights.
+            </div>
+          )}
+        </div>
 
         {/* District Map Section - Right */}
         <div>
-          <DistrictMap predictions={predictionMap} />
+          <DistrictMap
+            predictions={districtPredictions}
+            selectedDistrict={selectedDistrict}
+            onSelectDistrict={(name) => setSelectedDistrict(name)}
+          />
         </div>
       </div>
 
@@ -209,23 +267,17 @@ export default function Home() {
             label={t("dashboard.current_season")}
             value={seasonValue}
             icon={Calendar}
-            trend={seasonTrend}
+            trend={`Forecast Year ${currentYear}`}
             color="bg-emerald-600"
           />
         </motion.div>
         <motion.div variants={item}>
           <StatCard
-            label={t("dashboard.expected_yield")}
-            value={yieldValue}
+            label="Average Expected Yield"
+            value={averageYieldValue}
             icon={TrendingUp}
             trend={yieldTrend}
-            trendType={
-              dashboardData?.confidence === "High"
-                ? "up"
-                : dashboardData?.confidence === "Low"
-                  ? "down"
-                  : "neutral"
-            }
+            trendType="up"
             color="bg-lime-500"
           />
         </motion.div>
@@ -240,17 +292,11 @@ export default function Home() {
         </motion.div>
         <motion.div variants={item}>
           <StatCard
-            label={t("dashboard.weather_summary") || "Weather Summary"}
-            value={weatherValue}
-            icon={CloudSun}
-            trend={weatherTrend}
-            trendType={
-              dashboardData?.confidence === "High"
-                ? "up"
-                : dashboardData?.confidence === "Low"
-                  ? "down"
-                  : "neutral"
-            }
+            label="Peak Target Yield"
+            value={highestYieldValue}
+            icon={BarChart3}
+            trend={`Highest in ${batchResult?.bestDistrict || "Target Zone"}`}
+            trendType="up"
             color="bg-lime-500"
           />
         </motion.div>
@@ -258,3 +304,4 @@ export default function Home() {
     </div>
   );
 }
+
