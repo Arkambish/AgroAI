@@ -68,3 +68,35 @@ export function useLocalJSON<T>(key: string): T | null {
     () => null
   );
 }
+
+/**
+ * Same as useLocalJSON, but read/write — a useState-shaped API backed by
+ * localStorage instead of a component-local fiber.
+ *
+ * Next.js's App Router only preserves component state across navigations
+ * for layouts that stay mounted; page.tsx-level useState is torn down and
+ * rebuilt on ANY URL change, including a locale-only change (e.g.
+ * /en/predict -> /si/predict), since locale lives in the path. Backing
+ * state like this in localStorage instead sidesteps that entirely — the
+ * value is re-read fresh on every mount rather than relying on a component
+ * instance surviving the navigation.
+ */
+export function useLocalJSONState<T>(
+  key: string
+): [T | null, (next: T | null) => void] {
+  const value = useLocalJSON<T>(key);
+
+  const setValue = useCallback(
+    (next: T | null) => {
+      if (next === null) {
+        localStorage.removeItem(key);
+      } else {
+        localStorage.setItem(key, JSON.stringify(next));
+      }
+      listeners.forEach((notify) => notify());
+    },
+    [key]
+  );
+
+  return [value, setValue];
+}

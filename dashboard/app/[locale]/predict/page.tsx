@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Sprout, Info, Sparkles } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 
@@ -15,15 +15,26 @@ import {
   type DistrictInfo,
 } from "@/lib/api";
 import { FEATURE_META_BY_NAME } from "@/lib/features";
-import { useLocalFlag } from "@/lib/use-local-flag";
+import { useLocalFlag, useLocalJSONState } from "@/lib/use-local-flag";
 import FieldInputCard, { type FarmerInputs } from "@/components/FieldInputCard";
 import KnownDataPanel from "@/components/KnownDataPanel";
 import AdvancedOverrides, {
   validateOverride,
 } from "@/components/AdvancedOverrides";
 import PredictionResultCard from "@/components/PredictionResultCard";
+import ChatAssistant from "@/components/ChatAssistant";
 
 const ADVANCED_KEY = "agrisense_advanced_mode";
+const PREDICTION_KEY = "last_prediction";
+const FARMER_INPUTS_KEY = "last_farmer_inputs";
+
+const DEFAULT_FARMER_INPUTS: FarmerInputs = {
+  district: "",
+  season: "",
+  year: new Date().getFullYear(),
+  extentHa: "",
+  lastSeasonYield: "",
+};
 
 export default function PredictPage() {
   const t = useTranslations();
@@ -31,21 +42,23 @@ export default function PredictPage() {
   const locale = useLocale();
 
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<PredictResponse | null>(null);
+  // Backed by localStorage rather than plain useState: Next.js's App Router
+  // resets page-level useState on ANY URL change, including a locale-only
+  // switch (/en/predict -> /si/predict), since locale lives in the path.
+  // This is what made the prediction and form inputs appear to vanish when
+  // switching language even though nothing about the data actually changed.
+  const [result, setResult] = useLocalJSONState<PredictResponse>(PREDICTION_KEY);
   const [predictError, setPredictError] = useState<string | null>(null);
 
   // Districts/seasons/years come from the dataset the API actually loaded, so
   // the UI can't offer a combination that has no data behind it.
   const [districts, setDistricts] = useState<DistrictInfo[]>([]);
 
-  // Tier A — what the farmer tells us.
-  const [farmerInputs, setFarmerInputs] = useState<FarmerInputs>({
-    district: "",
-    season: "",
-    year: new Date().getFullYear(),
-    extentHa: "",
-    lastSeasonYield: "",
-  });
+  // Tier A — what the farmer tells us. Same localStorage-backed persistence
+  // as `result`, for the same reason.
+  const [storedFarmerInputs, setFarmerInputs] =
+    useLocalJSONState<FarmerInputs>(FARMER_INPUTS_KEY);
+  const farmerInputs = storedFarmerInputs ?? DEFAULT_FARMER_INPUTS;
 
   // Tier B — what the system knows. Read-only; never mutated by the user, so
   // refreshing it can no longer wipe what they typed.
@@ -62,8 +75,17 @@ export default function PredictPage() {
     {}
   );
 
+  // Read via a ref rather than a dependency: this effect should only run
+  // once per real "load" trigger, not every time the persisted inputs
+  // change (which would refetch the catalog on every keystroke).
+  const farmerInputsRef = useRef(farmerInputs);
+  farmerInputsRef.current = farmerInputs;
+
   // Load the district catalog once, then seed the form with the first valid
-  // district/season/year combination.
+  // district/season/year combination — but only if nothing is already
+  // persisted, so a language switch (which re-runs this effect, since `t`
+  // gets a new identity per locale) doesn't stomp on what the farmer already
+  // entered.
   useEffect(() => {
     let active = true;
 
@@ -72,13 +94,18 @@ export default function PredictPage() {
         const data = await getDistricts();
         if (!active || !data.districts?.length) return;
         setDistricts(data.districts);
-        const first = data.districts[0];
-        setFarmerInputs((prev) => ({
-          ...prev,
-          district: first.name,
-          season: first.seasons[0] ?? "Yala",
-          year: first.years[first.years.length - 1] ?? prev.year,
-        }));
+
+        const current = farmerInputsRef.current;
+        const stillValid = data.districts.some((d) => d.name === current.district);
+        if (!current.district || !stillValid) {
+          const first = data.districts[0];
+          setFarmerInputs({
+            ...current,
+            district: first.name,
+            season: first.seasons[0] ?? "Yala",
+            year: first.years[first.years.length - 1] ?? current.year,
+          });
+        }
       } catch {
         if (active) setContextError(t("predict.districtsError"));
       }
@@ -89,7 +116,7 @@ export default function PredictPage() {
     return () => {
       active = false;
     };
-  }, [t]);
+  }, [t, setFarmerInputs]);
 
   const { district, season, year } = farmerInputs;
 
@@ -135,26 +162,24 @@ export default function PredictPage() {
         setPredictError(null);
       }
 
-      setFarmerInputs((prev) => {
-        const next = { ...prev, ...patch };
-        // Reconcile season/year against the new district's actual coverage, so
-        // the form can never request a combination the dataset lacks.
-        if (patch.district) {
-          const info = districts.find((d) => d.name === patch.district);
-          if (info) {
-            if (!info.seasons.includes(next.season)) {
-              next.season = info.seasons[0] ?? next.season;
-            }
-            const maxYear = info.years[info.years.length - 1];
-            if (maxYear !== undefined && next.year > maxYear + 2) {
-              next.year = maxYear;
-            }
+      const next = { ...farmerInputs, ...patch };
+      // Reconcile season/year against the new district's actual coverage, so
+      // the form can never request a combination the dataset lacks.
+      if (patch.district) {
+        const info = districts.find((d) => d.name === patch.district);
+        if (info) {
+          if (!info.seasons.includes(next.season)) {
+            next.season = info.seasons[0] ?? next.season;
+          }
+          const maxYear = info.years[info.years.length - 1];
+          if (maxYear !== undefined && next.year > maxYear + 2) {
+            next.year = maxYear;
           }
         }
-        return next;
-      });
+      }
+      setFarmerInputs(next);
     },
-    [districts]
+    [districts, farmerInputs, setFarmerInputs, setResult]
   );
 
   const handleOverrideChange = useCallback((name: string, raw: string) => {
@@ -232,7 +257,6 @@ export default function PredictPage() {
 
       const res = await predictYield(payload);
       setResult(res);
-      localStorage.setItem("last_prediction", JSON.stringify(res));
     } catch (error) {
       console.error("Prediction failed:", error);
       setPredictError(t("predict.error"));
@@ -319,7 +343,7 @@ export default function PredictPage() {
               locale={locale}
             />
           ) : (
-            <div className="flex h-full min-h-105 flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+            <div className="flex h-fit min-h-105 flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50 p-8 text-center">
               <div className="mb-4 rounded-2xl bg-emerald-100/60 p-4 text-emerald-700">
                 <Info size={36} />
               </div>
@@ -331,6 +355,13 @@ export default function PredictPage() {
               </p>
             </div>
           )}
+
+          <ChatAssistant
+            district={district}
+            season={season}
+            year={year}
+            hasPrediction={Boolean(result)}
+          />
         </section>
       </div>
     </div>

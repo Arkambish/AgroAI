@@ -72,56 +72,75 @@ export default function ExplainPage() {
           </h2>
 
           <div className="grid gap-4">
-            {explanations.map((item) => (
-              <div
-                key={item.feature}
-                className="rounded-xl border bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-bold text-slate-900">
-                      {t(`features.${item.name}`)}
-                    </p>
-                    <p className={clsx("text-sm", item.color)}>
-                      {item.impact === "Positive"
-                        ? t("impactPositive")
-                        : t("impactNegative")}
-                    </p>
+            {explanations.map((item) => {
+              // SHAP contribution is in the model's own units (MT/Ha), so it
+              // converts directly to kg/Ha for a number a farmer can picture.
+              const kgPerHa = Math.round(Math.abs(item.raw) * 1000);
+              const isPositive = item.impact === "Positive";
+
+              return (
+                <div
+                  key={item.name}
+                  className="rounded-xl border bg-white p-4 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-slate-900">
+                        {t(`features.${item.name}`)}
+                      </p>
+                      <p className={clsx("text-sm", item.color)}>
+                        {isPositive
+                          ? t("perFactorPositive", {
+                              feature: t(`features.${item.name}`),
+                              amount: kgPerHa,
+                            })
+                          : t("perFactorNegative", {
+                              feature: t(`features.${item.name}`),
+                              amount: kgPerHa,
+                            })}
+                      </p>
+                    </div>
+
+                    {isPositive ? (
+                      <TrendingUp className="shrink-0 text-emerald-500" />
+                    ) : (
+                      <TrendingDown className="shrink-0 text-red-500" />
+                    )}
                   </div>
 
-                  {item.impact === "Positive" ? (
-                    <TrendingUp className="shrink-0 text-emerald-500" />
-                  ) : (
-                    <TrendingDown className="shrink-0 text-red-500" />
-                  )}
-                </div>
-
-                {/* Relative influence — the SHAP magnitudes were previously
-                    computed and then thrown away. */}
-                <div className="mt-3">
-                  <div className="flex items-center justify-between text-[11px] text-slate-400">
-                    <span>{t("relative")}</span>
-                    <span className="font-mono tabular-nums">
-                      {item.raw > 0 ? "+" : ""}
-                      {item.raw.toFixed(3)}
-                    </span>
-                  </div>
-                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className={clsx(
-                        "h-full rounded-full",
-                        item.impact === "Positive"
-                          ? "bg-emerald-500"
-                          : "bg-red-500"
+                  {/* Diverging bar: extends right (emerald) from center for a
+                      positive contribution, left (red) for negative — so the
+                      direction is visible at a glance, not just the color. */}
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span>{t("relative")}</span>
+                      <span className="font-mono tabular-nums">
+                        {item.raw > 0 ? "+" : ""}
+                        {item.raw.toFixed(3)}
+                      </span>
+                    </div>
+                    <div className="relative mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div className="absolute inset-y-0 left-1/2 w-px bg-slate-300" />
+                      {isPositive ? (
+                        <div
+                          className="absolute inset-y-0 left-1/2 rounded-r-full bg-emerald-500"
+                          style={{
+                            width: `${Math.max(2, item.magnitude * 50).toFixed(1)}%`,
+                          }}
+                        />
+                      ) : (
+                        <div
+                          className="absolute inset-y-0 right-1/2 rounded-l-full bg-red-500"
+                          style={{
+                            width: `${Math.max(2, item.magnitude * 50).toFixed(1)}%`,
+                          }}
+                        />
                       )}
-                      style={{
-                        width: `${Math.max(2, item.magnitude * 100).toFixed(1)}%`,
-                      }}
-                    />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
@@ -136,7 +155,7 @@ export default function ExplainPage() {
 
             <ul className="mt-4 list-disc space-y-1.5 pl-6 text-slate-700">
               {explanations.map((item) => (
-                <li key={item.feature}>
+                <li key={item.name}>
                   <b>{t(`features.${item.name}`)}</b>{" "}
                   {item.impact === "Positive" ? t("positive") : t("negative")}
                 </li>

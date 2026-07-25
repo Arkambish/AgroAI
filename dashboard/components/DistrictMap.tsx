@@ -204,7 +204,7 @@ export default function DistrictMap({
 
   return (
     <div
-      className="relative overflow-hidden rounded-3xl border border-slate-200 shadow-xl"
+      className="relative overflow-hidden rounded-3xl border border-slate-200 shadow-xl  "
       style={{ height }}
     >
       <MapContainer
@@ -247,4 +247,4 @@ export default function DistrictMap({
       </div>
     </div>
   );
-}
+}

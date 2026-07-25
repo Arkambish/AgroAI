@@ -166,9 +166,33 @@
     "districtsError": "Could not load districts — backend unavailable."
   },
 
+  "chat": {
+    "title": "Ask about this prediction",
+    "subtitle": "Ask in plain language — answers are grounded in the prediction and history for your selected district, season and year.",
+    "placeholder": "e.g. Why is this yield lower than last year?",
+    "send": "Send",
+    "emptyState": "Ask a question about the current prediction, e.g. \"How confident are you?\" or \"Why is this the estimate?\"",
+    "needsPrediction": "Run a prediction first so the assistant has something to explain.",
+    "thinking": "Thinking…",
+    "error": "The assistant is unavailable right now. Please try again later.",
+    "notConfigured": "The assistant isn't configured on the server yet.",
+    "basedOnData": "Based on this data",
+    "hidePrediction": "Hide details",
+    "showPrediction": "Show details",
+    "dataPrediction": "Predicted yield",
+    "dataConfidence": "Confidence range",
+    "dataTopFactors": "Top factors",
+    "dataHistory": "Recent yield history",
+    "dataBaseline": "District average"
+  },
+
   "recommend": {
     "title": "Actionable Advice",
     "subtitle": "Steps you can take to improve your yield based on AI analysis",
+    "aiTitle": "AI Recommendation",
+    "aiLoading": "Working out the best next step for your field…",
+    "aiError": "We couldn't reach the recommendation service. Please try again.",
+    "aiRetry": "Try again",
 
     "noTitle": "No Recommendations Yet",
     "noDescription": "Please make a prediction first to see personalized agricultural advice.",
@@ -242,6 +266,8 @@
     "keyInsight": "Key Insight",
     "insightPositive": "{feature} was the strongest influence and it helped your yield. Keeping those conditions steady is the surest way to hold this level.",
     "insightNegative": "{feature} was the strongest influence and it held your yield back. See the Recommendations page for what to do about it.",
+    "perFactorPositive": "{feature} increased your predicted yield by about {amount} kg/Ha.",
+    "perFactorNegative": "{feature} decreased your predicted yield by about {amount} kg/Ha.",
     "overallGood": "Overall conditions are favorable",
     "overallMedium": "Overall conditions are moderate",
     "limitingFactor": "Main limiting factor",

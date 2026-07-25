@@ -7,12 +7,15 @@ import {
   ShieldAlert,
   Zap,
   Droplets,
+  Sparkles,
+  RotateCw,
 } from "lucide-react";
 
 import { useTranslations, useLocale } from "next-intl";
 import {
   convertSHAPToExplanation,
   getBaseline,
+  getRecommendation,
   type BaselineResponse,
   type ExplanationItem,
   type PredictResponse,
@@ -33,8 +36,16 @@ export default function RecommendationPage() {
   );
   const [baseline, setBaseline] = useState<BaselineResponse | null>(null);
 
+  const [aiRecommendation, setAiRecommendation] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(false);
+  // Bumped by the retry button to re-run the fetch effect without changing
+  // any of district/season/year/locale.
+  const [aiRetryToken, setAiRetryToken] = useState(0);
+
   const predDistrict = prediction?.district;
   const predSeason = prediction?.season;
+  const predYear = prediction?.year;
 
   useEffect(() => {
     if (!predDistrict || !predSeason) return;
@@ -52,6 +63,40 @@ export default function RecommendationPage() {
       active = false;
     };
   }, [predDistrict, predSeason]);
+
+  // Re-fetches whenever the underlying prediction or the UI language
+  // changes — a language switch needs a fresh call anyway, since the
+  // recommendation text itself is generated in that language, not
+  // translated client-side.
+  useEffect(() => {
+    if (!predDistrict || !predSeason || predYear === undefined) return;
+    let active = true;
+
+    setAiLoading(true);
+    setAiError(false);
+
+    getRecommendation({
+      district: predDistrict,
+      season: predSeason,
+      year: predYear,
+      locale,
+    })
+      .then((data) => {
+        if (!active) return;
+        setAiRecommendation(data.recommendation);
+      })
+      .catch((err) => {
+        console.error("Recommendation request failed:", err);
+        if (active) setAiError(true);
+      })
+      .finally(() => {
+        if (active) setAiLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [predDistrict, predSeason, predYear, locale, aiRetryToken]);
 
   if (!prediction) {
     return (
@@ -185,6 +230,40 @@ export default function RecommendationPage() {
         </h1>
 
         <p className="text-slate-500">{t("recommend.subtitle")}</p>
+      </div>
+
+      <div className="rounded-3xl bg-linear-to-br from-emerald-600 to-lime-600 p-8 text-white shadow-xl">
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-wide">
+          <Sparkles size={14} />
+          <span>{t("recommend.aiTitle")}</span>
+        </div>
+
+        {aiLoading && (
+          <div className="flex items-center gap-3 text-emerald-50">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            <span>{t("recommend.aiLoading")}</span>
+          </div>
+        )}
+
+        {!aiLoading && aiError && (
+          <div className="flex flex-wrap items-center gap-4">
+            <p className="text-emerald-50">{t("recommend.aiError")}</p>
+            <button
+              type="button"
+              onClick={() => setAiRetryToken((n) => n + 1)}
+              className="flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 text-sm font-bold transition-colors hover:bg-white/25"
+            >
+              <RotateCw size={14} />
+              {t("recommend.aiRetry")}
+            </button>
+          </div>
+        )}
+
+        {!aiLoading && !aiError && aiRecommendation && (
+          <p className="text-lg leading-relaxed text-emerald-50">
+            {aiRecommendation}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
