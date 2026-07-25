@@ -1,0 +1,16 @@
+{
+  "model": "RandomForest",
+  "rmse": 2.0668,
+  "mae": 1.6812,
+  "r2": 0.8422,
+  "mape": 24.66,
+  "confidence_interval_method": "95% CI using LOYO-CV RMSE: margin = 1.96 × RMSE",
+  "example": {
+    "district": "Matale",
+    "season": "Yala",
+    "predicted_yield_MT_per_Ha": 16.2,
+    "confidence_lower": 12.15,
+    "confidence_upper": 20.25
+  },
+  "notes": "Uncertainty intervals are derived from Leave-One-Year-Out cross-validation RMSE. A wider interval indicates higher prediction uncertainty for that district-season combination."
+}

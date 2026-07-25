@@ -1,0 +1,12 @@
+{
+  "district": "Matale",
+  "season": "Yala",
+  "year": 2024,
+  "predicted_yield_MT_per_Ha": 16.2,
+  "confidence_lower": 12.15,
+  "confidence_upper": 20.25,
+  "confidence": "High",
+  "model": "RandomForest",
+  "model_r2": 0.84,
+  "notes": "Matale (Dambulla region) produces roughly 50% of Sri Lanka's big onion supply. Yala season yields in Matale typically range from 12 to 24 MT/Ha under normal conditions."
+}

@@ -1,0 +1,10 @@
+{
+  "model_name": "XGBoost",
+  "district": "Matale",
+  "season": "Yala",
+  "year": 2019,
+  "actual_yield_MT_per_Ha": 15.77,
+  "predicted_yield_MT_per_Ha": 13.30,
+  "prediction_error_MT_per_Ha": -2.47,
+  "notes": "LOYO-CV out-of-fold prediction for Matale Yala 2019. The model under-predicted actual yield by 2.47 MT/Ha, suggesting environmental factors (e.g. rainfall, NDVI) were more favourable than the model expected."
+}

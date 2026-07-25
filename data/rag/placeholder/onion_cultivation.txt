@@ -1,0 +1,21 @@
+Big Onion (Allium cepa) Cultivation in Sri Lanka — AgriSense Knowledge Base
+
+Districts: Matale, Anuradhapura, Polonnaruwa, Kurunegala.
+
+Seasons:
+- Yala (April–August): Main growing season in the dry zone. Drier and sunnier. Typical yields are higher (12–24 MT/Ha in Matale).
+- Maha (October–March): Off-season, wetter and cooler. Yields are generally lower (6–15 MT/Ha).
+
+Soil requirements:
+- Preferred soil pH: 6.0–7.0. Yields drop outside this range.
+- Well-drained loamy soils are ideal.
+
+Key yield factors:
+- Rainfall and irrigation: Adequate water during bulb formation is critical. Low rainfall during Yala may reduce yield unless irrigation is applied.
+- Temperature and humidity: High heat stress reduces bulb size. The temp_x_humidity interaction is a major model feature.
+- Vegetation health (NDVI/EVI): Satellite-derived greenness indices reflect crop vigour during the growing season.
+- Previous year yield and 3-year average: Historical yield trends influence predictions.
+
+Matale context:
+- The Dambulla region in Matale produces approximately 50% of national big onion supply.
+- Low yield in Matale during Yala may be linked to drought stress (low NDVI), insufficient rainfall, or sub-optimal soil pH.

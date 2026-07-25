@@ -1,0 +1,12 @@
+{
+  "district": "Matale",
+  "season": "Yala",
+  "top_features": [
+    {"rank": 1, "name": "ndvi_x_lst", "mean_abs_shap": 2.185},
+    {"rank": 2, "name": "season_min_ndvi", "mean_abs_shap": 0.677},
+    {"rank": 3, "name": "season_mean_ndvi", "mean_abs_shap": 0.577},
+    {"rank": 4, "name": "season_max_ndvi", "mean_abs_shap": 0.391},
+    {"rank": 5, "name": "yield_3yr_avg", "mean_abs_shap": 0.328}
+  ],
+  "interpretation": "Vegetation health (NDVI) combined with land surface temperature is the strongest driver of yield. Low season_min_ndvi or season_mean_ndvi indicates poor crop vigour and is associated with lower predicted yields in Matale."
+}
