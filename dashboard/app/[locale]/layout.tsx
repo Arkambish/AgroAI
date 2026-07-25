@@ -1,5 +1,6 @@
 import { NextIntlClientProvider } from "next-intl";
 import Navbar from "@/components/Navbar";
+import { getSafeLocale, mergeMessages } from "@/i18n/routing";
 
 export default async function LocaleLayout({
   children,
@@ -9,12 +10,21 @@ export default async function LocaleLayout({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
+  const safeLocale = getSafeLocale(locale);
 
-  const supportedLocales = ["en", "si", "ta"];
-  const safeLocale = supportedLocales.includes(locale) ? locale : "en";
+  // Merge over English so any untranslated key degrades to English rather than
+  // rendering a raw key. (This used to import the locale file directly, which
+  // bypassed the fallback entirely.)
+  const fallbackMessages = (await import("../../messages/en.json")).default;
+  const localeMessages =
+    safeLocale === "en"
+      ? fallbackMessages
+      : (await import(`../../messages/${safeLocale}.json`)).default;
 
-  const messages = (await import(`../../messages/${safeLocale}.json`))
-    .default;
+  const messages = mergeMessages(
+    fallbackMessages as Record<string, unknown>,
+    localeMessages as Record<string, unknown>
+  );
 
   return (
     <NextIntlClientProvider

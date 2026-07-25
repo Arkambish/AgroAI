@@ -7,21 +7,102 @@
     "explain": "Why This Prediction?"
   },
 
+  "nav": {
+    "home": "Home",
+    "predict": "Predict Yield",
+    "explain": "Explanation",
+    "recommend": "Recommendations"
+  },
+
   "form": {
     "district": "District",
-    "season": "Season",
-    "year": "Year",
-    "rainfall": "Rainfall (mm)",
-    "temperature": "Temperature (°C)",
-    "humidity": "Humidity (%)",
-    "soilMoisture": "Soil Moisture (%)",
-    "soilPh": "Soil pH",
-    "solarRad": "Solar Radiation (MJ/m²)",
-    "ndvi": "NDVI (vegetation index)",
-    "evi": "EVI (vegetation index)",
-    "clay": "Clay (%)",
-    "sand": "Sand (%)",
-    "organicCarbon": "Organic Carbon (%)"
+    "season": "Cultivation Season",
+    "year": "Target Year",
+    "optional": "(optional)",
+    "on": "On",
+    "off": "Off",
+
+    "fieldSectionTitle": "Tell us about your field",
+    "fieldSectionHelp": "Choose where and when you are growing. Everything else is filled in from records for your area.",
+    "loadingArea": "Loading your area…",
+
+    "extentLabel": "How much land did you plant?",
+    "extentHelp": "In hectares. Leave blank to use the district average.",
+    "lastYieldLabel": "What did you harvest last season?",
+    "lastYieldHelp": "In MT per hectare. This is one of the strongest signals you can give.",
+    "useDistrictAverage": "Use district average",
+
+    "knownSectionTitle": "What we already know about your area",
+    "knownSectionHelp": "These come from satellites, weather stations and official harvest records — you do not need to enter them.",
+    "contextUnavailable": "No records found for this area yet. The prediction will use wider district and seasonal averages.",
+
+    "provenanceExact": "Exact {year} record",
+    "provenanceAverage": "{years}-year average for {district} ({season})",
+
+    "advancedTitle": "Advanced / Officer mode",
+    "advancedHelp": "For agriculture officers with a soil test or fresh field reading.",
+    "overrideCount": "{count, plural, one {# value overridden} other {# values overridden}}",
+    "noOverrides": "Using recorded values for your area.",
+    "resetDefaults": "Reset to district defaults",
+    "outOfRange": "Enter a value between {min} and {max}.",
+    "fixErrors": "Please correct the highlighted values before predicting.",
+
+    "source": {
+      "user": "You",
+      "district_season_mean": "District record",
+      "district_mean": "District avg",
+      "season_mean": "Season avg",
+      "global_mean": "Overall avg",
+      "derived": "Calculated",
+      "zero_fallback": "Missing"
+    }
+  },
+
+  "featureGroups": {
+    "weather": "Weather",
+    "satellite": "Satellite vegetation",
+    "historical": "Past harvests",
+    "soil": "Soil",
+    "interaction": "Combined indicators"
+  },
+
+  "features": {
+    "season_avg_temp": "Average temperature",
+    "season_total_rainfall": "Total season rainfall",
+    "season_avg_humidity": "Average humidity",
+    "season_avg_solar_rad": "Solar radiation",
+    "growing_degree_days": "Growing degree days",
+    "heat_stress_days": "Heat stress days",
+    "drought_index_spi": "Drought index (SPI)",
+    "temp_range": "Temperature range",
+    "max_daily_rainfall": "Heaviest rainfall",
+
+    "season_mean_ndvi": "Average greenness (NDVI)",
+    "season_max_ndvi": "Peak greenness",
+    "season_min_ndvi": "Lowest greenness",
+    "ndvi_std": "Greenness variability",
+    "ndvi_anomaly": "Greenness vs normal",
+    "time_to_peak_ndvi": "Days to peak growth",
+    "ndvi_growth_rate": "Growth rate",
+    "season_mean_evi": "Enhanced vegetation (EVI)",
+    "season_mean_ndwi": "Water index (NDWI)",
+    "season_mean_lst_day": "Daytime land temperature",
+    "season_mean_lst_night": "Night land temperature",
+
+    "prev_season_yield": "Last season's yield",
+    "prev_year_yield": "Last year's yield",
+    "yield_3yr_avg": "3-year average yield",
+    "season_indicator": "Season type",
+    "extent_prev_season": "Area planted",
+
+    "soil_ph": "Soil pH",
+    "organic_carbon": "Organic carbon",
+    "clay_pct": "Clay content",
+    "sand_pct": "Sand content",
+
+    "rainfall_x_ndvi": "Rainfall × greenness",
+    "temp_x_humidity": "Temperature × humidity",
+    "ndvi_x_lst": "Greenness × land temperature"
   },
 
   "button": {
@@ -43,18 +124,46 @@
   },
 
   "predict": {
+    "eyebrow": "AI Decision Support",
     "title": "Predict Onion Yield",
-    "subtitle": "Enter soil and weather conditions to predict yield",
+    "subtitle": "Choose your district and season. We fill in the weather, satellite and soil data for you.",
     "waiting": "Waiting for Prediction",
-    "waitingDescription": "Fill in the form and click Predict Yield to get AI analysis",
+    "waitingDescription": "Choose your field details and tap Predict Yield to get the AI analysis",
+
     "expectedYield": "Expected Yield",
-    "confidence": "Confidence",
+    "expectedRange": "Expected Yield Range",
+    "mostLikely": "Most likely around {value} MT/Ha",
+
+    "intervalConformal": "{pct}% conformal prediction interval, calibrated on leave-one-year-out residuals. The true yield falls in this range {pct} times out of 100.",
+    "intervalGaussian": "Range estimated as ±1.96 × the model's error (RMSE). Approximate, not calibrated.",
+    "intervalHeuristic": "Rough ±15% estimate only — this model has no calibrated interval yet.",
+
+    "modelLabel": "Model: {model}",
+    "modelReliability": "Model reliability",
+    "r2Value": "R² = {value}",
+    "r2Unknown": "R² unavailable",
+    "reliabilityNote": {
+      "high": "This model explains most of the variation in past harvests. Treat the range as a solid guide.",
+      "medium": "This model explains some of the variation in past harvests. Use the range alongside your own judgement.",
+      "low": "This model explains very little of the variation in past harvests — it is close to predicting the district average. Treat the range as a rough guide only, not a forecast.",
+      "unknown": "Model accuracy has not been recorded. Treat this as an indication only."
+    },
+
+    "districtAverage": "Your district's average",
+    "baselineYears": "Based on {n} recorded seasons",
+    "change": "Compared to average",
+    "vsDistrictAverage": "vs district average",
     "previousSeason": "Previous Season",
-    "change": "Change",
+
+    "dataSourcesTitle": "Where this prediction came from",
+    "dataSourcesBody": "Built from {user} of {total} values you supplied and {records} filled in from records for your area.",
+    "zeroFillWarning": "{n} values had no record at all and were left empty — treat this prediction with extra caution.",
+
     "success": "Prediction Completed",
     "successDescription": "AI has successfully generated yield prediction",
-    "whyPrediction": "Why this prediction?"
-    ,"error": "Prediction failed — backend unavailable. Please try again later."
+    "whyPrediction": "Why this prediction?",
+    "error": "Prediction failed — backend unavailable. Please try again later.",
+    "districtsError": "Could not load districts — backend unavailable."
   },
 
   "recommend": {
@@ -69,7 +178,7 @@
     "learnHow": "Learn how",
 
     "whatIfTitle": "If conditions improve...",
-    "whatIfText": "Our simulations show your yield could increase from {current} MT/Ha to {improved} MT/Ha.",
+    "whatIfText": "Your predicted yield is {current} MT/Ha. The best recorded season in your district reached {best} MT/Ha — the gap shows what better conditions could deliver.",
 
     "riskTitle": "Risk Prevention",
 
@@ -81,9 +190,10 @@
     "soilAction": "Monitor drainage",
     "pestAction": "Early spray recommended",
 
-    "riskModerate": "Moderate Risk",
-    "riskLow": "Low Risk",
-    "riskHigh": "High Risk",
+    "riskModerate": "Moderate",
+    "riskLow": "Low",
+    "riskHigh": "High",
+    "riskBasis": "Risk levels are derived from the factors that lowered your prediction.",
 
     "action": "Action",
 
@@ -119,15 +229,19 @@
     "summary": "Summary for Farmers",
     "reasoning": "AI Explanation",
 
-    "basedOn": "Based on your inputs for",
+    "basedOn": "Based on the conditions recorded for",
     "expected": "we expect a yield of",
 
     "relative": "Relative Influence",
 
     "positive": "helped increase",
     "negative": "reduced",
+    "impactPositive": "Raised the prediction",
+    "impactNegative": "Lowered the prediction",
 
     "keyInsight": "Key Insight",
+    "insightPositive": "{feature} was the strongest influence and it helped your yield. Keeping those conditions steady is the surest way to hold this level.",
+    "insightNegative": "{feature} was the strongest influence and it held your yield back. See the Recommendations page for what to do about it.",
     "overallGood": "Overall conditions are favorable",
     "overallMedium": "Overall conditions are moderate",
     "limitingFactor": "Main limiting factor",
@@ -140,14 +254,18 @@
       "humidity": "Humidity",
       "soil_ph": "Soil pH",
       "soil_moisture": "Soil Moisture",
-      "ndvi": "NDVI",
+      "ndvi": "Greenness (NDVI)",
       "solar_radiation": "Solar Radiation",
-      "evi": "EVI",
+      "evi": "Vegetation (EVI)",
       "clay": "Clay",
       "sand": "Sand",
       "organic_carbon": "Organic Carbon",
-      "yield 3yr avg": "3-Year Average Yield"
-
+      "drought": "Drought Index",
+      "prev_yield": "Past Harvests",
+      "temp_x_humidity": "Temperature & Humidity",
+      "rainfall_x_ndvi": "Rainfall & Greenness",
+      "ndvi_x_lst": "Greenness & Land Temperature",
+      "other": "Other Factors"
     }
   },
   "districts": {

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { LayoutDashboard, Sprout, Brain, Lightbulb, Menu, X } from "lucide-react";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { clsx, type ClassValue } from "clsx";
@@ -13,26 +14,17 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const navItems = [
-  { name: "Home", href: "", icon: LayoutDashboard },
-  { name: "Predict Yield", href: "predict", icon: Sprout },
-  { name: "Explanation", href: "explain", icon: Brain },
-  { name: "Recommendations", href: "recommend", icon: Lightbulb },
+  { key: "home", href: "", icon: LayoutDashboard },
+  { key: "predict", href: "predict", icon: Sprout },
+  { key: "explain", href: "explain", icon: Brain },
+  { key: "recommend", href: "recommend", icon: Lightbulb },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const [locale, setLocale] = useState("en");
-
-  useEffect(() => {
-    // Detect locale from path
-    const match = pathname?.split("/")[1];
-    if (["en", "ta", "si"].includes(match)) {
-      setLocale(match);
-    } else {
-      setLocale("en");
-    }
-  }, [pathname]);
+  const locale = useLocale();
+  const t = useTranslations("nav");
 
   // Helper to build locale-aware links
   const getLocaleHref = (href: string) => {
@@ -69,7 +61,7 @@ export default function Navbar() {
                 )}
               >
                 <item.icon size={18} />
-                <span>{item.name}</span>
+                <span>{t(item.key)}</span>
               </Link>
             ))}
             <div className="ml-4">
@@ -96,17 +88,17 @@ export default function Navbar() {
             {navItems.map((item) => (
               <Link
                 key={item.href}
-                href={item.href}
+                href={getLocaleHref(item.href)}
                 onClick={() => setIsOpen(false)}
                 className={cn(
                   "flex items-center space-x-3 rounded-lg px-3 py-3 text-base font-medium transition-colors",
-                  pathname === item.href
+                  pathname === getLocaleHref(item.href)
                     ? "bg-primary/10 text-primary"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 )}
               >
                 <item.icon size={20} />
-                <span>{item.name}</span>
+                <span>{t(item.key)}</span>
               </Link>
             ))}
           </div>

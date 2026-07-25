@@ -6,10 +6,12 @@ Endpoints:
   GET  /models/compare
   GET  /feature-importance
   GET  /context
+  GET  /baseline
   GET  /districts
 """
 
 import json
+import math
 import os
 import sys
 import numpy as np
@@ -20,7 +22,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import ALL_FEATURES, DISTRICTS, SEASONS, DATA_VARIANT
+from config import (
+    ALL_FEATURES, DISTRICTS, SEASONS, DATA_VARIANT, TARGET_COLUMN,
+    INTERACTION_FEATURES,
+)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Serve the variant selected by DATA_VARIANT (default 'synthetic'). Set
@@ -36,7 +41,148 @@ CORS(app)
 _state = {
     'model': None, 'metrics': None, 'model_name': None, 'scaler': None,
     'context_df': None, 'explainer': None, 'conformal': None,
+    'defaults': None, 'baselines': None, 'catalog': None,
 }
+
+# Where each feature group's values actually come from. Surfaced to the
+# dashboard so the farmer can see the provenance of every auto-filled value
+# instead of being asked to type numbers only a satellite could know.
+FEATURE_SOURCE_LABELS = {
+    'weather': 'NASA POWER',
+    'satellite': 'MODIS / Sentinel-2',
+    'historical': 'DCS records',
+    'soil': 'SoilGrids',
+    'interaction': 'Derived',
+}
+
+
+def _finite(value) -> bool:
+    """True when a request value is a usable number (not None/''/NaN/inf)."""
+    if value is None or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
+
+
+def _build_defaults(df: pd.DataFrame) -> dict:
+    """Precompute the district/season → district → season → global mean cascade.
+
+    /predict used to zero-fill any feature missing from the payload. With 32
+    features and a form that supplies at most 10, that meant a request for a
+    district the context table doesn't cover produced a confident number built
+    from soil_ph=0 and prev_year_yield=0. This table is the honest fallback.
+    """
+    feature_cols = [c for c in ALL_FEATURES if c in df.columns]
+    numeric = df[feature_cols].apply(pd.to_numeric, errors='coerce')
+    keyed = pd.concat([df[['District', 'Season']], numeric], axis=1)
+
+    def _as_map(grouped) -> dict:
+        return {
+            key: {c: float(v) for c, v in row.items() if pd.notna(v)}
+            for key, row in grouped.iterrows()
+        }
+
+    return {
+        'district_season': _as_map(
+            keyed.groupby(['District', 'Season'])[feature_cols].mean()
+        ),
+        'district': _as_map(keyed.groupby('District')[feature_cols].mean()),
+        'season': _as_map(keyed.groupby('Season')[feature_cols].mean()),
+        'global': {
+            c: float(v) for c, v in numeric.mean().items() if pd.notna(v)
+        },
+    }
+
+
+def _build_baselines(df: pd.DataFrame) -> dict:
+    """Historical yield stats per (district, season) — replaces the hardcoded
+    13.5 MT/Ha 'Historical Benchmark' the dashboard used to display."""
+    if TARGET_COLUMN not in df.columns:
+        return {}
+
+    baselines = {}
+    for (district, season), grp in df.groupby(['District', 'Season']):
+        yields = pd.to_numeric(grp[TARGET_COLUMN], errors='coerce').dropna()
+        if yields.empty:
+            continue
+        baselines[(district, season)] = {
+            'district': district,
+            'season': season,
+            'mean': round(float(yields.mean()), 2),
+            'min': round(float(yields.min()), 2),
+            'max': round(float(yields.max()), 2),
+            'n_years': int(len(yields)),
+            'years': sorted(int(y) for y in grp['Year'].dropna().unique()),
+        }
+    return baselines
+
+
+def _build_catalog(df: pd.DataFrame) -> list:
+    """Districts actually present in the loaded dataset, with the seasons and
+    years each one covers.
+
+    config.DISTRICTS is a superset across variants (synthetic has Jaffna and no
+    Kurunegala; real has Kurunegala, no Jaffna, and is Yala-only). Advertising
+    all five made the dashboard offer combinations that 404.
+    """
+    catalog = []
+    for district, grp in df.groupby('District'):
+        catalog.append({
+            'name': str(district),
+            'seasons': sorted(str(s) for s in grp['Season'].dropna().unique()),
+            'years': sorted(int(y) for y in grp['Year'].dropna().unique()),
+        })
+    return sorted(catalog, key=lambda d: d['name'])
+
+
+def _resolve_features(data: dict):
+    """Build the 32-feature vector, recording where every value came from.
+
+    Resolution order per feature: request value → (district, season) mean →
+    district mean → season mean → global mean → 0.0. The three interaction
+    terms are always recomputed from the resolved inputs so they can never
+    disagree with the features the model actually sees.
+    """
+    defaults = _state.get('defaults') or {}
+    district = data.get('district')
+    season = data.get('season')
+
+    tiers = [
+        ('district_season_mean', (defaults.get('district_season') or {}).get((district, season), {})),
+        ('district_mean', (defaults.get('district') or {}).get(district, {})),
+        ('season_mean', (defaults.get('season') or {}).get(season, {})),
+        ('global_mean', defaults.get('global') or {}),
+    ]
+
+    values, sources = {}, {}
+    for feature in ALL_FEATURES:
+        if _finite(data.get(feature)):
+            values[feature] = float(data[feature])
+            sources[feature] = 'user'
+            continue
+        for tier_name, tier in tiers:
+            if feature in tier and math.isfinite(tier[feature]):
+                values[feature] = tier[feature]
+                sources[feature] = tier_name
+                break
+        else:
+            values[feature] = 0.0
+            sources[feature] = 'zero_fallback'
+
+    # Interaction terms are products of resolved inputs, never independent.
+    derived = {
+        'rainfall_x_ndvi': ('season_total_rainfall', 'season_mean_ndvi'),
+        'temp_x_humidity': ('season_avg_temp', 'season_avg_humidity'),
+        'ndvi_x_lst': ('season_mean_ndvi', 'season_mean_lst_day'),
+    }
+    for feature, (left, right) in derived.items():
+        if feature in values:
+            values[feature] = values[left] * values[right]
+            sources[feature] = 'derived'
+
+    return values, sources
 
 
 def _load_state() -> None:
@@ -84,13 +230,22 @@ def _load_state() -> None:
         
         print(f'[api] Loaded {name} (metrics={metrics or "n/a"})')
 
-    # Optional: cache the processed dataset for the /context endpoint.
+    # Cache the processed dataset. It backs /context, the default cascade that
+    # /predict uses instead of zero-filling, /baseline and /districts.
     integrated_csv = os.path.join(PROCESSED_DIR, 'integrated_dataset.csv')
     if os.path.exists(integrated_csv):
-        _state['context_df'] = pd.read_csv(integrated_csv)
-        print(f'[api] Loaded context dataset ({len(_state["context_df"])} rows)')
+        df = pd.read_csv(integrated_csv)
+        _state['context_df'] = df
+        _state['defaults'] = _build_defaults(df)
+        _state['baselines'] = _build_baselines(df)
+        _state['catalog'] = _build_catalog(df)
+        print(
+            f'[api] Loaded context dataset ({len(df)} rows, '
+            f'{len(_state["catalog"])} districts) + default cascade'
+        )
     else:
-        print('[api] integrated_dataset.csv not found — /context will return 503.')
+        print('[api] integrated_dataset.csv not found — /context will return 503 '
+              'and /predict will fall back to zero-fill.')
 
     # Optional: conformal (calibrated) interval half-widths per model.
     conf_path = os.path.join(RESULTS_DIR, 'conformal.json')
@@ -115,7 +270,8 @@ def predict():
     if _state['model'] is None:
         return jsonify({'error': 'Model not loaded'}), 503
 
-    feature_vec = np.array([[float(data.get(f, 0.0)) for f in ALL_FEATURES]],
+    resolved, feature_sources = _resolve_features(data)
+    feature_vec = np.array([[resolved[f] for f in ALL_FEATURES]],
                            dtype=np.float32)
     if _state['scaler'] is not None:
         feature_vec = _state['scaler'].transform(feature_vec)
@@ -154,6 +310,14 @@ def predict():
     if _state['metrics'] and _state['metrics'].get('R2', 0) < 0.5:
         confidence_val = "Low"
 
+    # How much of the vector is grounded in a real record vs a wider fallback.
+    n_user = sum(1 for s in feature_sources.values() if s == 'user')
+    n_grounded = sum(
+        1 for s in feature_sources.values()
+        if s in ('user', 'district_season_mean', 'district_mean', 'derived')
+    )
+    n_zero = sum(1 for s in feature_sources.values() if s == 'zero_fallback')
+
     response = {
         'district': data.get('district'),
         'season': data.get('season'),
@@ -167,6 +331,15 @@ def predict():
         'model_r2': _state['metrics'].get('R2', None) if _state['metrics'] else None,
         'interval_method': interval_method,
         'interval_coverage': conf.get('empirical_coverage') if conf else None,
+        'feature_sources': feature_sources,
+        'resolved_features': {k: round(v, 4) for k, v in resolved.items()},
+        'data_completeness': {
+            'n_features': len(ALL_FEATURES),
+            'n_user_supplied': n_user,
+            'n_grounded': n_grounded,
+            'n_zero_filled': n_zero,
+            'fraction_grounded': round(n_grounded / len(ALL_FEATURES), 3),
+        },
     }
 
     # TODO: Implement PostgreSQL storage here
@@ -246,28 +419,92 @@ def context():
         'season': season,
         'year': year,
         'source': source,
+        'n_years': int(len(sub)),
         'available_years': sorted(int(y) for y in sub['Year'].unique()),
+        'source_labels': FEATURE_SOURCE_LABELS,
     })
     return jsonify(payload)
 
 
+@app.route('/baseline', methods=['GET'])
+def baseline():
+    """Historical yield stats for a (district, season).
+
+    The dashboard used to compare every prediction against a hardcoded
+    13.5 MT/Ha. This serves the real per-district figure instead.
+    """
+    baselines = _state.get('baselines')
+    if not baselines:
+        return jsonify({'error': 'baseline data not loaded'}), 503
+
+    district = request.args.get('district', type=str)
+    season = request.args.get('season', type=str)
+    if not district or not season:
+        return jsonify({'error': 'query params district and season are required'}), 400
+
+    stats = baselines.get((district, season))
+    if stats is None:
+        # Fall back to the district across all seasons before giving up.
+        across = [v for (d, _), v in baselines.items() if d == district]
+        if not across:
+            return jsonify({
+                'error': f'no yield history for district={district}',
+                'district': district, 'season': season,
+            }), 404
+        means = [v['mean'] for v in across]
+        return jsonify({
+            'district': district,
+            'season': season,
+            'mean': round(sum(means) / len(means), 2),
+            'min': min(v['min'] for v in across),
+            'max': max(v['max'] for v in across),
+            'n_years': sum(v['n_years'] for v in across),
+            'years': sorted({y for v in across for y in v['years']}),
+            'source': 'district_all_seasons',
+        }), 200
+
+    return jsonify({**stats, 'source': 'district_season'})
+
+
 @app.route('/districts', methods=['GET'])
 def list_districts():
-    """Return the four target districts and the two seasons. Lets the
-    frontend keep its dropdowns in sync with backend config."""
+    """Districts, seasons and years actually present in the loaded dataset.
+
+    Previously returned config.DISTRICTS unconditionally — a superset across
+    data variants — so the dashboard offered Kurunegala under the synthetic
+    model and Maha under the (Yala-only) real model, both of which 404.
+    """
+    catalog = _state.get('catalog')
     df = _state.get('context_df')
-    years = (
-        sorted(int(y) for y in df['Year'].unique())
-        if df is not None else []
-    )
+
+    if not catalog:
+        # Dataset not loaded — fall back to config so the UI still renders.
+        return jsonify({
+            'districts': [{'name': d, 'seasons': list(SEASONS), 'years': []}
+                          for d in DISTRICTS],
+            'seasons': list(SEASONS),
+            'years': [],
+            'variant': DATA_VARIANT,
+            'source': 'config_fallback',
+        })
+
     return jsonify({
-        'districts': list(DISTRICTS),
-        'seasons': list(SEASONS),
-        'years': years,
+        'districts': catalog,
+        'seasons': sorted({s for d in catalog for s in d['seasons']}),
+        'years': sorted(int(y) for y in df['Year'].dropna().unique()),
+        'variant': DATA_VARIANT,
+        'source': 'dataset',
     })
 
 
-if __name__ == '__main__':
+# Load at import time so a WSGI/gunicorn server serves a ready model. Previously
+# this only ran under __main__, so every /predict behind gunicorn returned 503.
+try:
     _load_state()
+except FileNotFoundError as exc:
+    print(f'[api] Startup warning: {exc}')
+
+
+if __name__ == '__main__':
     port = int(os.environ.get('PORT', '5000'))
     app.run(debug=False, host='0.0.0.0', port=port)

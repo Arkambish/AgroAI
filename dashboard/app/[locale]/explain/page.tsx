@@ -1,41 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useMemo } from "react";
+import { useTranslations, useLocale } from "next-intl";
 import { Brain, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
-import { convertSHAPToExplanation, type PredictResponse } from "@/lib/api";
+import {
+  convertSHAPToExplanation,
+  type ExplanationItem,
+  type PredictResponse,
+} from "@/lib/api";
+import { useLocalJSON } from "@/lib/use-local-flag";
 import clsx from "clsx";
 
-export type ExplanationItem = {
-  name: string;
-  impact: "Positive" | "Negative";
-  color?: string;
-  raw: number;
-};
+export type { ExplanationItem };
 
 export default function ExplainPage() {
   const t = useTranslations("explain");
+  const locale = useLocale();
 
-  const [prediction, setPrediction] = useState<PredictResponse | null>(null);
-  const [explanations, setExplanations] = useState<ExplanationItem[]>([]);
-
-  useEffect(() => {
-    const lastPrediction = localStorage.getItem("last_prediction");
-
-    if (!lastPrediction) return;
-
-    try {
-      const parsed: PredictResponse = JSON.parse(lastPrediction);
-
-      setPrediction(parsed);
-
-      if (parsed?.shap_values) {
-        setExplanations(convertSHAPToExplanation(parsed.shap_values));
-      }
-    } catch (err) {
-      console.error("Failed to load prediction:", err);
-    }
-  }, []);
+  const prediction = useLocalJSON<PredictResponse>("last_prediction");
+  const explanations = useMemo<ExplanationItem[]>(
+    () =>
+      prediction?.shap_values
+        ? convertSHAPToExplanation(prediction.shap_values)
+        : [],
+    [prediction]
+  );
 
   if (!prediction) {
     return (
@@ -51,7 +40,7 @@ export default function ExplainPage() {
         <p className="max-w-md text-slate-500">{t("noDescription")}</p>
 
         <a
-          href="/predict"
+          href={`/${locale}/predict`}
           className="rounded-xl bg-primary px-6 py-3 font-bold text-white shadow-lg transition-transform hover:scale-105"
         >
           {t("goPredict")}
@@ -60,74 +49,117 @@ export default function ExplainPage() {
     );
   }
 
+  // The strongest factor drives the key insight — previously the box rendered
+  // its heading with no body text at all.
+  const top = explanations[0];
+
   return (
     <div className="space-y-10">
-      {/* Header */}
       <div className="flex flex-col space-y-2">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">
           {t("title")}
         </h1>
 
         <p className="text-slate-500">
-          {t("subtitle")} {prediction.predicted_yield_MT_per_Ha} MT/Ha
+          {t("subtitle")} — {prediction.predicted_yield_MT_per_Ha} MT/Ha
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* Left */}
         <section className="space-y-6">
           <h2 className="text-xl font-bold text-slate-800">
             {t("keyFactors")}
           </h2>
 
           <div className="grid gap-4">
-            {explanations.map((item, index) => (
+            {explanations.map((item) => (
               <div
-                key={index}
-                className="flex justify-between rounded-xl border bg-white p-4"
+                key={item.feature}
+                className="rounded-xl border bg-white p-4 shadow-sm"
               >
-                <div>
-                  <p className="font-bold">{t(`features.${item.name}`)}</p>
-                  <p className={clsx(item.color)}>
-                    {item.impact} {t("relative")}
-                  </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-slate-900">
+                      {t(`features.${item.name}`)}
+                    </p>
+                    <p className={clsx("text-sm", item.color)}>
+                      {item.impact === "Positive"
+                        ? t("impactPositive")
+                        : t("impactNegative")}
+                    </p>
+                  </div>
+
+                  {item.impact === "Positive" ? (
+                    <TrendingUp className="shrink-0 text-emerald-500" />
+                  ) : (
+                    <TrendingDown className="shrink-0 text-red-500" />
+                  )}
                 </div>
 
-                <div className="flex items-center">
-                  {item.impact === "Positive" ? (
-                    <TrendingUp className="text-emerald-500" />
-                  ) : (
-                    <TrendingDown className="text-red-500" />
-                  )}
+                {/* Relative influence — the SHAP magnitudes were previously
+                    computed and then thrown away. */}
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>{t("relative")}</span>
+                    <span className="font-mono tabular-nums">
+                      {item.raw > 0 ? "+" : ""}
+                      {item.raw.toFixed(3)}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className={clsx(
+                        "h-full rounded-full",
+                        item.impact === "Positive"
+                          ? "bg-emerald-500"
+                          : "bg-red-500"
+                      )}
+                      style={{
+                        width: `${Math.max(2, item.magnitude * 100).toFixed(1)}%`,
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </section>
 
-        {/* Right */}
         <section className="space-y-6">
           <h2 className="text-xl font-bold text-slate-800">{t("summary")}</h2>
 
-          <div className="rounded-xl border bg-white p-6">
-            <p>
+          <div className="rounded-xl border bg-white p-6 shadow-sm">
+            <p className="text-slate-700">
               {t("basedOn")} <b>{prediction.district}</b> {t("expected")}{" "}
               <b>{prediction.predicted_yield_MT_per_Ha} MT/Ha</b>
             </p>
 
-            <ul className="mt-4 list-disc pl-6">
-              {explanations.map((item, i) => (
-                <li key={i}>
-                  <b>{item.name}</b>{" "}
+            <ul className="mt-4 list-disc space-y-1.5 pl-6 text-slate-700">
+              {explanations.map((item) => (
+                <li key={item.feature}>
+                  <b>{t(`features.${item.name}`)}</b>{" "}
                   {item.impact === "Positive" ? t("positive") : t("negative")}
                 </li>
               ))}
             </ul>
 
-            <div className="mt-6 rounded bg-amber-50 p-4">
-              <AlertTriangle className="text-amber-500" />
-              <p className="mt-2 font-bold">{t("keyInsight")}</p>
-            </div>
+            {top && (
+              <div className="mt-6 rounded-xl bg-amber-50 p-4">
+                <AlertTriangle className="text-amber-500" size={20} />
+                <p className="mt-2 font-bold text-amber-900">
+                  {t("keyInsight")}
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-amber-800">
+                  {top.impact === "Positive"
+                    ? t("insightPositive", {
+                        feature: t(`features.${top.name}`),
+                      })
+                    : t("insightNegative", {
+                        feature: t(`features.${top.name}`),
+                      })}
+                </p>
+              </div>
+            )}
           </div>
         </section>
       </div>

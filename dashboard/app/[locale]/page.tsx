@@ -17,6 +17,7 @@ import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import {
   predictYieldsForAllDistricts,
+  getDistricts,
   type BatchPredictionResult,
   getYieldCategory,
 } from "@/lib/api";
@@ -57,9 +58,21 @@ export default function Home() {
       setError(null);
 
       try {
+        // Ask the API which districts and seasons it actually has data for,
+        // rather than assuming a hardcoded list that may not match the variant.
+        const catalog = await getDistricts();
+        const names = catalog.districts.map((d) => d.name);
+        const season = catalog.seasons.includes("Yala")
+          ? "Yala"
+          : (catalog.seasons[0] ?? "Yala");
+        const latestYear =
+          catalog.years[catalog.years.length - 1] ?? new Date().getFullYear();
+
         const result = await predictYieldsForAllDistricts(
-          "Yala",
-          new Date().getFullYear()
+          season,
+          latestYear,
+          {},
+          names
         );
 
         if (mounted) {
