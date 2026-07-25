@@ -1,7 +1,7 @@
 {
-  "Model": "RandomForest",
-  "RMSE": 4.0506,
-  "MAE": 3.3932,
-  "R2": 0.0203,
-  "MAPE": 23.44
+  "Model": "PhysResidual",
+  "RMSE": 3.9021,
+  "MAE": 3.3497,
+  "R2": 0.0908,
+  "MAPE": 23.32
 }

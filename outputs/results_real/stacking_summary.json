@@ -1,0 +1,124 @@
+{
+  "base_models": [
+    "bilstm",
+    "cnn",
+    "cnn_lstm_hybrid",
+    "lstm",
+    "physresidual",
+    "randomforest",
+    "svr",
+    "symbolicregression",
+    "xgboost"
+  ],
+  "n_rows": 28,
+  "protocol": "nested Leave-One-Year-Out; weights fit on train years only",
+  "combiners": {
+    "StackMean": {
+      "Model": "StackMean",
+      "RMSE": 5.0621,
+      "MAE": 4.2961,
+      "R2": -0.5301,
+      "MAPE": 25.39,
+      "Train_Time_s": 0.0,
+      "Best_Params": {
+        "weights": {
+          "bilstm": 0.1111,
+          "cnn": 0.1111,
+          "cnn_lstm_hybrid": 0.1111,
+          "lstm": 0.1111,
+          "physresidual": 0.1111,
+          "randomforest": 0.1111,
+          "svr": 0.1111,
+          "symbolicregression": 0.1111,
+          "xgboost": 0.1111
+        }
+      },
+      "Parameters": null
+    },
+    "StackInvRMSE": {
+      "Model": "StackInvRMSE",
+      "RMSE": 4.3261,
+      "MAE": 3.6694,
+      "R2": -0.1175,
+      "MAPE": 23.28,
+      "Train_Time_s": 0.0,
+      "Best_Params": {
+        "weights": {
+          "bilstm": 0.1276,
+          "cnn": 0.0493,
+          "cnn_lstm_hybrid": 0.0496,
+          "lstm": 0.0789,
+          "physresidual": 0.1473,
+          "randomforest": 0.1421,
+          "svr": 0.138,
+          "symbolicregression": 0.1259,
+          "xgboost": 0.1414
+        }
+      },
+      "Parameters": null
+    },
+    "StackConvex": {
+      "Model": "StackConvex",
+      "RMSE": 4.3237,
+      "MAE": 3.6222,
+      "R2": -0.1162,
+      "MAPE": 24.36,
+      "Train_Time_s": 0.0,
+      "Best_Params": {
+        "weights": {
+          "bilstm": 0.1986,
+          "cnn": 0.0,
+          "cnn_lstm_hybrid": 0.0051,
+          "lstm": 0.0153,
+          "physresidual": 0.3987,
+          "randomforest": 0.0447,
+          "svr": 0.0392,
+          "symbolicregression": 0.0273,
+          "xgboost": 0.2711
+        }
+      },
+      "Parameters": null
+    }
+  },
+  "mean_weights": {
+    "StackMean": {
+      "bilstm": 0.1111,
+      "cnn": 0.1111,
+      "cnn_lstm_hybrid": 0.1111,
+      "lstm": 0.1111,
+      "physresidual": 0.1111,
+      "randomforest": 0.1111,
+      "svr": 0.1111,
+      "symbolicregression": 0.1111,
+      "xgboost": 0.1111
+    },
+    "StackInvRMSE": {
+      "bilstm": 0.1276,
+      "cnn": 0.0493,
+      "cnn_lstm_hybrid": 0.0496,
+      "lstm": 0.0789,
+      "physresidual": 0.1473,
+      "randomforest": 0.1421,
+      "svr": 0.138,
+      "symbolicregression": 0.1259,
+      "xgboost": 0.1414
+    },
+    "StackConvex": {
+      "bilstm": 0.1986,
+      "cnn": 0.0,
+      "cnn_lstm_hybrid": 0.0051,
+      "lstm": 0.0153,
+      "physresidual": 0.3987,
+      "randomforest": 0.0447,
+      "svr": 0.0392,
+      "symbolicregression": 0.0273,
+      "xgboost": 0.2711
+    }
+  },
+  "forecast_combination_puzzle": "learned convex blend beats the equal-weight mean (puzzle does NOT hold here)",
+  "references": [
+    "Wolpert 1992 (stacked generalization)",
+    "Stock & Watson 2004; Claeskens et al. 2016 (forecast-combination puzzle)",
+    "Breiman 1996 (non-negative stacking weights)"
+  ]
+}

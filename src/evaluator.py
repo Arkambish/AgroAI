@@ -16,6 +16,10 @@ from config import RESULTS_DIR, PLOTS_DIR  # variant-aware (synthetic|real)
 
 ML_NAMES = {'RandomForest', 'XGBoost', 'SVR'}
 DL_NAMES = {'LSTM', 'BiLSTM', 'CNN', 'CNN_LSTM_Hybrid'}
+# Novelty models (interpretable / hybrid / ensemble) — coloured distinctly and kept OUT of the
+# pure ML-vs-DL statistical pooling in _summarise().
+NOVEL_NAMES = {'SymbolicRegression', 'PhysResidual',
+               'StackMean', 'StackInvRMSE', 'StackConvex'}
 
 
 def compute_metrics(y_true, y_pred, model_name: str) -> dict:
@@ -57,6 +61,8 @@ def _comparison_bar_plot(comparison: pd.DataFrame, save_path: str) -> None:
     for m in comparison['Model']:
         if m in ML_NAMES:
             colors.append('tab:blue')
+        elif m in NOVEL_NAMES:
+            colors.append('tab:green')
         elif m == 'CNN_LSTM_Hybrid':
             colors.append('tab:red')
         else:
@@ -78,6 +84,7 @@ def _comparison_bar_plot(comparison: pd.DataFrame, save_path: str) -> None:
         plt.Rectangle((0, 0), 1, 1, color='tab:blue', label='ML model'),
         plt.Rectangle((0, 0), 1, 1, color='tab:orange', label='DL model'),
         plt.Rectangle((0, 0), 1, 1, color='tab:red', label='Hybrid CNN-LSTM (novel)'),
+        plt.Rectangle((0, 0), 1, 1, color='tab:green', label='Novelty (physics/stacking/symbolic)'),
     ]
     ax1.legend(handles=legend_elements, loc='upper left')
     ax2.legend(loc='upper right')

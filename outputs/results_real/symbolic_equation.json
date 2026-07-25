@@ -14,7 +14,7 @@
     "MAE": 3.9126,
     "R2": -0.2538,
     "MAPE": 27.19,
-    "Train_Time_s": 36.34,
+    "Train_Time_s": 35.66,
     "Best_Params": {
       "features": [
         "temp_x_humidity",
