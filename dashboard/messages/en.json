@@ -54,6 +54,7 @@
     "success": "Prediction Completed",
     "successDescription": "AI has successfully generated yield prediction",
     "whyPrediction": "Why this prediction?"
+    ,"error": "Prediction failed — backend unavailable. Please try again later."
   },
 
   "recommend": {
@@ -138,7 +139,15 @@
       "temperature": "Temperature",
       "humidity": "Humidity",
       "soil_ph": "Soil pH",
-      "soil_moisture": "Soil Moisture"
+      "soil_moisture": "Soil Moisture",
+      "ndvi": "NDVI",
+      "solar_radiation": "Solar Radiation",
+      "evi": "EVI",
+      "clay": "Clay",
+      "sand": "Sand",
+      "organic_carbon": "Organic Carbon",
+      "yield 3yr avg": "3-Year Average Yield"
+
     }
   },
   "districts": {

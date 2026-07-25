@@ -51,6 +51,7 @@
     "success": "கணிப்பு முடிந்தது",
     "successDescription": "AI வெற்றிகரமாக கணிப்பை உருவாக்கியது",
     "whyPrediction": "ஏன் இந்த கணிப்பு?"
+    ,"error": "கணிப்பு தோல்வி — பின்வினையை வழங்கும் சேவை கிடைக்கவில்லை. தயவுசெய்து பின்னர் முயற்சிக்கவும்."
   },
 
   "recommend": {
@@ -136,7 +137,14 @@
       "temperature": "வெப்பநிலை",
       "humidity": "ஈரப்பதம்",
       "soil_moisture": "மண் ஈரப்பதம்",
-      "soil_ph": "மண் pH"
+      "soil_ph": "மண் pH",
+      "ndvi": "NDVI",
+      "solar_radiation": "சூரிய கதிர்வீச்சு",
+      "evi": "EVI",
+      "clay": "களிமண்",
+      "sand": "மணல்",
+      "organic_carbon": "கரிம கார்பன்",
+      "yield 3yr avg": "3-ஆண்டு சராசரி விளைச்சல்"
     }
   },
   "districts": {
