@@ -1,0 +1,29 @@
+{
+  "equation": "sub(add(sqrt(sqrt(mul(temp_x_humidity, prev_year_yield))), 3.251), drought_index_spi)",
+  "raw_program": "sub(add(sqrt(sqrt(mul(X0, X4))), 3.251), X2)",
+  "features": [
+    "temp_x_humidity",
+    "season_mean_evi",
+    "drought_index_spi",
+    "rainfall_x_ndvi",
+    "prev_year_yield"
+  ],
+  "metrics": {
+    "Model": "SymbolicRegression",
+    "RMSE": 4.5823,
+    "MAE": 3.9126,
+    "R2": -0.2538,
+    "MAPE": 27.19,
+    "Train_Time_s": 36.34,
+    "Best_Params": {
+      "features": [
+        "temp_x_humidity",
+        "season_mean_evi",
+        "drought_index_spi",
+        "rainfall_x_ndvi",
+        "prev_year_yield"
+      ]
+    },
+    "Parameters": null
+  }
+}

@@ -6,7 +6,7 @@
     "MAE": 3.3932,
     "R2": 0.0203,
     "MAPE": 23.44,
-    "Train_Time_s": 2.95,
+    "Train_Time_s": 2.89,
     "Best_Params": {
       "max_depth": 10,
       "min_samples_leaf": 1,

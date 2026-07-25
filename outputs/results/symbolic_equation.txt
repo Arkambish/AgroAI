@@ -1,0 +1,4 @@
+Avg_Yield_MT_per_Ha ≈ add(sqrt(ndvi_x_lst), mul(season_min_ndvi, add(mul(yield_3yr_avg, season_mean_ndvi), sqrt(ndvi_x_lst))))
+
+Features: ['ndvi_x_lst', 'season_min_ndvi', 'season_mean_ndvi', 'season_max_ndvi', 'yield_3yr_avg']
+RMSE=2.0944  R2=0.838  MAPE=23.01%

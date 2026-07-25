@@ -35,7 +35,7 @@ CORS(app)
 
 _state = {
     'model': None, 'metrics': None, 'model_name': None, 'scaler': None,
-    'context_df': None, 'explainer': None,
+    'context_df': None, 'explainer': None, 'conformal': None,
 }
 
 
@@ -92,6 +92,13 @@ def _load_state() -> None:
     else:
         print('[api] integrated_dataset.csv not found — /context will return 503.')
 
+    # Optional: conformal (calibrated) interval half-widths per model.
+    conf_path = os.path.join(RESULTS_DIR, 'conformal.json')
+    if os.path.exists(conf_path):
+        with open(conf_path) as f:
+            _state['conformal'] = json.load(f)
+        print('[api] Loaded conformal intervals')
+
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -114,11 +121,18 @@ def predict():
         feature_vec = _state['scaler'].transform(feature_vec)
     prediction = float(_state['model'].predict(feature_vec)[0])
 
+    # Prefer conformal (calibrated) interval half-width; fall back to Gaussian ±1.96·RMSE.
+    conf = (_state.get('conformal') or {}).get(_state.get('model_name'))
     rmse = float(_state['metrics'].get('RMSE', 0)) if _state['metrics'] else 0.0
-    if rmse > 0:
+    if conf and conf.get('q'):
+        margin = float(conf['q'])
+        interval_method = f'conformal_{int(round(conf.get("coverage_target", 0.9) * 100))}pct'
+    elif rmse > 0:
         margin = 1.96 * rmse
+        interval_method = 'gaussian_1.96rmse'
     else:
         margin = prediction * 0.15
+        interval_method = 'heuristic_15pct'
 
     # Calculate SHAP values for this prediction
     shap_dict = {}
@@ -151,6 +165,8 @@ def predict():
         'shap_values': shap_dict,
         'model': _state.get('model_name'),
         'model_r2': _state['metrics'].get('R2', None) if _state['metrics'] else None,
+        'interval_method': interval_method,
+        'interval_coverage': conf.get('empirical_coverage') if conf else None,
     }
 
     # TODO: Implement PostgreSQL storage here
@@ -175,6 +191,16 @@ def feature_importance():
     if not os.path.exists(fi_path):
         return jsonify({'error': 'feature_importance.json not found — run SHAP step first.'}), 404
     with open(fi_path) as f:
+        return jsonify(json.load(f))
+
+
+@app.route('/equation', methods=['GET'])
+def equation():
+    """The interpretable symbolic-regression yield equation (novelty artifact)."""
+    eq_path = os.path.join(RESULTS_DIR, 'symbolic_equation.json')
+    if not os.path.exists(eq_path):
+        return jsonify({'error': 'symbolic_equation.json not found — run the pipeline first.'}), 404
+    with open(eq_path) as f:
         return jsonify(json.load(f))
 
 

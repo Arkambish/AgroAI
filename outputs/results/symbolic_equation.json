@@ -1,0 +1,29 @@
+{
+  "equation": "add(sqrt(ndvi_x_lst), mul(season_min_ndvi, add(mul(yield_3yr_avg, season_mean_ndvi), sqrt(ndvi_x_lst))))",
+  "raw_program": "add(sqrt(X0), mul(X1, add(mul(X4, X2), sqrt(X0))))",
+  "features": [
+    "ndvi_x_lst",
+    "season_min_ndvi",
+    "season_mean_ndvi",
+    "season_max_ndvi",
+    "yield_3yr_avg"
+  ],
+  "metrics": {
+    "Model": "SymbolicRegression",
+    "RMSE": 2.0944,
+    "MAE": 1.6572,
+    "R2": 0.838,
+    "MAPE": 23.01,
+    "Train_Time_s": 83.11,
+    "Best_Params": {
+      "features": [
+        "ndvi_x_lst",
+        "season_min_ndvi",
+        "season_mean_ndvi",
+        "season_max_ndvi",
+        "yield_3yr_avg"
+      ]
+    },
+    "Parameters": null
+  }
+}

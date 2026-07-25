@@ -6,7 +6,7 @@
     "MAE": 3.4836,
     "R2": -0.0375,
     "MAPE": 24.55,
-    "Train_Time_s": 0.04,
+    "Train_Time_s": 0.03,
     "Best_Params": {
       "C": 10,
       "epsilon": 0.1,
