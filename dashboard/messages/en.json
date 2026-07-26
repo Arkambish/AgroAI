@@ -108,7 +108,8 @@
   "button": {
     "predict": "Predict Yield",
     "start": "Start Prediction",
-    "go_to_predict": "Go to Prediction"
+    "go_to_predict": "Go to Prediction",
+    "newPrediction": "New Prediction"
   },
 
   "dashboard": {

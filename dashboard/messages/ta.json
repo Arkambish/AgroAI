@@ -108,7 +108,8 @@
   "button": {
     "predict": "கணிப்பு செய்க",
     "start": "கணிப்பை தொடங்கு",
-    "go_to_predict": "கணிப்புக்கு செல்லவும்"
+    "go_to_predict": "கணிப்புக்கு செல்லவும்",
+    "newPrediction": "புதிய கணிப்பு"
   },
 
   "dashboard": {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Lightbulb,
   CheckCircle2,
@@ -9,6 +10,7 @@ import {
   Droplets,
   Sparkles,
   RotateCw,
+  RotateCcw,
 } from "lucide-react";
 
 import { useTranslations, useLocale } from "next-intl";
@@ -20,7 +22,7 @@ import {
   type ExplanationItem,
   type PredictResponse,
 } from "@/lib/api";
-import { useLocalJSON } from "@/lib/use-local-flag";
+import { useLocalJSON, resetPrediction, PREDICTION_KEY } from "@/lib/use-local-flag";
 import { clsx } from "clsx";
 
 type RiskLevel = "High" | "Moderate" | "Low";
@@ -28,8 +30,17 @@ type RiskLevel = "High" | "Moderate" | "Low";
 export default function RecommendationPage() {
   const t = useTranslations();
   const locale = useLocale();
+  const router = useRouter();
 
-  const prediction = useLocalJSON<PredictResponse>("last_prediction");
+  const prediction = useLocalJSON<PredictResponse>(PREDICTION_KEY);
+
+  // Same centralized reset used on Predict/Explain — clears the shared
+  // prediction/SHAP/recommendation state and sends the farmer back to the
+  // form to start over.
+  const handleNewPrediction = () => {
+    resetPrediction();
+    router.push(`/${locale}/predict`);
+  };
   const explanations = useMemo<ExplanationItem[]>(
     () => convertSHAPToExplanation(prediction?.shap_values ?? {}),
     [prediction]
@@ -224,12 +235,23 @@ export default function RecommendationPage() {
 
   return (
     <div className="space-y-10">
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          {t("recommend.title")}
-        </h1>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div className="flex flex-col space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            {t("recommend.title")}
+          </h1>
 
-        <p className="text-slate-500">{t("recommend.subtitle")}</p>
+          <p className="text-slate-500">{t("recommend.subtitle")}</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleNewPrediction}
+          className="flex shrink-0 items-center justify-center space-x-2 rounded-2xl border-2 border-slate-200 bg-white px-5 py-3 font-bold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50"
+        >
+          <RotateCcw size={18} />
+          <span>{t("button.newPrediction")}</span>
+        </button>
       </div>
 
       <div className="rounded-3xl bg-linear-to-br from-emerald-600 to-lime-600 p-8 text-white shadow-xl">

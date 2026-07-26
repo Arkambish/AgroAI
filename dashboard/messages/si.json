@@ -108,7 +108,8 @@
   "button": {
     "predict": "අනාවැකි කරන්න",
     "start": "අනාවැකිය අරඹන්න",
-    "go_to_predict": "අනාවැකි වෙත යන්න"
+    "go_to_predict": "අනාවැකි වෙත යන්න",
+    "newPrediction": "නව අනාවැකියක්"
   },
 
   "dashboard": {

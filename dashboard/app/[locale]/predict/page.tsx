@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Sprout, Info, Sparkles } from "lucide-react";
+import { Sprout, Info, Sparkles, RotateCcw } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 
 import {
@@ -15,7 +15,13 @@ import {
   type DistrictInfo,
 } from "@/lib/api";
 import { FEATURE_META_BY_NAME } from "@/lib/features";
-import { useLocalFlag, useLocalJSONState } from "@/lib/use-local-flag";
+import {
+  useLocalFlag,
+  useLocalJSONState,
+  resetPrediction,
+  PREDICTION_KEY,
+  FARMER_INPUTS_KEY,
+} from "@/lib/use-local-flag";
 import FieldInputCard, { type FarmerInputs } from "@/components/FieldInputCard";
 import KnownDataPanel from "@/components/KnownDataPanel";
 import AdvancedOverrides, {
@@ -25,8 +31,6 @@ import PredictionResultCard from "@/components/PredictionResultCard";
 import ChatAssistant from "@/components/ChatAssistant";
 
 const ADVANCED_KEY = "agrisense_advanced_mode";
-const PREDICTION_KEY = "last_prediction";
-const FARMER_INPUTS_KEY = "last_farmer_inputs";
 
 const DEFAULT_FARMER_INPUTS: FarmerInputs = {
   district: "",
@@ -75,48 +79,51 @@ export default function PredictPage() {
     {}
   );
 
-  // Read via a ref rather than a dependency: this effect should only run
-  // once per real "load" trigger, not every time the persisted inputs
-  // change (which would refetch the catalog on every keystroke).
+  // Read via a ref rather than a dependency: the seed effect below should
+  // only re-seed when it actually needs to, not every time the persisted
+  // inputs change (which would fight the farmer's own edits).
   const farmerInputsRef = useRef(farmerInputs);
   farmerInputsRef.current = farmerInputs;
 
-  // Load the district catalog once, then seed the form with the first valid
-  // district/season/year combination — but only if nothing is already
-  // persisted, so a language switch (which re-runs this effect, since `t`
-  // gets a new identity per locale) doesn't stomp on what the farmer already
-  // entered.
+  // Fetch the district catalog. Split from seeding (below) so a "New
+  // Prediction" reset — which clears farmerInputs but doesn't need a fresh
+  // fetch, since `districts` is already loaded — can re-trigger seeding on
+  // its own without an extra network round-trip.
   useEffect(() => {
     let active = true;
 
-    const loadDistricts = async () => {
-      try {
-        const data = await getDistricts();
-        if (!active || !data.districts?.length) return;
-        setDistricts(data.districts);
-
-        const current = farmerInputsRef.current;
-        const stillValid = data.districts.some((d) => d.name === current.district);
-        if (!current.district || !stillValid) {
-          const first = data.districts[0];
-          setFarmerInputs({
-            ...current,
-            district: first.name,
-            season: first.seasons[0] ?? "Yala",
-            year: first.years[first.years.length - 1] ?? current.year,
-          });
-        }
-      } catch {
+    getDistricts()
+      .then((data) => {
+        if (active && data.districts?.length) setDistricts(data.districts);
+      })
+      .catch(() => {
         if (active) setContextError(t("predict.districtsError"));
-      }
-    };
-
-    void loadDistricts();
+      });
 
     return () => {
       active = false;
     };
-  }, [t, setFarmerInputs]);
+  }, [t]);
+
+  // Seed the first valid district/season/year whenever the current selection
+  // is empty or no longer valid for the loaded catalog — covers both the
+  // first-ever load (nothing persisted yet) and a reset (which clears
+  // farmerInputs back to blank), without duplicating this logic between the
+  // two call sites.
+  useEffect(() => {
+    if (!districts.length) return;
+    const current = farmerInputsRef.current;
+    const stillValid = districts.some((d) => d.name === current.district);
+    if (current.district && stillValid) return;
+
+    const first = districts[0];
+    setFarmerInputs({
+      ...current,
+      district: first.name,
+      season: first.seasons[0] ?? "Yala",
+      year: first.years[first.years.length - 1] ?? current.year,
+    });
+  }, [districts, storedFarmerInputs, setFarmerInputs]);
 
   const { district, season, year } = farmerInputs;
 
@@ -256,6 +263,9 @@ export default function PredictPage() {
       }
 
       const res = await predictYield(payload);
+      // A full overwrite, not a merge — localStorage.setItem inside setResult
+      // always replaces the previous value wholesale, so a re-predict can
+      // never leave a stale SHAP value or field lingering from the last one.
       setResult(res);
     } catch (error) {
       console.error("Prediction failed:", error);
@@ -264,6 +274,22 @@ export default function PredictPage() {
       setLoading(false);
     }
   };
+
+  // "New Prediction": clears the shared prediction/SHAP state (which also
+  // sends Explain/Recommendation back to their "run a prediction first"
+  // placeholder, since they read the same key) and the form, but never the
+  // locale — resetPrediction() only ever touches its own two keys. The
+  // district/season/year seed effect above re-populates the form the moment
+  // farmerInputs goes back to empty, using the catalog already in memory.
+  const handleNewPrediction = useCallback(() => {
+    resetPrediction();
+    setPredictError(null);
+    setOverrides({});
+    setOverrideErrors({});
+    setContext(null);
+    setContextError(null);
+    setBaseline(null);
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -306,21 +332,34 @@ export default function PredictPage() {
             onReset={handleReset}
           />
 
-          <button
-            type="button"
-            onClick={handlePredict}
-            disabled={loading || !isValid}
-            className="flex w-full items-center justify-center space-x-2 rounded-2xl bg-emerald-600 py-4 text-lg font-bold text-white shadow-lg transition-all hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? (
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            ) : (
-              <>
-                <Sprout size={24} />
-                <span>{t("button.predict")}</span>
-              </>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handlePredict}
+              disabled={loading || !isValid}
+              className="flex flex-1 items-center justify-center space-x-2 rounded-2xl bg-emerald-600 py-4 text-lg font-bold text-white shadow-lg transition-all hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? (
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <>
+                  <Sprout size={24} />
+                  <span>{t("button.predict")}</span>
+                </>
+              )}
+            </button>
+
+            {result && (
+              <button
+                type="button"
+                onClick={handleNewPrediction}
+                className="flex items-center justify-center space-x-2 rounded-2xl border-2 border-slate-200 bg-white px-5 py-4 font-bold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50"
+              >
+                <RotateCcw size={20} />
+                <span className="hidden sm:inline">{t("button.newPrediction")}</span>
+              </button>
             )}
-          </button>
+          </div>
 
           {hasErrors && (
             <p className="text-center text-sm font-medium text-red-600">
