@@ -1,180 +1,210 @@
 # 05 — Novelty and Research Contribution
 
-This document is what you'll lean on when writing the introduction, methodology, and discussion sections of your final report. It explains *what is new* about this work and *why it matters*.
-
-## The research gap (what doesn't exist yet)
-
-Look at what the literature has done for crop yield prediction:
-
-| What's been done | Where |
-|---|---|
-| Rice (paddy) yield prediction in Sri Lanka using ML | Amarasinghe et al. 2024 (cited in your proposal) |
-| Maize/wheat yield prediction with LSTM | Many papers, mostly US/EU |
-| CNN on satellite RGB images for yield | Several papers, mostly cash crops |
-| Deep learning surveys in agriculture | Kamilaris & Prenafeta-Boldú 2018 |
-
-What **doesn't** exist yet:
-
-1. **No big-onion yield prediction system** for Sri Lanka — the proposal explicitly says this.
-2. **No vegetable yield prediction** under the data-scarcity conditions typical of Sri Lankan horticulture (no crop-cutting surveys → ~150 data points, not thousands).
-3. **No bimodal-monsoon-aware architectures** — most models are built for single-season cash crops.
-4. **No quantitative ablation** showing how much each data source contributes to vegetable yield prediction in Sri Lanka.
-
-This research targets all four gaps.
+> **Rewritten.** The previous version of this file claimed three novelties — an ML-vs-DL
+> comparison, a season-injecting CNN-LSTM hybrid, and a data-source ablation — using
+> synthetic-data numbers. All three have since been falsified on real data:
+>
+> * the season indicator is **constant** (the real panel is Yala-only), so the hybrid's
+>   season-injection is inert by construction;
+> * the DL models were fed a **fabricated** weather sequence, a deterministic function of
+>   their own tabular inputs, so the ML-vs-DL comparison measured nothing;
+> * the ablation's headline ("satellite explains 80% of variance") was a synthetic
+>   artifact — on real data, district-mean NDVI cannot see a crop occupying 0.002–0.89%
+>   of a district's land area.
+>
+> Results of record: **[PADR_FINDINGS.md](PADR_FINDINGS.md)**.
 
 ---
 
-## Three concrete novelties
+## The problem with the old framing
 
-### Novelty 1: First ML vs DL comparison for vegetable yield prediction with scarce data
+The supervisor's objection was correct and worth restating precisely. Every model in the
+original project was a known method transplanted to a new crop:
 
-**The question this research answers:**
-> "When you have only ~150 records spread across 4 districts and 20 years, does deep learning beat classical machine learning for crop yield prediction?"
+| what was built | prior art it reproduces |
+|---|---|
+| RF / XGBoost / SVR under LOYO-CV | standard county-yield ML since ~2016 |
+| CNN-LSTM hybrid | You et al., Huang et al. — maize, wheat, soybean |
+| physics-residual (FAO backbone + ML on residual) | **Shahhosseini et al. 2021**, cited in the code itself |
+| stacking / inverse-RMSE / convex weights | forecast-combination literature, 1969 onward |
+| split conformal | Vovk et al.; already applied to yield prediction |
+| SHAP + ablation | reporting practice, not contribution |
 
-**Why this is a contribution:**
-The conventional wisdom from imagenet-style problems is "more parameters + more data = better". But in agriculture, especially for non-cash crops in developing countries, you don't have ImageNet-scale data. You have a few decades of patchy government surveys. The field needs *guidance* on whether DL is even worth the complexity in this regime.
+Novelty in each case reduced to *"first applied to onion"*. That is a **domain** claim.
+A thesis needs a **method** claim.
 
-By running 3 ML models and 4 DL models on the same data with the same evaluation protocol (LOYO-CV) and the same statistical tests (Wilcoxon, paired t), this research gives a defensible answer.
+## The gap that is actually here
 
-**Expected contribution to the field:**
-- If ML wins: "for vegetable yield prediction in data-scarce contexts, classical ML is sufficient" — a useful negative result that saves practitioners from wasting effort on DL.
-- If DL wins: "DL methods, when carefully regularised and architecturally tuned to bimodal seasonality, transcend the data-scarcity barrier" — a positive result that opens up DL adoption.
+The research problem is not "predict onion yield". It is:
 
-Either way, **the comparison itself is the contribution.**
+> **How do you learn a crop-yield model when labels are extremely scarce (n = 28), the
+> covariates are abundant (≈38,000 daily weather records), and the validation protocol
+> removes the dominant source of variance by construction?**
 
-### Novelty 2: A hybrid CNN-LSTM architecture for the bimodal Yala/Maha monsoon system
+That is not onion-specific. It describes crop forecasting across most of South Asia and
+Africa, wherever crop-cutting surveys do not exist. Every method in the original project
+assumed labels were scarce-but-adequate and covariates arrived pre-summarised. Here the
+asymmetry is inverted, and that asymmetry is the contribution.
 
-**The architectural innovation:**
+---
 
-Most multi-modal yield models look like this:
+## The method: PADR
+
+**Phenology-Aligned Differentiable Response** — a smooth, 17-parameter agronomic response
+model whose crop constants are *estimated from data under agronomic bounds*, applied to
+daily weather re-indexed onto thermal phenological time, fitted by gradient-based
+optimisation with shrinkage toward literature values.
 
 ```
-Concatenate(satellite_features, weather_features)
-   ↓
-Dense layers
-   ↓
-Yield prediction
+S(d,y) = ∫₀¹ β(τ) · f_T(τ) · f_W(τ) · f_WL(τ) dτ
+ŷ      = (Y₀ + u_d) · S(d,y)
 ```
 
-This loses the spatial structure of satellite data and the temporal structure of weather data. Both get flattened into one vector.
+Seventeen parameters, against 44,929 in the CNN-LSTM it replaces. Implementation:
+[src/padr.py](../src/padr.py), [src/phenology.py](../src/phenology.py).
 
-**This research's hybrid:**
+### The four claims, and how each was tested
+
+Every claim is an *arm* in [src/ablation_padr.py](../src/ablation_padr.py), so each can be
+falsified independently. Two survived; two did not.
+
+| # | claim | distinguished from | Δ R² vs control | verdict |
+|---|---|---|---|---|
+| **N1** | The FAO-33 and thermal constants (Ky, T_base, T_opt, T_crit, W_max) are **learned end-to-end** | Shahhosseini 2021 and the repo's own `physics_residual.py` freeze the crop model and fit ML on its *residual* — a two-stage hybrid. PADR estimates the physics itself. | **+0.566** | **supported** |
+| **N4** | **Shrinkage-to-physics**: an L2 penalty pulls each constant toward its textbook value, so it moves only when the data pay for it | the statistical answer to calibrating a mechanistic model on 28 observations | **+1.166** vs heavy shrinkage | **supported** |
+| **N2** | Weather integrated over **thermal phenological time**, anchored on the DCS-reported harvest date | distributed-lag yield regression uses calendar time or fixed stage windows | +0.011 | **negligible here** |
+| **N3** | An explicit **waterlogging penalty**, absent from FAO-33 | a domain-driven model-structure extension for tropical wet-season onion | −0.004 | **inert** |
+
+**Report it this way.** An ablation in which every proposed component helps is not a
+credible ablation. N2 is negligible because thermal and calendar time nearly coincide when
+temperature barely varies — the method is not wrong, the panel simply offers it nothing to
+correct. N3 is inert because waterlogging exceeds its estimated 96 mm/7-day threshold in
+3.5% of bins, in one year only.
+
+---
+
+## The headline result
+
+PADR does **not** beat predicting the training mean (R² = −0.374 against −0.230). That is
+the finding, not a failure, and it is defensible in three linked steps.
+
+### 1. The target was largely fabricated, and has been rebuilt
+
+50 of 124 month-rows were `source=synthetic`, and the fabrication reached the **target**.
+Rebuilt from 87 real DCS extent/production records as Σ(MT)/Σ(ha); correlation with the
+old target is only **0.68**. Six physically impossible records (up to **442 MT/ha**) were
+excluded. See [PADR_FINDINGS.md §1](PADR_FINDINGS.md).
+
+### 2. The target R² was mathematically unattainable
 
 ```
-Satellite ─→ CNN branch ─┐
-                          │
-Weather  ─→ LSTM branch ─┼─→ Concatenate ─→ Dense ─→ Yield
-                          │
-Season   ─────────────────┘  (Yala=1, Maha=0)
+between YEAR      63.6%     ← leave-one-year-out removes this by construction
+between DISTRICT   2.2%
+residual          34.2%     ← 54% of which is measurement error (2.81 MT/ha per cell)
+
+implied LOYO R² ceiling = 0.162
 ```
 
-The novelty is **threefold**:
+> The project's original target of **R² > 0.75 was not difficult — it was unattainable.**
+> No model could have reached it on this panel under this protocol.
 
-1. **Preserves modality structure** before merging. The CNN branch learns vegetation patterns; the LSTM branch learns weather temporal dynamics. Each modality is processed by a network architecture *suited to its data type*.
+### 3. The agro-climatic channel is inactive, and PADR is what shows it
 
-2. **Explicit season indicator injection.** The Yala/Maha indicator is concatenated *after* the heavy feature extraction, just before the final dense layers. This means:
-   - The CNN/LSTM branches learn season-agnostic feature extractors (better data efficiency).
-   - The final dense layers learn season-specific yield baselines.
-   - It's effectively soft multi-task learning in one model — the model "knows" which season's pattern to apply.
+```
+stress index S : CV =  7.95%
+observed yield : CV = 34.97%
+```
 
-3. **Calibrated for scarce data.** The architecture has only ~45,000 parameters (compare: a typical image classifier has millions). Combined with 20% dropout and early stopping, it's regularised hard. This is engineered for the FYP data regime, not borrowed from a different domain.
+Thermal response is near-constant (0.86–0.91 — tropical temperatures barely move); water
+deficit binds in 0–31% of bins and usually **0** (1,043 mm of rain plus tank irrigation);
+waterlogging binds only in 2022. A model whose output varies 8% cannot explain a target
+that varies 35%. Excluding the anomalous years makes PADR *relatively worse*, so this is
+not "right model, foiled by a policy shock" — the signal is genuinely absent.
 
-**Why this matters:**
-Bimodal monsoon agriculture is the norm in tropical Asia (Sri Lanka, India, Bangladesh, parts of SE Asia). An architecture that natively handles bimodal seasonality is reusable across the region for many crops, not just big onion.
+> **Big onion yield in Sri Lanka's dry zone is not agro-climatically limited at
+> district-season resolution.**
 
-### Novelty 3: Quantitative ablation across 6 data-source configurations
+**Why the mechanistic model is essential to this claim.** A random forest scoring −0.56
+tells an examiner nothing. PADR reports *which* mechanisms are inactive, *by how much*,
+with agronomic constants estimated to plausible values and tight across all seven folds
+(Ky = 0.97 ± 0.05, T_base = 10.24 ± 0.13). That is what a mechanistic model buys and a
+black box cannot.
 
-**The ablation experiments:**
+### A secondary finding worth its own paragraph
 
-| Code | Features | What it tests |
+Pinning the constants to their FAO-33 literature values (`strong_shrinkage`) produces a
+stress CV of **35.3%** — almost exactly the observed yield CV — yet scores the *worst*
+R² of any arm at −1.540. Learning the constants does not add explanatory power so much as
+**remove spurious sensitivity**: stress CV falls 22.4% → 8.1% while R² improves by 0.57.
+
+> Standard FAO-33 crop coefficients materially overstate weather sensitivity for big onion
+> under Sri Lankan dry-zone tank irrigation. This is a direct argument for local
+> calibration of mechanistic crop models — visible only because the constants were made
+> estimable.
+
+---
+
+## Methodological corrections that stand on their own
+
+Each of these is independently reportable, and each corrects a real defect.
+
+| correction | before | after |
 |---|---|---|
-| A | Weather only | Weather baseline |
-| B | Satellite only | Satellite baseline |
-| C | Historical (lagged yield) only | Memory baseline |
-| D | Soil only | Soil baseline |
-| E | Weather + Satellite | Two-source synergy |
-| F | All sources combined | Full multi-source value |
-
-For each, run LOYO-CV → record RMSE, MAE, R² → produce a comparison plot.
-
-**Why this is novel for vegetable yield in Sri Lanka:**
-
-No published study has decomposed the contribution of each data source for big onion in Sri Lanka. Your supervisor and field practitioners can use these ablation numbers to answer:
-
-- "If I can only afford one data stream, which one gives me the most yield-prediction power?"
-- "Is satellite data worth the engineering cost for this use case?"
-- "How much does soil data add once I already have weather + satellite?"
-
-**Synthetic-data preview of findings:**
-
-```
-A_Weather_only        R² = 0.256
-B_Satellite_only      R² = 0.802
-C_Historical_only     R² = 0.471
-D_Soil_only           R² = -0.408   ← negative R² means worse than predicting the mean
-E_Weather+Satellite   R² = 0.809
-F_All_features        R² = 0.829
-```
-
-The headline: **satellite data alone explains ~80% of yield variance**, weather alone explains only ~26%, and adding weather to satellite barely improves R² (0.802 → 0.809). This suggests satellite imagery is the **single highest-value data stream** for big onion yield prediction.
-
-(These are synthetic-data numbers — the magnitudes will shift with real data, but the methodology is the contribution.)
+| Target definition | mean of monthly yields, ~40% fabricated | Σ(MT)/Σ(ha) from 87 real DCS records |
+| Look-ahead leaks | 4 (anomalies z-scored on the full panel, global median fill, full-sample winsorisation) | anomalies standardised against the **2000–2018** pre-sample climatology; yield lags dropped as unfixable under LOYO |
+| DL sequence inputs | **fabricated** from seasonal aggregates via a fixed sine curve | real daily NASA POWER series, 37,988 records |
+| Dead features | 7 constants or exact linear transforms (`solar_rad`=18.0, `heat_stress_days`=0, …) | removed; `heat_stress_days` now ranges 33–116 from real daily maxima |
+| Conformal coverage | `1.000` for all models — calibration set == evaluation set | year-blocked cross-conformal, coverage **0.911** vs 0.90 nominal |
+| Observation weighting | none, despite extents spanning 4–1,765 ha | `sqrt(extent)`, reported weighted and unweighted |
 
 ---
 
-## Methodological rigour (also a contribution)
+## Talking points for the viva
 
-These are practices borrowed from rigorous ML research that elevate the FYP:
+**"What is novel about your research?"**
 
-### Leave-One-Year-Out CV
-Most yield-prediction papers split data randomly into train/test. That's wrong for time-series — it leaks future information. LOYO-CV is the time-series-correct evaluation. Using it explicitly addresses a well-known methodological flaw in the agricultural ML literature.
+1. *"I make the agronomic constants of a FAO-33-style crop model estimable rather than
+   assumed, and fit them under agronomic bounds with shrinkage toward literature values.
+   Existing hybrids freeze the crop model and fit machine learning on its residual — I
+   estimate the physics itself. Learning the constants improves R² by 0.57."*
+2. *"I show that the standard FAO coefficients overstate weather sensitivity for big onion
+   under Sri Lankan tank irrigation by roughly a factor of four in stress variability."*
+3. *"I decompose yield variance and show the R² > 0.75 target was unattainable: 64% of
+   variance is between-year and removed by leave-one-year-out, and measurement error is
+   54% of what remains, capping attainable R² at 0.162."*
+4. *"I demonstrate that the agro-climatic channel is inactive in this system — the stress
+   index varies 8% against 35% in observed yield — and identify inputs and policy, not
+   weather, as the binding constraint."*
 
-### Statistical significance testing
-Reporting "RF gets R² = 0.842, XGB gets R² = 0.827" without a statistical test doesn't tell you if the difference is real or noise. The Wilcoxon signed-rank test on paired residuals does. Including this elevates the analysis from "leaderboard reporting" to "scientific comparison".
+**"Why is your R² negative?"**
 
-### SHAP for interpretability
-Showing R² is not enough — agricultural stakeholders want to know *why* the model thinks yield will be 16 MT/Ha. SHAP gives per-prediction and per-feature attributions. Including SHAP plots in your final report addresses the well-known "black-box problem" critique that often hits ML-in-agriculture papers.
+*"Because leave-one-year-out removes 64% of the variance by construction and measurement
+error accounts for half of the rest. The attainable ceiling is 0.162, and every model
+including the naive mean sits below zero. The contribution is not the score — it is
+establishing why no score was available, and which mechanisms are responsible."*
 
-### Reproducibility
-Every random seed is fixed (`RANDOM_STATE=42`). Every artefact is saved (models, plots, CSVs, JSONs). Anyone can re-run `python main.py` and get the same numbers. This satisfies the FAIR data / reproducible science principles your supervisor will appreciate.
+**"How is this different from existing work?"**
 
----
+- Shahhosseini et al. (2021) run a crop model with fixed coefficients and fit ML on the
+  residual. PADR estimates the coefficients, which is what makes them reportable as a
+  scientific result.
+- Distributed-lag and functional yield regressions index weather by calendar time or fixed
+  growth-stage windows. PADR derives its axis from the DCS-reported harvest distribution
+  and accumulated heat — though on this panel that refinement proves negligible, which is
+  itself reported.
+- Yield-prediction papers routinely report R² without establishing whether their
+  validation protocol permits it. The variance decomposition and the attainable ceiling
+  are, as far as this review found, not standard practice.
 
-## How this fits the FYP report structure
+## Honest limitations
 
-Map this research to standard chapters:
-
-| Chapter | What goes there |
-|---|---|
-| **Introduction** | Problem from [01_PROBLEM_AND_DATA.md](01_PROBLEM_AND_DATA.md) — onion imports, lack of survey methodology, food security |
-| **Literature Review** | Existing rice/maize/wheat yield prediction work; identify the gaps listed at the top of this file |
-| **Methodology** | Pipeline architecture from [03_PIPELINE_WALKTHROUGH.md](03_PIPELINE_WALKTHROUGH.md); model architectures from [04_MODELS_EXPLAINED.md](04_MODELS_EXPLAINED.md); LOYO-CV evaluation protocol |
-| **Experimental Setup** | Data sources table; hyperparameter grids; evaluation metrics; statistical tests |
-| **Results** | Model comparison table + bar chart; per-district R²; Yala vs Maha analysis |
-| **Discussion** | Three novelty sections from above; ablation findings (which data source matters most?); SHAP interpretation; ML-vs-DL verdict for this data regime |
-| **Conclusion** | Best model + R² achieved; whether target R² > 0.75 was met; recommendations for stakeholders; future work |
-| **Appendix** | Configuration files; full LOYO fold-by-fold tables; all 17 generated plots |
-
----
-
-## Talking points for your supervisor / viva
-
-When asked "what's novel about your research?":
-
-1. **"This is the first published machine learning system for big onion yield prediction in Sri Lanka."**
-2. **"I've designed a hybrid CNN-LSTM architecture that natively handles the bimodal Yala/Maha monsoon system, by injecting a season indicator into the final dense layers — letting the model learn season-specific yield baselines while sharing earlier feature extraction across seasons."**
-3. **"I've conducted a rigorous comparison of three classical ML and four deep learning models using Leave-One-Year-Out Cross-Validation and statistical significance tests, answering whether DL is worth the complexity in data-scarce vegetable yield prediction."**
-4. **"I've decomposed the contribution of each data source via a six-experiment ablation study, providing actionable guidance to practitioners about which data streams are essential vs redundant."**
-
-When asked "why does it matter?":
-
-1. **Food security**: Sri Lanka is import-dependent for big onion. Better forecasts → better import planning → more stable prices → more reliable food supply.
-2. **Foreign exchange**: Big onion imports cost foreign exchange. Better forecasts → smarter imports → savings.
-3. **Farmer welfare**: Early forecasts help farmers price decisions and resource allocation.
-4. **Methodology transferable**: The bimodal-monsoon architecture works for other tropical Asian crops in similar climate regimes.
-
-When asked "how does this differ from existing work?":
-
-- "Amarasinghe et al. (2024) did rice yield in Sri Lanka — but rice has crop-cutting surveys with thousands of data points; vegetables don't. My work targets the data-scarce vegetable regime."
-- "Kamilaris & Prenafeta-Boldú (2018) surveyed deep learning in agriculture broadly — but didn't address bimodal monsoon systems or vegetable-specific challenges."
-- "Most yield-prediction CNN-LSTM hybrids are designed for cash crops with monthly satellite mosaics; mine is engineered for the data scarcity and seasonal bimodality of South Asian non-cash crops."
+1. n = 28 (4 districts × 7 years, Yala only). No Maha data exists.
+2. Kurunegala and Matale fall in one NASA POWER grid cell — byte-identical weather. Three
+   distinct weather series for four districts, and Kurunegala's NDVI is a Matale proxy.
+3. Soil is missing for Kurunegala and Matale (no SoilGrids export).
+4. Six month-records were excluded as physically impossible and need DCS verification.
+5. The 2022 collapse (9.42 vs 19.30 MT/ha, all four districts) is *consistent* with the
+   April-2021 fertilizer import ban and the 2022 economic crisis, but this analysis does
+   not establish that attribution — cite the policy literature.
+6. No fertilizer, irrigation, input-cost or price data was available. Given the finding,
+   these are the variables that matter most and are the obvious next collection effort.

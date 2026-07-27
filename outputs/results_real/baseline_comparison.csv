@@ -1,0 +1,8 @@
+Model,RMSE,MAE,R2,RMSE_wt,R2_wt,achievable
+Oracle_YearMean,3.7752,3.2383,0.6359,3.5438,0.7164,False
+TrainMean,6.9375,5.4573,-0.2296,7.3993,-0.2362,True
+DistrictMean,7.2183,5.4188,-0.3312,7.8637,-0.3962,True
+XGBoost,7.2959,5.4564,-0.36,7.3423,-0.2172,True
+RandomForest,7.803,5.8258,-0.5556,7.6678,-0.3275,True
+SVR_rbf,7.8471,6.0077,-0.5732,8.2815,-0.5485,True
+Persistence,9.033,7.3266,-1.0846,9.4425,-1.0132,True

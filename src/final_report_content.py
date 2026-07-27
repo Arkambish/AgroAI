@@ -1703,25 +1703,108 @@ CHAPTER_7 = [
     ("h2", "7.1 Introduction"),
     ("p",
      "Chapter 6 documented the implemented system. This chapter reports what it "
-     "achieves. It first characterises the dataset that was actually collected, "
-     "because every result that follows must be read against its size. It then "
-     "states the evaluation protocol and metrics, reports the model comparison, "
-     "and answers the two design questions posed in Chapter 5: whether the "
-     "mechanistic backbone earns its place, and whether stacking helps. It then "
-     "reports the symbolic equation, the data-source ablation, per-district "
-     "behaviour, calibrated uncertainty and feature attribution, and closes "
-     "with the synthetic-data run that validates the architecture "
-     "independently of the small-sample question."),
+     "achieves, and it begins somewhere unusual for a results chapter: with an "
+     "audit of the data itself. That audit changed the target variable, and "
+     "every number downstream of it, so reporting it first is not a preamble but "
+     "a precondition for reading anything that follows."),
     ("p",
-     "Results in sections 7.2 through 7.11 come exclusively from the real "
-     "collected dataset. Section 7.12 alone reports synthetic-data numbers, and "
-     "labels them as such throughout. The two are never mixed."),
+     "The chapter then establishes how much of the target is explainable in "
+     "principle under the chosen validation protocol, before reporting what any "
+     "model actually achieved. Taking those in that order matters. A model "
+     "comparison read without knowing the attainable ceiling invites the reader "
+     "to attribute to the models what belongs to the data."),
+    ("p",
+     "Sections 7.2 and 7.3 report the data audit and the corrected dataset. "
+     "Section 7.4 states the protocol. Section 7.5 decomposes the variance and "
+     "derives the ceiling. Sections 7.6 through 7.9 report the model "
+     "comparison, the phenology-aligned differentiable response model and its "
+     "estimated agronomic constants, the mechanism ablations, and the diagnosis "
+     "of why the agro-climatic channel does not carry the signal. Section 7.10 "
+     "establishes how strong a signal the model could have detected, without "
+     "which the preceding section's negative conclusion would carry no weight. "
+     "Sections 7.11 and 7.12 report calibrated uncertainty and per-district "
+     "behaviour."),
 
-    ("h2", "7.2 The Evaluation Dataset"),
+    ("h2", "7.2 Data Integrity Audit"),
     ("p",
-     "The collected dataset contains twenty-eight seasonal records: four "
-     "districts observed over seven consecutive years, all in the Yala season. "
-     "Table 7.1 gives its composition and the distribution of the target."),
+     "The dataset used in the interim report was assembled from a monthly file "
+     "of one hundred and twenty-four records. Auditing that file against the "
+     "underlying Department of Census and Statistics returns established that "
+     "fifty of those one hundred and twenty-four rows carried the marker "
+     "source=synthetic, and that the fabrication reached the target variable "
+     "rather than only the covariates."),
+    ("p",
+     "This matters because yield varies from month to month within every one of "
+     "the twenty-eight district-year cells, and the seasonal target was their "
+     "unweighted mean. A cell whose months were part real and part fabricated "
+     "therefore produced a target that was part real and part invented. Only "
+     "four of the twenty-eight cells were composed entirely of real months, so "
+     "filtering at cell level was not available as a remedy."),
+    ("table", (
+        ["Category", "Count"],
+        [
+            ["Month-cells with a genuine DCS extent and production record", "87"],
+            ["Rows marked source=real, all of which map to a DCS record", "74"],
+            ["Rows marked source=synthetic with no DCS record at all", "39"],
+            ["Rows marked synthetic that did have a real record, discarded and replaced", "11"],
+            ["Genuine DCS records never used by the pipeline", "13"],
+            ["Cells composed entirely of real months", "4 of 28"],
+        ],
+        "Table 7.1: Provenance audit of the interim monthly dataset",
+    )),
+    ("p",
+     "The remedy was to abandon the monthly file as the target source and "
+     "rebuild the panel from the eighty-seven genuine DCS records, which report "
+     "harvested extent and total production as separate columns. This permits "
+     "the standard agronomic definition of yield as total production divided by "
+     "total harvested area, aggregated over the months a cell actually has. All "
+     "twenty-eight cells survive, and every value traces to a real record."),
+    ("p",
+     "The corrected target correlates with the previous one at only 0.68, and "
+     "its standard deviation more than doubles, from 4.17 to 6.37 metric tons "
+     "per hectare. Averaging fabricated values into the target had been "
+     "compressing precisely the variance the models were being asked to "
+     "predict."),
+    ("p",
+     "Two parsing faults were found and corrected in the process, either of "
+     "which silently corrupts the panel. Production values are written with "
+     "thousands separators in two records, which parse to missing values unless "
+     "the reader is told to expect them; that alone had been rendering Matale "
+     "2020 as 0.53 rather than 12.16 metric tons per hectare. Separately, zero "
+     "is a missing-data code for the second vegetation-index composite and for "
+     "all three soil columns, but a genuine measurement for extent and "
+     "production, and the two cases must be distinguished."),
+    ("p",
+     "Finally, six month-records imply yields that are not physically "
+     "attainable. The world record for onion is approximately one hundred metric "
+     "tons per hectare under intensive irrigation, and Sri Lanka averages fifteen "
+     "to twenty. Table 7.2 lists them."),
+    ("table", (
+        ["Record", "Extent (ha)", "Production (MT)", "Implied yield (MT/ha)"],
+        [
+            ["Matale, October 2025", "30.0", "13,271.7", "442"],
+            ["Polonnaruwa, October 2025", "16.7", "2,419.5", "145"],
+            ["Polonnaruwa, November 2019", "1.4", "274.0", "192"],
+            ["Anuradhapura, August 2021", "7.8", "856.4", "110"],
+            ["Polonnaruwa, October 2019", "2.8", "240.0", "84"],
+            ["Anuradhapura, October 2025", "156.9", "10,698.6", "68"],
+        ],
+        "Table 7.2: Month-records excluded as physically impossible",
+    )),
+    ("p",
+     "These six were excluded, each affected cell surviving on its remaining "
+     "months. The effect is corroborating rather than merely cosmetic: the 2025 "
+     "district yields, which had read 35.96, 42.72 and 42.11, resolve to 21.07, "
+     "21.95 and 22.85 — a coherence across three independent districts that the "
+     "uncorrected figures did not show. The full audit trail is written to "
+     "data_quality_report.csv. These records should be checked against the "
+     "original DCS publication, and this report does not claim to have "
+     "established which of extent or production was mis-transcribed."),
+
+    ("h2", "7.3 The Corrected Evaluation Dataset"),
+    ("p",
+     "Table 7.3 gives the composition of the corrected panel and the "
+     "distribution of the corrected target."),
     ("table", (
         ["Property", "Value"],
         [
@@ -1729,854 +1812,936 @@ CHAPTER_7 = [
             ["Districts", "Anuradhapura, Kurunegala, Matale, Polonnaruwa"],
             ["Years", "2019–2025 (7 years)"],
             ["Seasons", "Yala only"],
-            ["Records per district", "7"],
-            ["Records per year", "4"],
-            ["Predictors engineered", "32"],
-            ["Target mean", "16.39 MT/Ha"],
-            ["Target standard deviation", "4.17 MT/Ha"],
-            ["Target range", "8.50 – 24.06 MT/Ha"],
-            ["District means", "Anuradhapura 18.11, Matale 16.63, Polonnaruwa 16.11, Kurunegala 14.70"],
+            ["Target definition", "Total production (MT) / total harvested extent (ha)"],
+            ["Source records", "87 genuine DCS month-records, less 6 excluded"],
+            ["Target mean", "17.89 MT/Ha"],
+            ["Target standard deviation", "6.37 MT/Ha"],
+            ["Target range", "3.63 – 33.58 MT/Ha"],
+            ["Harvested extent per cell", "3.5 – 1,765 ha"],
         ],
-        "Table 7.1: Composition of the collected evaluation dataset",
+        "Table 7.3: Composition of the corrected evaluation dataset",
     )),
     ("p",
-     "Three properties of this dataset govern the interpretation of everything "
-     "that follows, and it is more useful to state them plainly at the outset "
-     "than to discover them in the discussion."),
+     "Harvested extent spans a factor of five hundred across cells. A "
+     "district-year covering three and a half hectares yields an estimate of "
+     "very different reliability from one covering one thousand seven hundred, "
+     "and treating them as equally informative is not defensible. Observations "
+     "are therefore weighted by the square root of harvested extent, normalised "
+     "to mean one. Plain area weighting was rejected because its five-hundred-fold "
+     "span would have effectively removed Kurunegala from the analysis "
+     "altogether. Both weighted and unweighted metrics are reported throughout."),
     ("p",
-     "First, twenty-eight records against thirty-two predictors is a regime in "
-     "which the number of candidate explanatory variables exceeds the number of "
-     "observations. No learning algorithm can reliably identify which "
-     "predictors matter under that ratio. This is not a defect in the "
-     "modelling; it is a property of what data exists for this crop, and it is "
-     "precisely the condition the project set out to work within rather than to "
-     "wish away."),
+     "Four properties of this dataset govern the interpretation of everything "
+     "that follows."),
     ("p",
-     "Second, the collected record covers only the Yala season. The Maha season "
-     "is represented in the system design, in the feature set and in the "
-     "synthetic reference run, but not in the collected data. Consequently the "
-     "hybrid CNN-LSTM's season-indicator injection — designed specifically for "
-     "the bimodal structure — cannot be evaluated on real data, because the "
-     "indicator is constant across every real record. Its architectural claim "
-     "is therefore tested only on the synthetic reference in section 7.12, and "
-     "this limitation is restated in section 8.5."),
+     "First, twenty-eight records is a small sample by any standard, and with "
+     "seven years the Leave-One-Year-Out protocol produces seven folds of four "
+     "records each, each training on twenty-four."),
     ("p",
-     "Third, with seven years the Leave-One-Year-Out protocol produces seven "
-     "folds of four records each. Each fold's training partition holds "
-     "twenty-four records. Any model that requires more than a couple of dozen "
-     "effective observations to fit its parameters is being asked to do "
-     "something the data cannot support, and the results reflect that."),
+     "Second, the collected record covers only the Yala season. The hybrid "
+     "CNN-LSTM's season-indicator injection, designed for the bimodal Yala and "
+     "Maha structure, therefore cannot be evaluated at all on real data: the "
+     "indicator is constant across every record, making the architectural claim "
+     "inert by construction rather than merely untested."),
+    ("p",
+     "Third, the four districts are not four independent meteorological "
+     "observations. Kurunegala and Matale fall inside a single NASA POWER grid "
+     "cell and receive byte-identical daily weather, at a correlation of exactly "
+     "one. There are three distinct weather series for four districts."),
+    ("p",
+     "Fourth, and most consequentially for the satellite component, onion "
+     "occupies between 0.002 and 0.89 per cent of any district's land area. A "
+     "district-mean MODIS composite is therefore a measurement of paddy, forest "
+     "and scrub, not of onion. Anchoring the crop calendar on the satellite "
+     "green-up curve was attempted and twenty-five of twenty-eight district-years "
+     "failed to anchor. This is also the explanation for the interim report's "
+     "satellite-only ablation result, which was negative on real data while "
+     "appearing strongly positive on synthetic data where the vegetation index "
+     "had been generated as a function of yield."),
 
-    ("h2", "7.3 Evaluation Protocol and Metrics"),
+    ("h2", "7.4 Evaluation Protocol and Metrics"),
     ("p",
      "Every model reported here was evaluated identically. The outer loop holds "
-     "out one year at a time; hyperparameters are chosen by an inner "
-     "time-series-aware search on the training partition; the selected "
-     "configuration is refitted and used to predict the held-out year. Every "
-     "fitted quantity — including the physics-residual model's affine "
-     "calibration and the stacking layer's weights — is estimated inside the "
-     "fold. The reported metrics are computed on the pooled out-of-fold "
-     "predictions, so every one of the twenty-eight records contributes a "
-     "prediction made by a model that never saw it."),
+     "out one year at a time and predicts it from a model refitted on the "
+     "remaining six. Every fitted quantity, including all scaling, is estimated "
+     "inside the fold. Metrics are computed on the pooled out-of-fold "
+     "predictions, so each of the twenty-eight records contributes a prediction "
+     "made by a model that never saw it."),
     ("p",
-     "Four metrics are reported. Root mean squared error is in the units of the "
-     "target and penalises large errors quadratically, which matters because a "
-     "large error in an import-planning forecast is disproportionately costly. "
-     "Mean absolute error is in the same units and is more interpretable as a "
-     "typical miss. The coefficient of determination expresses the fraction of "
-     "target variance explained relative to a constant-mean predictor; it is "
-     "negative when a model performs worse than simply predicting the mean, "
-     "which is a meaningful and frequently occurring outcome at this sample "
-     "size. Mean absolute percentage error normalises the miss against the "
-     "actual value."),
+     "Four look-ahead leaks present in the interim pipeline were removed. The "
+     "vegetation anomaly and the standardised drought index had been computed by "
+     "standardising against the full 2019 to 2025 panel, so every fold saw "
+     "statistics derived from its own held-out year; these are now standardised "
+     "against a 2000 to 2018 climatology that no fold ever tests on, which "
+     "removes the leak by construction rather than by fold bookkeeping. The "
+     "target had been winsorised at full-sample percentiles, which is also a "
+     "leak, and this was removed in favour of the explicit physical-plausibility "
+     "filter described in section 7.2."),
     ("p",
-     "Model pairs are compared with the Wilcoxon signed-rank test on paired "
-     "per-record absolute residuals, so that the comparison accounts for the "
-     "fact that the same records are predicted by every model."),
+     "The lagged-yield features were not repaired but dropped. Under "
+     "Leave-One-Year-Out with year k held out, the training row for year k plus "
+     "one carries year k's observed yield as a predictor, which is a leak with no "
+     "clean fix inside this protocol. They also purchase very little here: only "
+     "2.2 per cent of target variance lies between districts, which is the whole "
+     "of what a persistence term can capture. The two lag columns were in any "
+     "case identical, the panel being single-season."),
+    ("p",
+     "Seven predictors were removed as constants or exact linear transforms of "
+     "others: solar radiation had been hard-coded to 18.0, the water index to "
+     "0.1, organic carbon to 1.8, previous-season extent to 400.0, the "
+     "heat-stress day count to zero, the season indicator to one, and the two "
+     "land-surface temperature columns were air temperature plus and minus six "
+     "degrees. With genuine daily weather now loaded, the heat-stress count "
+     "ranges from thirty-three to one hundred and sixteen days rather than being "
+     "identically zero; the interim code had compared a monthly mean temperature "
+     "against a daily threshold."),
 
-    ("h2", "7.4 Model Comparison Results"),
+    ("h2", "7.5 Variance Decomposition and the Attainable Ceiling"),
     ("p",
-     "Table 7.2 reports every model under the shared protocol, ordered by root "
-     "mean squared error. Figure 7.1 presents the same comparison graphically."),
+     "Before comparing models it is necessary to establish how much of the "
+     "target is explainable at all under this protocol. Table 7.4 decomposes the "
+     "corrected target's total sum of squares."),
     ("table", (
-        ["Model", "RMSE", "MAE", "R²", "MAPE (%)", "Train time (s)", "Parameters"],
+        ["Component", "Sum of squares", "Share of total"],
         [
-            ["PhysResidual", "3.9021", "3.3497", "0.0908", "23.32", "1.01", "—"],
-            ["RandomForest", "4.0506", "3.3932", "0.0203", "23.44", "2.89", "—"],
-            ["XGBoost", "4.0677", "3.4392", "0.0120", "23.76", "1.76", "—"],
-            ["SVR", "4.1684", "3.4836", "−0.0375", "24.55", "0.03", "—"],
-            ["StackConvex", "4.3237", "3.6222", "−0.1162", "24.36", "0.00", "—"],
-            ["StackInvRMSE", "4.3261", "3.6694", "−0.1175", "23.28", "0.00", "—"],
-            ["BiLSTM", "4.5186", "3.6261", "−0.2192", "23.33", "31.66", "77,601"],
-            ["SymbolicRegression", "4.5823", "3.9126", "−0.2538", "27.19", "35.66", "—"],
-            ["StackMean", "5.0621", "4.2961", "−0.5301", "25.39", "0.00", "—"],
-            ["LSTM", "7.3132", "5.7093", "−2.1935", "33.30", "23.31", "30,625"],
-            ["CNN_LSTM_Hybrid", "11.6126", "10.8517", "−7.0521", "64.47", "29.55", "44,929"],
-            ["CNN", "11.6973", "10.7711", "−7.1700", "62.91", "19.24", "8,577"],
+            ["Between years", "696.89", "63.6%"],
+            ["Between districts", "24.09", "2.2%"],
+            ["Residual", "374.97", "34.2%"],
         ],
-        "Table 7.2: Model comparison under Leave-One-Year-Out cross-validation",
+        "Table 7.4: Variance decomposition of the corrected target",
     )),
-    ("fig", (f"{REAL}/results/model_comparison_bar.png",
-             "Figure 7.1: Model comparison on the collected dataset")),
+    ("fig", (f"{REAL}/results/variance_ceiling.png",
+             "Figure 7.1: Where yield variance lies, and what remains attainable "
+             "under Leave-One-Year-Out")),
     ("p",
-     "The physics-residual hybrid is the strongest model, with a root mean "
-     "squared error of 3.90 metric tons per hectare, a mean absolute error of "
-     "3.35, a coefficient of determination of 0.091 and a mean absolute "
-     "percentage error of 23.3 per cent. Random Forest follows at 4.05 and "
-     "0.020, then XGBoost at 4.07 and 0.012. Support Vector Regression is "
-     "marginally below the mean predictor at −0.038."),
+     "Sixty-four per cent of the variance lies between years and two per cent "
+     "between districts. Leave-One-Year-Out holds out an entire year, and "
+     "therefore removes the dominant component of the variance by construction. "
+     "This single fact explains the near-zero and negative coefficients of "
+     "determination reported throughout this chapter and in the interim report. "
+     "It is arithmetic rather than a modelling failure, and no choice of "
+     "algorithm alters it."),
     ("p",
-     "These figures must be reported for what they are. An R² of 0.091 means "
-     "the best model explains about nine per cent of the variance in district "
-     "yield. The project set a target of 0.75 at proposal stage, and on the "
-     "collected data that target is not met. Section 8.2 discusses at length "
-     "why this is the expected outcome at twenty-eight records rather than a "
-     "failure of the implementation, and section 7.12 demonstrates that the "
-     "same code reaches 0.842 when the sample is adequate."),
+     "The residual can be bounded further. Each cell's yield is an "
+     "extent-weighted mean over two to five month-records, so the weighted "
+     "spread of those records, divided by the effective sample size, estimates "
+     "the sampling variance of that mean directly. That estimate is 2.81 metric "
+     "tons per hectare per cell, which is 19.5 per cent of total variance and "
+     "53.6 per cent of within-year variance. More than half of the "
+     "between-district variation within a year is measurement noise in the "
+     "target, learnable by nothing."),
     ("p",
-     "The ordering of the model families is the more informative result. Every "
-     "deep architecture falls below the constant-mean predictor, and the two "
-     "convolutional models fail catastrophically, with coefficients of "
-     "determination near −7 and mean absolute percentage errors above sixty per "
-     "cent. The Wilcoxon signed-rank test on paired absolute residuals rejects "
-     "the hypothesis that the deep family matches the classical family, with a "
-     "p-value below 0.0001. The hybrid CNN-LSTM does not beat its standalone "
-     "components; it sits between the CNN and the LSTM, and all three are far "
-     "behind the tree ensembles."),
+     "Subtracting the year component, which the protocol makes unavailable, and "
+     "the measurement error, which nothing can learn, gives an implied ceiling on "
+     "the attainable coefficient of determination of 0.162."),
     ("p",
-     "This is a negative result, and it is one of the project's substantive "
-     "findings rather than an embarrassment to be minimised. The published "
-     "literature that motivates hybrid deep architectures for yield prediction "
-     "[8], [2] validates them at sample sizes three orders of magnitude larger. "
-     "What Table 7.2 establishes is that the architectural advantage does not "
-     "survive the reduction: at twenty-eight records, capacity is a liability "
-     "and the correct choice for a practitioner in this position is a "
-     "regularised classical learner, ideally one carrying a mechanistic prior. "
-     "That is actionable guidance which the existing literature does not "
-     "supply, and it answers Gap 2 of section 2.8 directly."),
-    ("p",
-     "Figures 7.2 and 7.3 show the actual-against-predicted scatter and the "
-     "residual distribution for Random Forest, the best purely learned model. "
-     "The scatter shows the characteristic regression-to-the-mean compression "
-     "of a model working with weak signal: predictions cluster in a narrower "
-     "band than the actuals, so high-yield records are under-predicted and "
-     "low-yield records over-predicted. The residual distribution is centred "
-     "near zero without pronounced skew, which indicates the errors are noise "
-     "rather than systematic bias — the model is not wrong in a fixable "
-     "direction, it is simply short of signal."),
-    ("fig", (f"{REAL}/results/actual_vs_pred_rf.png",
-             "Figure 7.2: Actual against predicted yield, Random Forest")),
-    ("fig", (f"{REAL}/results/residuals_rf.png",
-             "Figure 7.3: Residual distribution, Random Forest")),
+     "The consequence should be stated without hedging. The project set a target "
+     "of 0.75 at proposal stage. That target was not difficult on this panel; it "
+     "was unattainable. No model, of any architecture or capacity, could have "
+     "reached it under this validation protocol on this data. The interim "
+     "report's suggestion that the synthetic run's 0.842 demonstrated the "
+     "architecture to be sound and the sample merely inadequate does not survive "
+     "this analysis either: the synthetic data was generated by a known "
+     "functional form, so recovering it demonstrates only that the estimator can "
+     "invert a function it was given."),
 
-    ("h2", "7.5 Does the Mechanistic Backbone Help?"),
+    ("h2", "7.6 Model Comparison Results"),
     ("p",
-     "Section 5.6 argued that supplying established agronomy rather than "
-     "learning it should pay at this sample size. Table 7.3 tests that argument "
-     "by separating the two stages of the physics-residual hybrid."),
+     "Table 7.5 reports every model under the shared protocol on the corrected "
+     "target. Two reference rows frame the comparison. The train-mean predictor "
+     "is the best available to a model that knows nothing about the held-out "
+     "year. The oracle year-mean row uses the held-out year's own mean and is "
+     "therefore not achievable; it is reported to bound what perfect knowledge of "
+     "the year effect would purchase."),
     ("table", (
-        ["Configuration", "RMSE", "MAE", "R²", "MAPE (%)"],
+        ["Model", "RMSE", "MAE", "R²", "R² (area-weighted)"],
         [
-            ["Mechanistic backbone alone (no learner)", "4.5241", "3.6576", "−0.2221", "25.13"],
-            ["Random Forest alone (no backbone)", "4.0506", "3.3932", "0.0203", "23.44"],
-            ["Physics-residual hybrid (backbone + learner)", "3.9021", "3.3497", "0.0908", "23.32"],
+            ["Oracle year-mean (not achievable)", "3.775", "3.238", "+0.636", "+0.716"],
+            ["Train mean", "6.938", "5.457", "−0.230", "−0.236"],
+            ["District historical mean", "7.218", "5.419", "−0.331", "−0.396"],
+            ["XGBoost", "7.296", "5.456", "−0.360", "−0.217"],
+            ["PADR", "7.333", "6.016", "−0.374", "−0.455"],
+            ["Random Forest", "7.803", "5.826", "−0.556", "−0.328"],
+            ["Support Vector Regression", "7.847", "6.008", "−0.573", "−0.549"],
+            ["Persistence", "9.033", "7.327", "−1.085", "−1.013"],
         ],
-        "Table 7.3: Physics-residual with and without the mechanistic backbone",
+        "Table 7.5: Model comparison on the corrected target under "
+        "Leave-One-Year-Out cross-validation",
     )),
+    ("fig", (f"{REAL}/results/padr_scoreboard.png",
+             "Figure 7.2: Leave-One-Year-Out R² for every model against the "
+             "attainable ceiling")),
     ("p",
-     "The result is unambiguous in direction. The backbone alone is worse than "
-     "predicting the mean, at −0.222, which is expected: a three-factor "
-     "closed-form suitability function calibrated by two parameters cannot "
-     "capture district-level yield on its own. The learner alone reaches 0.020. "
-     "The combination reaches 0.091. Adding the mechanistic prior to the "
-     "Random Forest improves the coefficient of determination by 0.070 and "
-     "reduces root mean squared error by 0.15 metric tons per hectare, a "
-     "relative error reduction of 3.7 per cent."),
+     "Every feature-based model performs worse than predicting the training "
+     "mean. This is the honest result and it is consistent across the "
+     "classical, mechanistic and ensemble families. Read against section 7.5 it "
+     "is also the expected result: the models are being asked to recover a "
+     "year effect that the protocol has removed, using features that carry "
+     "2.2 per cent of the variance between districts."),
     ("p",
-     "The mechanism is worth stating precisely, because the improvement is not "
-     "explained by the backbone being accurate. It is explained by the backbone "
-     "changing what the learner has to do. Without it, the forest must discover "
-     "the water-limitation and thermal-time relationships from twenty-four "
-     "training records while simultaneously fitting everything else. With it, "
-     "those relationships are supplied a priori from FAO-33 [31] and the "
-     "standard degree-day formulation [32], and the forest's entire capacity is "
-     "directed at the residual. In a sample-starved regime, a prior that is "
-     "merely approximately right is worth more than the degrees of freedom it "
-     "saves. This is the same logic Shahhosseini et al. [33] demonstrated with "
-     "a full crop simulator, reproduced here with a closed-form backbone that "
-     "costs three lines of arithmetic."),
-    ("p",
-     "One caveat is recorded honestly. The heat-stress-day count is zero "
-     "throughout the collected Yala data, so the heat factor is inert and the "
-     "measured benefit comes from the thermal-time and water components only. "
-     "The heat factor would engage in a hotter season, but on this data it "
-     "contributes nothing, and the improvement should be attributed to two of "
-     "the three mechanistic components rather than all three."),
-
-    ("h2", "7.6 Does Stacking Help?"),
-    ("p",
-     "Section 5.7 posed the forecast-combination question: does an estimated "
-     "weighting beat a simple average, or does the well-documented "
-     "forecast-combination puzzle [37], [38] hold here? Table 7.4 reports the "
-     "three combiners and the weights the convex fit assigned."),
+     "Table 7.6 gives the per-fold breakdown, which localises the difficulty."),
     ("table", (
-        ["Combiner", "RMSE", "MAE", "R²", "Weighting rule"],
+        ["Year", "Actual mean (MT/ha)", "PADR RMSE", "Train-mean RMSE", "XGBoost RMSE"],
         [
-            ["StackConvex", "4.3237", "3.6222", "−0.1162", "Least squares on the simplex"],
-            ["StackInvRMSE", "4.3261", "3.6694", "−0.1175", "Proportional to inverse validation RMSE"],
-            ["StackMean", "5.0621", "4.2961", "−0.5301", "Equal weights across all nine base models"],
+            ["2019", "17.97", "4.19", "5.01", "4.79"],
+            ["2020", "13.85", "5.82", "5.22", "4.95"],
+            ["2021", "18.98", "3.87", "2.64", "4.14"],
+            ["2022", "9.42", "11.12", "10.61", "8.34"],
+            ["2023", "18.33", "4.54", "2.67", "3.08"],
+            ["2024", "26.90", "11.50", "11.76", "14.25"],
+            ["2025", "19.78", "5.79", "4.41", "5.09"],
         ],
-        "Table 7.4: Stacking combiners and their learned weights",
+        "Table 7.6: Per-fold root mean squared error",
     )),
     ("p",
-     "Two findings follow. The first concerns the puzzle itself. The learned "
-     "convex blend, at −0.116, clearly outperforms the equal-weight mean at "
-     "−0.530. The forecast-combination puzzle does not hold in this setting. "
-     "The explanation is visible in Table 7.2: the base pool contains models "
-     "whose errors differ by a factor of three, and equal weighting therefore "
-     "spends a ninth of its mass on each of the two convolutional models that "
-     "score below −7. When base learners are of grossly unequal quality, even a "
-     "crudely estimated weighting beats uniform averaging, because the "
-     "estimation error the puzzle warns about is smaller than the error "
-     "introduced by weighting a broken model equally with a good one."),
-    ("p",
-     "The convex fit allocated 0.399 to the physics-residual hybrid, 0.271 to "
-     "XGBoost, 0.199 to the BiLSTM, 0.045 to Random Forest, 0.039 to Support "
-     "Vector Regression, 0.027 to the symbolic model, 0.015 to the LSTM, 0.005 "
-     "to the hybrid CNN-LSTM, and exactly zero to the CNN. The optimiser "
-     "eliminated the worst model entirely and concentrated on the physics-"
-     "residual hybrid — which is an independent confirmation of the section 7.5 "
-     "result, arrived at by a completely different route. The non-trivial "
-     "weight on the BiLSTM is also informative: although that model scores "
-     "poorly alone, its errors are evidently decorrelated enough from the tree "
-     "models to earn a place in the blend."),
-    ("p",
-     "The second finding is the one that matters for deployment. Every "
-     "combiner, including the best, is worse than the single physics-residual "
-     "hybrid at 0.091. Stacking does not help here. This is consistent with the "
-     "sample-size argument that runs through the whole evaluation: the "
-     "meta-learner must estimate a nine-dimensional weight vector from "
-     "twenty-eight out-of-fold predictions, and even constrained to the simplex "
-     "that estimation costs more than the diversification gains. The system "
-     "therefore serves the physics-residual hybrid, not the stack. Reporting "
-     "the stacking result as a negative finding, rather than quietly dropping "
-     "it, is what allows the next researcher to know that this avenue was "
-     "tested."),
+     "Two years dominate the total error for every model. In 2022 the mean "
+     "yield across all four districts fell to 9.42 metric tons per hectare "
+     "against 19.30 in the remaining years, with Matale reaching 3.63. That "
+     "collapse is consistent across all three of Matale's month-records, so it "
+     "is a genuine crop failure rather than a transcription artefact, and it "
+     "affects every district simultaneously. Its timing coincides with the "
+     "April 2021 prohibition on chemical fertilizer imports and the 2022 "
+     "economic crisis. This report notes the coincidence and directs the reader "
+     "to the policy literature; the panel alone cannot establish the "
+     "attribution. What it can establish is that no weather-driven model can "
+     "anticipate such an event, and that 2022 will remain the worst fold for any "
+     "such model."),
 
-    ("h2", "7.7 The Symbolic Equation"),
+    ("h2", "7.7 The Phenology-Aligned Differentiable Response Model"),
     ("p",
-     "The genetic-programming search over the five highest-attribution "
-     "predictors converged on the following closed-form expression for average "
-     "yield in metric tons per hectare:"),
-    ("code",
-     "Yield  =  ( temp_x_humidity  x  prev_year_yield ) ^ (1/4)\n"
-     "                +  3.251\n"
-     "                -  drought_index_spi"),
+     "PADR replaces the interim report's physics-residual hybrid. The "
+     "distinction is not incremental. The physics-residual approach, following "
+     "Shahhosseini and colleagues, runs a mechanistic backbone with coefficients "
+     "fixed at published values and fits a learner to its residual. PADR instead "
+     "makes the mechanistic coefficients themselves estimable, fitting them "
+     "jointly with the response under agronomic box constraints and a penalty "
+     "that shrinks each toward its literature value. The model carries seventeen "
+     "parameters against the hybrid CNN-LSTM's 44,929."),
     ("p",
-     "Under the same cross-validation protocol this equation scores a root mean "
-     "squared error of 4.58, a coefficient of determination of −0.254 and a "
-     "mean absolute percentage error of 27.2 per cent. It is not competitive as "
-     "a predictor, and it is not served as one."),
+     "Weather enters the model on a thermal phenological axis rather than a "
+     "calendar one. The harvest date for each district-year is taken as the "
+     "extent-weighted mean of the DCS monthly production distribution, which is "
+     "a genuinely crop-specific signal and which moves across a fifty-one day "
+     "span. Planting is then located by accumulating growing degree-days "
+     "backwards from harvest until a thermal requirement is met. All twenty-eight "
+     "district-years anchored successfully with no fallbacks, and the result is "
+     "agronomically coherent: planting between day 138 and day 200, season "
+     "lengths from 76 to 99 days. Hotter Anuradhapura completes a season in 78 to "
+     "86 days while cooler Matale and Kurunegala require 90 to 99 to accumulate "
+     "the same heat, which is the physics behaving as it should."),
     ("p",
-     "Its value is diagnostic and communicative. Structurally, the equation "
-     "says three things that are agronomically sensible. Yield increases with "
-     "the product of the temperature-humidity term and the previous year's "
-     "yield, compressed through a fourth root — that is, it increases with "
-     "favourable growing conditions combined with a district's demonstrated "
-     "productivity, with strongly diminishing returns. Yield decreases with the "
-     "drought index term. And a constant offset near 3.25 sets the baseline. "
-     "That the evolutionary search, given free rein over expression structure, "
-     "independently arrived at a form in which district history and moisture "
-     "availability are the load-bearing terms corroborates the SHAP ranking of "
-     "section 7.11, which was computed by an entirely unrelated method."),
-    ("p",
-     "For a district agricultural officer, an equation that can be read and "
-     "checked against experience has a credibility that a forest of two hundred "
-     "trees does not, even when the forest is more accurate. The equation is "
-     "therefore served through its own endpoint and displayed in the "
-     "explainability view alongside — never instead of — the point forecast "
-     "from the deployed model."),
-
-    ("h2", "7.8 Data-Source Ablation"),
-    ("p",
-     "The ablation study re-runs the full protocol under six predictor "
-     "configurations, holding model, protocol and seed fixed so that only the "
-     "data source varies. Table 7.5 and Figure 7.4 report the outcome."),
+     "Table 7.7 reports the estimated agronomic constants, averaged across the "
+     "seven Leave-One-Year-Out folds. These are the scientific output of the "
+     "model, and they stand independently of its predictive accuracy."),
     ("table", (
-        ["Configuration", "Predictors", "RMSE", "MAE", "R²"],
+        ["Parameter", "Estimated (mean ± sd)", "Literature", "Identifiable?", "Reading"],
         [
-            ["A — Weather only", "9", "5.4972", "4.6080", "−0.8044"],
-            ["B — Satellite only", "11", "5.2825", "4.3860", "−0.6662"],
-            ["C — Historical only", "5", "5.6024", "4.5058", "−0.8741"],
-            ["D — Soil only", "4", "4.5877", "3.5251", "−0.2567"],
-            ["E — Weather + Satellite", "20", "5.6643", "4.8029", "−0.9158"],
-            ["F — All sources", "32", "4.2567", "3.5314", "−0.0819"],
+            ["Optimum temperature", "28.95 ± 0.95 °C", "24.0", "Yes (2.9%)", "Pulled well up; dry-zone adaptation"],
+            ["Soil water capacity", "147.1 ± 6.2 mm", "100", "Yes (1.0%)", "Deeper effective store than assumed"],
+            ["Base temperature", "10.24 ± 0.13 °C", "10.0", "Yes (9.1%)", "Confirms the standard base temperature"],
+            ["Waterlogging severity", "0.006 ± 0.001", "no prior", "Yes (0.4%)", "Newly estimated"],
+            ["Waterlogging threshold", "96.0 ± 5.2 mm/7d", "no prior", "Yes (1.4%)", "Newly estimated"],
+            ["Critical temperature", "35.58 ± 0.71 °C", "35.0", "NO (16.2%)", "Not reportable as a finding"],
+            ["Yield response factor Ky", "0.97 ± 0.05", "1.1 (FAO-33)", "NO (12.8%)", "Not reportable — see below"],
+            ["Attainable yield", "20.45 ± 1.14 MT/ha", "—", "—", "—"],
         ],
-        "Table 7.5: Data-source ablation results",
-    )),
-    ("fig", (f"{REAL}/results/ablation_comparison.png",
-             "Figure 7.4: Data-source ablation on the collected dataset")),
-    ("p",
-     "Every single-source configuration performs worse than the constant-mean "
-     "predictor, and the full configuration at −0.082 is the best of the six. "
-     "The primary conclusion is therefore that no individual data stream "
-     "carries the signal on its own at this sample size; only the combination "
-     "approaches parity with the mean, and even then does not exceed it."),
-    ("p",
-     "Two secondary observations deserve comment. Soil alone, at −0.257, is the "
-     "strongest single source despite having only four predictors, all of them "
-     "static per district. This is almost certainly not a finding about soil "
-     "science. Static per-district predictors act as a district identifier, and "
-     "since districts differ systematically in mean yield — from 14.70 in "
-     "Kurunegala to 18.11 in Anuradhapura — a model given only soil is "
-     "effectively fitting district means. That is a real signal, but it is a "
-     "baseline effect, not a soil effect, and it is important to say so rather "
-     "than to report a spurious agronomic conclusion."),
-    ("p",
-     "The second observation is that combining weather with satellite, at "
-     "−0.916, is worse than either alone. With twenty predictors and "
-     "twenty-four training records per fold, adding features adds variance "
-     "faster than it adds information. This is a textbook manifestation of the "
-     "curse of dimensionality, made visible by the controlled design of the "
-     "experiment, and it is direct evidence for the sample-size argument that "
-     "the whole chapter has been building."),
-    ("p",
-     "For contrast, section 7.12 reports the same six experiments on the "
-     "synthetic reference, where the sample is adequate. There the ordering is "
-     "entirely different and interpretable: satellite alone reaches 0.802 and "
-     "the full configuration 0.829. The comparison between the two ablation "
-     "tables is itself an argument that what limits the real-data result is the "
-     "sample, not the feature design."),
-
-    ("h2", "7.9 Per-District Behaviour"),
-    ("p",
-     "Table 7.6 decomposes the physics-residual hybrid's out-of-fold errors by "
-     "district."),
-    ("table", (
-        ["District", "n", "Mean actual (MT/Ha)", "RMSE", "MAE", "R²"],
-        [
-            ["Anuradhapura", "7", "18.11", "2.718", "2.176", "0.361"],
-            ["Polonnaruwa", "7", "16.11", "3.828", "3.301", "0.220"],
-            ["Matale", "7", "16.63", "4.779", "4.381", "0.023"],
-            ["Kurunegala", "7", "14.70", "4.002", "3.540", "−1.183"],
-        ],
-        "Table 7.6: Per-district predictability",
+        "Table 7.7: Agronomic constants estimated by PADR across LOYO folds, with "
+        "identifiability from the recovery experiment of section 7.10",
     )),
     ("p",
-     "Anuradhapura is the most predictable district at 0.361, and it is also "
-     "the largest and most established big onion producing district, with the "
-     "highest mean yield. Polonnaruwa follows at 0.220. Matale is essentially "
-     "at the mean predictor. Kurunegala is much worse than the mean at −1.183, "
-     "despite having a root mean squared error of 4.00 that is lower than "
-     "Matale's 4.78."),
+     "The standard deviations across folds are small relative to the admissible "
+     "ranges. It would be natural to read that as evidence of a "
+     "well-conditioned estimator, and for five of the seven constants it is. For "
+     "two of them it is not, and the distinction matters enough to state before "
+     "any of these values is quoted elsewhere."),
     ("p",
-     "That apparent contradiction is instructive and should not be passed over. "
-     "The coefficient of determination is normalised by each district's own "
-     "target variance. Kurunegala has the lowest mean yield and the narrowest "
-     "spread of the four, so a moderate absolute error consumes a large "
-     "fraction of a small variance and produces a strongly negative score. "
-     "Matale has a wider spread, so a larger absolute error still leaves the "
-     "ratio near one. For an operational user the absolute error is the "
-     "relevant quantity, and by that measure Kurunegala is predicted better "
-     "than Matale. Reporting only the coefficient of determination would have "
-     "given the opposite and misleading impression, which is why both are in "
-     "the table."),
+     "The recovery experiment reported in section 7.10 fits PADR to data "
+     "generated from known constants. For the yield response factor it is "
+     "revealing: given data generated with Ky of 0.966, the estimator returns "
+     "1.108, which is its literature prior rather than the truth. The shrinkage "
+     "penalty that makes a seventeen-parameter model estimable at twenty-eight "
+     "observations also pins any parameter the data cannot constrain to its "
+     "prior, and the resulting narrow spread across folds is the stability of "
+     "that prior rather than evidence from the data. It is precision without "
+     "accuracy, and a tight interval would have concealed it."),
     ("p",
-     "The practical implication is that a deployed system should not present a "
-     "single national confidence statement. Anuradhapura forecasts warrant more "
-     "weight than Matale forecasts, and the dashboard's per-district intervals "
-     "are the mechanism by which that difference is communicated."),
+     "Accordingly, no claim is made here about Ky or the critical temperature as "
+     "estimated quantities. The optimum temperature and the soil water capacity "
+     "are recovered to within three per cent of their admissible ranges and are "
+     "reported as findings. The separate conclusion that FAO-33 coefficients "
+     "overstate weather sensitivity, in section 7.8, does not rest on any "
+     "individual point estimate; it rests on the ablation contrast between "
+     "estimated and pinned configurations, and is unaffected."),
+    ("p",
+     "The district offsets are correspondingly tiny, from −0.14 to +0.20 metric "
+     "tons per hectare, exactly as the 2.2 per cent between-district variance "
+     "share of section 7.5 predicts."),
+    ("fig", (f"{REAL}/results/beta_curve.png",
+             "Figure 7.3: Estimated phenological sensitivity across the growing "
+             "season, with the range across folds")),
+    ("p",
+     "Figure 7.3 shows the estimated sensitivity weighting over phenological "
+     "time. It declines monotonically, placing roughly seven times more weight on "
+     "conditions at establishment than at harvest. The band across folds is "
+     "narrow. Read cautiously — section 7.9 shows the underlying stress signal is "
+     "weak, so this curve is estimated from little information — the shape is "
+     "nonetheless agronomically plausible for a crop whose bulb is largely "
+     "determined early."),
 
-    ("h2", "7.10 Calibrated Uncertainty"),
+    ("h2", "7.8 Mechanism Ablations"),
     ("p",
-     "Split-conformal calibration [39], [40] was applied to the out-of-fold "
-     "residuals of every model at a nominal ninety per cent coverage level. "
-     "Table 7.7 reports the resulting interval half-widths."),
+     "Each of the model's four design claims was tested by an arm that disables "
+     "the mechanism in question, so that each claim can be falsified "
+     "independently. Alongside the coefficient of determination, Table 7.8 "
+     "reports the coefficient of variation of the stress index across "
+     "district-years, which measures how much variation each configuration is "
+     "capable of generating at all. The observed target varies with a "
+     "coefficient of variation of 35.0 per cent."),
     ("table", (
-        ["Model", "Half-width q (MT/Ha)", "Target coverage", "Empirical coverage", "Calibration n"],
+        ["Arm", "R²", "Stress CV", "What it isolates"],
         [
-            ["PhysResidual", "6.852", "0.90", "1.00", "28"],
-            ["RandomForest", "7.451", "0.90", "1.00", "28"],
-            ["StackConvex", "7.799", "0.90", "1.00", "28"],
-            ["SVR", "7.967", "0.90", "1.00", "28"],
-            ["XGBoost", "8.025", "0.90", "1.00", "28"],
-            ["StackInvRMSE", "8.077", "0.90", "1.00", "28"],
-            ["SymbolicRegression", "8.734", "0.90", "1.00", "28"],
-            ["StackMean", "9.477", "0.90", "1.00", "28"],
-            ["BiLSTM", "10.951", "0.90", "1.00", "28"],
-            ["LSTM", "17.284", "0.90", "1.00", "28"],
-            ["CNN", "19.114", "0.90", "1.00", "28"],
-            ["CNN_LSTM_Hybrid", "21.863", "0.90", "1.00", "28"],
+            ["Full model", "−0.374", "8.14%", "PADR as specified"],
+            ["Fixed physics", "−0.940", "22.39%", "Coefficients frozen at literature values"],
+            ["Calendar time", "−0.385", "8.31%", "Time spaced in days, not accumulated heat"],
+            ["No waterlogging", "−0.370", "8.04%", "Excess-water penalty disabled"],
+            ["Flat sensitivity", "−0.429", "9.78%", "Phenological weighting removed"],
+            ["No shrinkage", "−0.373", "11.57%", "Coefficients free to chase noise"],
+            ["Heavy shrinkage", "−1.540", "35.33%", "Coefficients effectively pinned to literature"],
         ],
-        "Table 7.7: Split-conformal interval half-widths at ninety per cent",
+        "Table 7.8: Mechanism ablations",
     )),
     ("p",
-     "The half-widths rank the models in the same order as the point-error "
-     "metrics, which is the expected behaviour and a useful internal "
-     "consistency check. The physics-residual hybrid produces the tightest "
-     "interval at plus or minus 6.85 metric tons per hectare; the hybrid "
-     "CNN-LSTM produces the widest at plus or minus 21.86, which on a target "
-     "with a mean of 16.39 is an interval wider than the entire observed range "
-     "and therefore operationally useless. Conformal calibration makes that "
-     "uselessness explicit rather than allowing a confident-looking point "
-     "forecast to conceal it, which is exactly what the method is for."),
+     "Two of the four claims are supported and two are not. Learning the "
+     "agronomic coefficients rather than fixing them improves the coefficient of "
+     "determination by 0.566. Moderate shrinkage improves on heavy shrinkage by "
+     "1.166. Against these, indexing time thermally rather than by calendar "
+     "improves matters by 0.011, and the waterlogging term costs 0.004."),
     ("p",
-     "The empirical coverage of 1.00 for every model requires honest comment "
-     "and must not be read as a success. Coverage was measured on the same "
-     "twenty-eight residuals used to compute the quantile, and with a "
-     "calibration set that small the finite-sample correction in the "
-     "split-conformal quantile is substantial: the ninetieth percentile of "
-     "twenty-eight points, corrected, lands at or near the maximum observed "
-     "residual, so by construction almost nothing falls outside. The theoretical "
-     "guarantee — that marginal coverage is at least the nominal level under "
-     "exchangeability — still holds, but it is a lower bound, and here the "
-     "intervals are conservative rather than tight. A calibration set of a few "
-     "hundred records would be needed before the empirical figure carried "
-     "independent information. The correct reading of Table 7.7 is that the "
-     "half-widths are trustworthy as an upper bound on uncertainty and that "
-     "even the best of them, at plus or minus 6.85 on a mean of 16.39, is wide."),
+     "Reporting the two null results is deliberate. An ablation in which every "
+     "proposed component turns out to help is not a credible ablation. Thermal "
+     "time and calendar time nearly coincide when temperature barely varies, "
+     "which is precisely the regime documented in section 7.9; the method is not "
+     "wrong, but this panel offers it nothing to correct. The waterlogging term "
+     "exceeds its estimated threshold in 3.5 per cent of intervals, in one year "
+     "only, which is not enough exceedance to earn two parameters."),
     ("p",
-     "Even so, a wide honest interval is more useful to an import planner than "
-     "a narrow dishonest one. A forecast of 16 plus or minus 7 metric tons per "
-     "hectare tells a planner to hedge; a forecast of 16 with no interval "
-     "invites them not to."),
+     "The most informative row is the last. Pinning the coefficients to their "
+     "published FAO-33 and thermal values produces a stress index varying at "
+     "35.33 per cent, almost exactly matching the observed variation in yield, "
+     "and yet returns the worst coefficient of determination of any arm at "
+     "−1.540. The generic coefficients imply a crop far more weather-sensitive "
+     "than the data support, and they place that sensitivity in the wrong years. "
+     "Learning the coefficients does not so much add explanatory power as remove "
+     "spurious sensitivity: the stress coefficient of variation falls from 22.4 "
+     "to 8.1 per cent while the coefficient of determination improves by 0.57."),
+    ("p",
+     "This is a transferable finding. Standard FAO-33 crop coefficients "
+     "materially overstate weather sensitivity for big onion under Sri Lankan "
+     "dry-zone tank irrigation, and it is an argument for local calibration of "
+     "mechanistic crop models. It is visible only because the coefficients were "
+     "made estimable in the first place."),
 
-    ("h2", "7.11 Feature Attribution"),
+    ("h2", "7.9 Why the Agro-Climatic Channel Does Not Carry the Signal"),
     ("p",
-     "SHAP attributions [19] were computed on the best tree model. Figure 7.5 "
-     "shows the top-fifteen ranking by mean absolute attribution, Figure 7.6 "
-     "the summary plot showing the direction of each predictor's effect, and "
-     "Figure 7.7 the dependence plot for the highest-ranked predictor."),
-    ("fig", (f"{REAL}/results/shap_importance.png",
-             "Figure 7.5: SHAP mean absolute attribution, top fifteen predictors")),
-    ("fig", (f"{REAL}/results/shap_summary.png",
-             "Figure 7.6: SHAP summary plot")),
+     "The model's failure to beat the mean has a specific and diagnosable cause, "
+     "and identifying it is the principal scientific result of this work."),
+    ("fig", (f"{REAL}/results/stress_vs_yield.png",
+             "Figure 7.4: The stress index against observed yield, and the "
+             "variation each mechanism can generate")),
     ("p",
-     "The temperature-humidity interaction dominates, with a mean absolute "
-     "attribution of 1.404 — nearly three times the second-ranked predictor. "
-     "The seasonal mean EVI follows at 0.484, then the drought index at 0.148, "
-     "the rainfall-NDVI interaction at 0.141 and the previous year's yield at "
-     "0.123. Below that the attributions decline smoothly through the "
-     "temperature range, seasonal mean NDVI, maximum daily rainfall and the day "
-     "and night land surface temperatures."),
+     "The stress index varies across district-years with a coefficient of "
+     "variation of 7.95 per cent, spanning 0.69 to 0.94. The observed target "
+     "varies at 34.97 per cent, spanning 3.63 to 33.58 metric tons per hectare. "
+     "A quantity that varies by eight per cent cannot explain one that varies by "
+     "thirty-five, whatever its coefficients. This is a structural limit of the "
+     "model class on this data, not a tuning failure."),
     ("p",
-     "Two things are notable. First, the top of the ranking is dominated by "
-     "engineered interaction terms rather than by raw measurements. The "
-     "temperature-humidity product and the rainfall-NDVI product were both "
-     "constructed from agronomic hypothesis in section 5.3, and both outrank "
-     "the raw variables they were built from. That is direct evidence that the "
-     "feature engineering added information rather than merely reformatting it "
-     "— which matters, because in a regime where the model cannot discover "
-     "interactions from data, the interactions have to be supplied."),
+     "Decomposing the stress index identifies which mechanisms are inactive and "
+     "why. The thermal response stays between 0.86 and 0.91 across every "
+     "district-year, because tropical temperatures at these latitudes barely "
+     "vary from year to year. The water-deficit factor is exactly one in most "
+     "intervals and binds in between zero and thirty-one per cent of them, "
+     "usually zero: growing-season rainfall averages 1,043 millimetres and the "
+     "crop is additionally tank-irrigated, so drought effectively does not "
+     "occur. The waterlogging factor departs from one only in 2022. It carries "
+     "the highest correlation with yield of any component, at 0.53, precisely "
+     "because 2022 is the collapse year — an association that reflects "
+     "coincidence with the policy shock rather than a causal water effect."),
     ("p",
-     "Second, the ranking is agronomically coherent. Warm and humid conditions "
-     "drive both evaporative demand and fungal pressure on onion foliage; "
-     "canopy vigour as measured by EVI is the realised outcome of the growing "
-     "season; moisture deficit and district productivity history complete the "
-     "picture. A model whose top predictors were, say, sand fraction and solar "
-     "radiation would warrant suspicion. This one does not."),
-    ("fig", (f"{REAL}/results/shap_dependence_temp_x_humidity.png",
-             "Figure 7.7: SHAP dependence for the temperature-humidity interaction")),
-    ("p",
-     "The dependence plot in Figure 7.7 shows how the attribution of the "
-     "leading predictor varies with its own value, revealing the non-monotone "
-     "response the tree ensemble learned. The full attribution ranking is "
-     "tabulated in Appendix C."),
-    ("p",
-     "One caution applies to the whole section. Attributions computed on a "
-     "model that explains nine per cent of variance describe what that model "
-     "does, not necessarily what nature does. The ranking is a statement about "
-     "the fitted function and should be read as a hypothesis about drivers to "
-     "be confirmed on a larger record, not as an established agronomic finding."),
-
-    ("h2", "7.12 Architecture Validation on Synthetic Data"),
-    ("p",
-     "Every result above is bounded by twenty-eight records. That raises a "
-     "question the real data cannot answer: is the pipeline correct? A "
-     "pipeline with a subtle defect — a misaligned join, a leaked target, a "
-     "mis-specified architecture — would also produce near-zero coefficients of "
-     "determination, and the two causes would be indistinguishable from the "
-     "real-data results alone."),
-    ("p",
-     "To separate them, the identical code was run against a synthetic dataset "
-     "of approximately 160 records generated from a fixed seed and calibrated "
-     "to published district yield ranges and to the correlation structure "
-     "expected between weather, vegetation indices and yield. The synthetic run "
-     "shares every line of the pipeline with the real run; only the input "
-     "differs. Table 7.8 reports the outcome, and Figure 7.8 shows it. These "
-     "are synthetic numbers and are labelled as such; they are not claims about "
-     "big onion yield in Sri Lanka."),
+     "It might be supposed that the model is sound but defeated by the two "
+     "anomalous years. Table 7.9 tests that supposition and rejects it."),
     ("table", (
-        ["Model", "RMSE", "MAE", "R²", "MAPE (%)"],
+        ["Subset", "PADR R²", "Train-mean R²", "Oracle R²"],
         [
-            ["RandomForest", "2.0677", "1.6824", "0.8421", "24.68"],
-            ["SymbolicRegression", "2.0944", "1.6572", "0.8380", "23.01"],
-            ["XGBoost", "2.3030", "1.8596", "0.8041", "26.59"],
-            ["SVR", "2.8676", "2.2984", "0.6963", "33.81"],
-            ["CNN", "4.4423", "3.6005", "0.2711", "35.49"],
-            ["CNN_LSTM_Hybrid", "4.9434", "3.9557", "0.0974", "36.59"],
-            ["BiLSTM", "5.1006", "4.0954", "0.0391", "66.27"],
-            ["LSTM", "5.1478", "4.2112", "0.0212", "64.92"],
+            ["All seven years (n = 28)", "−0.374", "−0.230", "+0.636"],
+            ["Excluding 2022 (n = 24)", "−0.442", "−0.279", "+0.516"],
+            ["Excluding 2022 and 2024 (n = 20)", "−0.542", "−0.099", "+0.272"],
         ],
-        "Table 7.8: Synthetic-data model comparison (architecture validation)",
+        "Table 7.9: Model performance with anomalous years removed",
     )),
-    ("fig", (f"{SYNTH}/results/model_comparison_bar.png",
-             "Figure 7.8: Model comparison on the synthetic reference dataset")),
     ("p",
-     "On the synthetic reference the same Random Forest implementation reaches "
-     "a coefficient of determination of 0.842 and a root mean squared error of "
-     "2.07, comfortably exceeding the 0.75 target, and symbolic regression "
-     "reaches 0.838. The synthetic ablation is likewise interpretable: "
-     "satellite alone reaches 0.802, weather alone 0.256, historical alone "
-     "0.471, soil alone −0.408, weather with satellite 0.809 and all sources "
-     "0.829 — an ordering in which the satellite stream is clearly the "
-     "highest-value source and combination helps rather than hurts."),
+     "Removing the anomalous years makes the model relatively worse, not better. "
+     "The agro-climatic signal is genuinely absent from the ordinary years, not "
+     "merely masked in the extraordinary ones. The oracle row falling from 0.636 "
+     "to 0.272 across the same subsets confirms that much of what appeared as a "
+     "year effect was those two events."),
     ("p",
-     "Three conclusions follow. The pipeline is correct: the same code that "
-     "returns 0.020 on twenty-eight records returns 0.842 on a hundred and "
-     "sixty, so the near-zero real-data scores are attributable to the sample, "
-     "not to a defect. The feature design is sound: the ablation behaves as "
-     "designed when the sample supports it. And the deep-versus-classical "
-     "finding is robust rather than an artefact of extreme scarcity — even at "
-     "160 records the classical models lead decisively, with the best deep "
-     "model at 0.271 against Random Forest at 0.842. Deep architectures for "
-     "this problem need far more data than either dataset provides."),
+     "The conclusion, stated plainly: big onion yield in Sri Lanka's dry zone is "
+     "not agro-climatically limited at district-season resolution. The binding "
+     "constraints lie elsewhere — in inputs, management and policy — and the "
+     "relevant variables were not available to this project."),
+    ("p",
+     "The value of a mechanistic model in reaching this conclusion should be "
+     "noted. A random forest returning −0.556 tells the reader nothing about "
+     "why. PADR reports which mechanisms are inactive, by how much, with "
+     "agronomic coefficients estimated to plausible values and stable across "
+     "every fold. That decomposition is available only because the model has an "
+     "interpretable internal structure, and it is what converts a negative "
+     "predictive result into a positive scientific one."),
+
+    ("h2", "7.10 Detection Power and Identifiability"),
+    ("p",
+     "The claim of section 7.9 — that the agro-climatic channel does not carry "
+     "the signal — is only worth making if the model would have detected such a "
+     "signal had one been present. A negative result from an underpowered "
+     "instrument says nothing about the world. This section establishes the "
+     "instrument's sensitivity."),
+    ("p",
+     "Yields were simulated in which a known share of the variance is genuinely "
+     "driven by PADR's own stress index, with noise matched to the observed "
+     "within-year scale of 3.84 metric tons per hectare, and refitted under the "
+     "identical protocol."),
+    ("table", (
+        ["Weather share of variance", "LOYO R²", "Detected?"],
+        [
+            ["0 per cent (pure-noise control)", "−0.497 ± 0.202", "—"],
+            ["6 per cent", "+0.222 ± 0.038", "Yes"],
+            ["25 per cent", "+0.080 ± 0.115", "Yes"],
+            ["100 per cent", "+0.354 ± 0.013", "Yes"],
+        ],
+        "Table 7.11: Detection power at simulated weather-signal strengths",
+    )),
+    ("fig", (f"{REAL}/results/power_curve.png",
+             "Figure 7.5: The weather signal PADR would have recovered, against what "
+             "it recovered from the real panel")),
+    ("p",
+     "PADR detects a weather signal driving as little as six per cent of yield "
+     "variance at twenty-eight observations. It detected none in the real panel. "
+     "The agro-climatic signal in these data is therefore below six per cent of "
+     "variance, which is a considerably stronger statement than the observation "
+     "that a coefficient of determination came out negative."),
+    ("p",
+     "Two qualifications belong with that number. The curve is non-monotonic, "
+     "the twenty-five per cent point sitting below the six per cent point; with "
+     "only two replicates per amplitude the spread of ±0.115 at that point "
+     "covers the gap, and no real effect should be read into it. Separately, "
+     "the study used a single optimiser start from the literature values rather "
+     "than the twenty used for the headline fit. That is deliberately "
+     "optimistic — it hands the optimiser the neighbourhood of the answer — so "
+     "a failure to detect under those conditions errs in the conservative "
+     "direction for a power claim."),
+    ("p",
+     "The same machinery answers a second question: which constants are "
+     "identifiable at this sample size. Table 7.12 fits PADR to data generated "
+     "from known values and reports the error as a share of each parameter's "
+     "admissible range, taking under ten per cent as recovered."),
+    ("table", (
+        ["Parameter", "True", "Recovered", "Error (% of range)", "Identifiable"],
+        [
+            ["Waterlogging severity", "0.0060", "0.0058", "0.4", "Yes"],
+            ["Soil water capacity", "147.10", "145.37", "1.0", "Yes"],
+            ["Waterlogging threshold", "96.01", "99.18", "1.4", "Yes"],
+            ["Optimum temperature", "28.95", "28.60", "2.9", "Yes"],
+            ["Base temperature", "10.24", "11.15", "9.1", "Yes"],
+            ["Yield response factor Ky", "0.966", "1.108", "12.8", "No"],
+            ["Critical temperature", "35.58", "33.64", "16.2", "No"],
+        ],
+        "Table 7.12: Parameter recovery at n = 28",
+    )),
+    ("p",
+     "Five of the seven agronomic constants are recovered; the FAO-33 yield "
+     "response factor and the critical temperature are not. The failure mode for "
+     "Ky is instructive rather than merely inconvenient: given data generated "
+     "with a value of 0.966, the estimator returns 1.108, which is its "
+     "literature prior. The shrinkage penalty that makes the model estimable at "
+     "this sample size also pins any parameter the data cannot constrain to its "
+     "prior, and the narrow spread across folds then reflects the stability of "
+     "the prior rather than information in the data."),
+    ("p",
+     "That is a general caution for shrinkage-regularised mechanistic "
+     "calibration, and it is worth stating as a result in its own right: a tight "
+     "confidence interval on a shrunk parameter is not evidence that the "
+     "parameter was learned. Only a recovery experiment distinguishes the two "
+     "cases, and it costs very little to run."),
+
+    ("h2", "7.11 Calibrated Uncertainty"),
+    ("p",
+     "The interim report's conformal intervals reported an empirical coverage of "
+     "1.000 for all twelve models. That figure was an artefact: the quantile was "
+     "computed from the out-of-fold residuals and coverage was then measured on "
+     "the same residuals, so the calibration and evaluation sets were identical. "
+     "A sample's own high quantile necessarily covers it."),
+    ("p",
+     "The replacement is a year-blocked cross-conformal procedure following "
+     "Barber and colleagues. The interval for a held-out year is calibrated on "
+     "the residuals of every other year, so no observation ever calibrates its "
+     "own interval. Blocking by year rather than by record is necessary because "
+     "the four districts within a year share a year effect, which violates "
+     "record-level exchangeability."),
+    ("table", (
+        ["Model", "Blocked coverage", "Interval half-width (MT/ha)"],
+        [
+            ["Oracle year-mean", "0.929", "6.70"],
+            ["Train mean", "0.893", "14.90"],
+            ["PADR", "0.893", "15.29"],
+            ["District historical mean", "0.893", "15.84"],
+            ["XGBoost", "0.929", "16.42"],
+            ["Random Forest", "0.929", "17.63"],
+        ],
+        "Table 7.10: Year-blocked cross-conformal intervals at a nominal 90 per cent",
+    )),
+    ("p",
+     "Mean coverage across models is 0.911 against a nominal 0.90, so the "
+     "intervals are properly calibrated. Their width is the substantive finding. "
+     "A half-width of 15.29 metric tons per hectare on a target whose mean is "
+     "17.89 is an interval of approximately plus or minus eighty-five per cent. "
+     "These predictions are not usable for import planning or any other decision "
+     "the system was proposed to support, and the honest interval is the evidence "
+     "for that statement. A system that reported a point forecast without this "
+     "interval would be misleading its user."),
+
+    ("h2", "7.12 Per-District Behaviour"),
+    ("p",
+     "District-level differences are small and, given section 7.5, expected to "
+     "be: only 2.2 per cent of the target's variance lies between districts. The "
+     "estimated district offsets span 0.34 metric tons per hectare in total, "
+     "which is smaller than the measurement error of a single cell."),
+    ("p",
+     "Kurunegala warrants separate comment. Its harvested extent ranges from 3.5 "
+     "to 59 hectares against Matale's 104 to 1,765, so its yield estimates are "
+     "inherently the noisiest in the panel; it shares a weather grid cell with "
+     "Matale, so it has no independent meteorological observation; its "
+     "vegetation index is a Matale proxy, no MODIS export being available; and "
+     "its soil profile is absent from the SoilGrids export. Its apparent "
+     "difficulty in the interim report is therefore substantially an artefact of "
+     "observation quality rather than a property of the district's agronomy. The "
+     "extent weighting introduced in section 7.3 down-weights it accordingly."),
 
     ("h2", "7.13 Summary"),
     ("p",
-     "This chapter evaluated the system on twenty-eight collected records "
-     "spanning four districts and seven Yala seasons. The physics-residual "
-     "hybrid is the best model at R² 0.091 and RMSE 3.90 MT/Ha; the "
-     "proposal-stage target of 0.75 is not met on real data. The mechanistic "
-     "backbone improves the coefficient of determination by 0.070 over the "
-     "plain Random Forest, confirming that supplying agronomy beats learning "
-     "it at this scale. Stacking does not help, though the learned convex blend "
-     "clearly beats the equal-weight mean, so the forecast-combination puzzle "
-     "does not hold here. Every deep architecture falls below the mean "
-     "predictor, with the Wilcoxon test rejecting parity at p below 0.0001. The "
-     "ablation shows no single data source suffices and that adding features "
-     "can hurt. Per-district analysis shows Anuradhapura most predictable and "
-     "Kurunegala least by R², with the ordering reversing under absolute error. "
-     "Conformal intervals rank consistently with point errors but are "
-     "conservative at this calibration size. SHAP places engineered interaction "
-     "terms at the top of the ranking. The synthetic reference run reaches "
-     "0.842 with identical code, establishing that the limiting factor is the "
-     "sample rather than the implementation. The next chapter interprets these "
-     "results and sets out what should follow."),
+     "The dataset used in the interim report carried a target that was "
+     "approximately forty per cent fabricated. It has been rebuilt from "
+     "eighty-seven genuine DCS records using the standard definition of yield, "
+     "correlating with its predecessor at 0.68. Six physically impossible "
+     "records were excluded and four look-ahead leaks removed."),
+    ("p",
+     "On the corrected panel, sixty-four per cent of variance lies between years "
+     "and is removed by the validation protocol, and measurement error accounts "
+     "for over half of what remains within a year. The attainable coefficient of "
+     "determination is bounded at 0.162, so the proposal-stage target of 0.75 was "
+     "not achievable by any model."),
+    ("p",
+     "Every model, including PADR, performs worse than predicting the training "
+     "mean. PADR's decomposition identifies the reason: its stress index varies "
+     "at eight per cent against thirty-five per cent in the observed target, "
+     "because thermal stress is near-constant in this climate and water deficit "
+     "almost never binds under tank irrigation. Removing the anomalous years "
+     "makes the model relatively worse, establishing that the signal is absent "
+     "rather than masked."),
+    ("p",
+     "Of the model's four design claims, learning the agronomic coefficients and "
+     "shrinking them moderately toward literature are supported; thermal time "
+     "indexing and the waterlogging term are not. The estimated coefficients are "
+     "stable across folds and agronomically plausible, and the comparison "
+     "against their published values shows that FAO-33 materially overstates "
+     "weather sensitivity for this crop and irrigation regime."),
 ]
 
 
-# ============================================================================
-# Chapter 8 — Discussion and Conclusion
-# ============================================================================
-
 CHAPTER_8 = [
-    ("chapter", ("8", "Discussion, Conclusion and Further Work")),
+    ("chapter", ("8", "Discussion and Conclusion")),
 
     ("h2", "8.1 Introduction"),
     ("p",
-     "Chapter 7 reported what the system achieves. This chapter interprets "
-     "those results, positions the work against the literature reviewed in "
-     "Chapter 2, states the contributions the project makes, sets out honestly "
-     "the threats to the validity of its conclusions, describes the further "
-     "work that would follow, and concludes."),
+     "Chapter 7 reported what the system achieves. This chapter interprets those "
+     "results, withdraws two claims made in the interim report that the "
+     "corrected analysis does not support, positions the work against the "
+     "literature reviewed in Chapter 2, states the contributions the project "
+     "makes, sets out the threats to the validity of its conclusions, describes "
+     "the further work that would follow, and concludes."),
 
     ("h2", "8.2 Interpretation of the Results"),
-    ("h3", "8.2.1 On not meeting the accuracy target"),
+
+    ("h3", "8.2.1 On the accuracy target"),
     ("p",
-     "The project proposal set a target coefficient of determination above "
-     "0.75. On the collected data the best model reaches 0.091. It is worth "
-     "being direct about what that means and what it does not."),
+     "The project proposal set a target coefficient of determination above 0.75. "
+     "The interim report treated the shortfall against that target as a "
+     "consequence of sample size, and argued that the architecture was sound "
+     "because the identical code reached 0.842 on synthetic data. Neither part "
+     "of that argument survives the corrected analysis, and it is worth being "
+     "precise about why."),
     ("p",
-     "It does not mean the pipeline is defective. Section 7.12 established that "
-     "the identical code reaches 0.842 when given an adequate sample. It does "
-     "not mean the features are poorly designed; the same ablation that is "
-     "uninterpretable on twenty-eight records behaves exactly as designed on a "
-     "hundred and sixty. And it does not mean the evaluation is pessimistic by "
-     "choice — it means the evaluation is honest. A random train-test split on "
-     "twenty-eight records would have produced a far more flattering number, "
-     "and that number would have been an artefact of records from the same year "
-     "appearing on both sides of the split."),
+     "The synthetic comparison established nothing. That data was generated by a "
+     "known functional form inside the project's own data loader, with the "
+     "vegetation index constructed as a function of the yield it was later used "
+     "to predict. A model recovering 0.842 from it demonstrates that an "
+     "estimator can invert a function it was handed, which is not evidence about "
+     "behaviour on real observations. Any claim resting on the synthetic run "
+     "should be withdrawn, and section 7.12 of the interim report is superseded "
+     "accordingly."),
     ("p",
-     "What it does mean is that the target was set before the size of the "
-     "obtainable record was known. Twenty-eight observations of a noisy "
-     "biological process, against thirty-two candidate predictors, with the "
-     "dominant sources of variation — cultivar choice, irrigation scheduling, "
-     "fertiliser application, pest incidence, harvest timing — entirely "
-     "unobserved, is not a setting in which ninety per cent of variance can be "
-     "explained by weather and satellite proxies. The honest statement of the "
-     "result is that the system explains about nine per cent of district yield "
-     "variance and issues forecasts with a typical absolute miss of 3.35 metric "
-     "tons per hectare, or 23.3 per cent of the actual value, and that this is "
-     "what the available data supports."),
+     "The more substantial point is that the target was not merely unmet but "
+     "unattainable. Section 7.5 decomposed the corrected target and found that "
+     "63.6 per cent of its variance lies between years, which the "
+     "Leave-One-Year-Out protocol removes by construction, and that measurement "
+     "error in the target accounts for 53.6 per cent of the within-year "
+     "variance that remains. The implied ceiling on the attainable coefficient "
+     "of determination is 0.162. No model of any architecture could have reached "
+     "0.75 on this panel under this protocol. The target was set before the "
+     "structure of the obtainable record was known, and the appropriate response "
+     "is to report the ceiling rather than to rank models against an impossible "
+     "benchmark."),
     ("p",
-     "Whether that is useful depends on the alternative. The current practice "
-     "it would replace is a subjective post-harvest field assessment with no "
-     "quantified error at all. A pre-harvest forecast with a stated interval, "
-     "even a wide one, is a different kind of object from an unquantified "
-     "estimate arriving too late to act on."),
-    ("h3", "8.2.2 On the deep learning result"),
+     "This has a methodological implication beyond the present project. Yield "
+     "prediction studies routinely report a coefficient of determination without "
+     "first establishing whether their validation protocol permits a meaningful "
+     "one. Where the panel is short and the year effect dominant, a negative "
+     "value is the expected outcome and carries no information about model "
+     "quality. Reporting the decomposition alongside the score costs little and "
+     "prevents the reader from attributing to the model what belongs to the "
+     "design."),
+
+    ("h3", "8.2.2 Withdrawal of the deep learning finding"),
     ("p",
-     "The comprehensive failure of the deep family — every architecture below "
-     "the mean predictor, the two convolutional models near R² of −7 — is the "
-     "project's clearest empirical finding, and it is a negative one. The "
-     "literature that motivated including them [2], [8], [20] is not wrong; it "
-     "is validated in a regime this problem does not occupy. Representation "
-     "learning trades sample efficiency for expressive power, and when the "
-     "sample is twenty-four training records per fold, there is nothing to "
-     "trade with."),
+     "The interim report described the comprehensive failure of the deep family "
+     "as the project's clearest empirical finding, and drew from it the guidance "
+     "that a practitioner facing a similar problem should not begin with a deep "
+     "architecture. That finding must be withdrawn, because the deep models were "
+     "not given the inputs the report claimed they were given."),
     ("p",
-     "The finding survives a scale increase. At 160 synthetic records the "
-     "classical models still lead decisively, 0.842 against 0.271 for the best "
-     "deep model. This suggests the crossover point for this problem structure "
-     "lies well beyond a few hundred records, which for district-level "
-     "seasonal yield data means decades of additional record-keeping across "
-     "many more districts. The actionable guidance for a practitioner facing a "
-     "similar problem is therefore concrete: do not begin with a deep "
-     "architecture, and do not interpret its failure as an implementation "
-     "error."),
-    ("h3", "8.2.3 On the mechanistic backbone"),
+     "The sequence tensor supplied to the recurrent and convolutional models was "
+     "not a record of monthly weather. It was manufactured inside the feature "
+     "engineering stage by expanding the seasonal aggregates back out through a "
+     "fixed sinusoidal temperature curve and a fixed vector of rainfall weights, "
+     "with a small seeded perturbation. That construction is a deterministic and "
+     "invertible function of the tabular features the classical models already "
+     "received, so it carried no additional information whatsoever. The "
+     "comparison between the classical and deep families therefore measured "
+     "nothing about deep learning; it measured the cost of routing the same "
+     "information through a higher-capacity estimator, which is a different and "
+     "far less interesting question."),
     ("p",
-     "The physics-residual result — a 0.070 improvement in R² over the plain "
-     "Random Forest, and independent confirmation through the convex stack "
-     "assigning it the largest weight at 0.399 — is the project's clearest "
-     "positive finding. Its interest lies in the mechanism rather than the "
-     "magnitude. The backbone alone scores −0.222, so it is not a good "
-     "predictor. It helps because it removes work from the learner: the "
-     "water-limitation and thermal-time relationships come from FAO-33 [31] and "
-     "the standard degree-day formulation [32] instead of being estimated from "
-     "two dozen records."),
+     "The sequence inputs have since been replaced with genuine daily records "
+     "from NASA POWER, 37,988 of them across the four district centroids from "
+     "2000 to 2025. A properly specified comparison of the classical and deep "
+     "families on those inputs is stated as further work in section 8.6 rather "
+     "than claimed here. What can be said is that the earlier conclusion was "
+     "reached on invalid grounds, and that reporting this is preferable to "
+     "allowing a convenient negative result to stand unexamined."),
+
+    ("h3", "8.2.3 On estimating the physics rather than fixing it"),
     ("p",
-     "The generalisation is that in data-scarce agricultural prediction, "
-     "domain knowledge should enter as model structure rather than as feature "
-     "selection. Encoding an approximately correct physiological relationship "
-     "as a fixed functional form buys more than adding another predictor "
-     "column, because it does not consume degrees of freedom. Shahhosseini et "
-     "al. [33] demonstrated this with a full crop simulator; this work shows "
-     "that a three-factor closed form obtains a measurable part of the same "
-     "benefit at a small fraction of the modelling cost."),
-    ("h3", "8.2.4 On stacking and combination"),
+     "The interim report's positive finding was that a mechanistic backbone with "
+     "coefficients fixed at published values improved on a plain Random Forest, "
+     "and generalised this to the principle that domain knowledge should enter "
+     "as model structure rather than as feature selection. The corrected "
+     "analysis supports a sharper and more useful version of that principle."),
     ("p",
-     "That the learned convex blend beat the equal-weight mean by a wide margin "
-     "— −0.116 against −0.530 — while both remained worse than the single best "
-     "model is a coherent and instructive pair of results. The forecast-"
-     "combination puzzle [37], [38] presumes base learners of broadly "
-     "comparable quality, in which case estimating weights costs more than it "
-     "gains. That presumption fails when the pool contains models scoring below "
-     "−7, since uniform weighting then commits a ninth of the blend to each of "
-     "them. Meanwhile, estimating nine weights from twenty-eight out-of-fold "
-     "predictions is itself beyond what the sample supports, which is why no "
-     "combiner beat the physics-residual hybrid alone. The practical lesson is "
-     "to prune the base pool before combining, not to combine everything and "
-     "hope the weights sort it out."),
+     "Making the agronomic coefficients estimable rather than fixed improves the "
+     "coefficient of determination by 0.566, the largest effect of any design "
+     "choice tested. This is the difference between the approach of Shahhosseini "
+     "and colleagues [33], who run a crop simulator with published coefficients "
+     "and fit a learner to its residual, and the approach taken here, where the "
+     "coefficients are fitted jointly with the response under agronomic box "
+     "constraints and a penalty shrinking each toward its literature value."),
+    ("p",
+     "The mechanism by which it helps is instructive, and is the opposite of "
+     "what might be expected. Pinning the coefficients to their FAO-33 [31] and "
+     "degree-day [32] values produces a stress index varying at 35.33 per cent, "
+     "almost exactly matching the 34.97 per cent variation in observed yield, "
+     "and yet returns the worst score of any configuration tested at −1.540. The "
+     "published coefficients imply a crop considerably more weather-sensitive "
+     "than the data support, and they locate that sensitivity in the wrong "
+     "years. Estimating them does not add explanatory power so much as remove "
+     "spurious sensitivity: the stress index's coefficient of variation falls "
+     "from 22.4 to 8.1 per cent while the score improves by 0.57."),
+    ("p",
+     "The transferable statement is that standard FAO-33 crop coefficients "
+     "materially overstate weather sensitivity for big onion under Sri Lankan "
+     "dry-zone tank irrigation, and that mechanistic crop models applied outside "
+     "the conditions in which their coefficients were derived should be locally "
+     "calibrated rather than adopted wholesale. This is visible only because the "
+     "coefficients were made estimable, and it is the project's clearest "
+     "positive contribution."),
+    ("p",
+     "Two of the model's four design claims were not supported and are reported "
+     "as such. Indexing weather by accumulated heat rather than by calendar day "
+     "improved the score by 0.011, because the two axes nearly coincide in a "
+     "climate where temperature barely varies. The waterlogging term cost 0.004, "
+     "because it exceeds its estimated threshold in 3.5 per cent of intervals in "
+     "a single year. An ablation in which every proposed component happens to "
+     "help would not be a credible ablation."),
+
+    ("h3", "8.2.4 On the absence of an agro-climatic signal"),
+    ("p",
+     "The principal scientific result of this work is negative, and it is "
+     "diagnosed rather than merely observed. The model's stress index varies "
+     "across district-years with a coefficient of variation of 7.95 per cent "
+     "while the observed target varies at 34.97 per cent. A quantity varying by "
+     "eight per cent cannot explain one varying by thirty-five, whatever "
+     "coefficients it is given."),
+    ("p",
+     "Decomposing the index identifies which mechanisms are inactive and why. "
+     "The thermal response remains between 0.86 and 0.91 in every district-year, "
+     "because tropical temperatures at these latitudes vary little from year to "
+     "year. The water-deficit factor is exactly one in most intervals: "
+     "growing-season rainfall averages 1,043 millimetres against a pre-2019 "
+     "climatology of 747, and the crop is additionally tank-irrigated, so "
+     "drought effectively does not occur. Waterlogging departs from one only in "
+     "2022."),
+    ("p",
+     "The possibility that the model is sound but defeated by two anomalous "
+     "years was tested and rejected. Removing 2022 and 2024 makes the model "
+     "relatively worse rather than better, so the signal is absent from the "
+     "ordinary years rather than masked in the extraordinary ones."),
+    ("p",
+     "A negative result is only as good as the sensitivity of the instrument "
+     "producing it, so that sensitivity was measured directly. On simulated "
+     "panels PADR recovers a weather signal driving as little as six per cent of "
+     "yield variance at this sample size, and it recovered none from the real "
+     "data. The agro-climatic signal in this system is therefore below six per "
+     "cent of variance. Section 7.10 reports the experiment."),
+    ("p",
+     "The strength of that conclusion rests on the model's demonstrated "
+     "sensitivity. On simulated panels PADR recovers a weather signal driving as "
+     "little as six per cent of yield variance, and it recovered none from the "
+     "real data. This is what distinguishes a diagnosed absence from an "
+     "underpowered instrument, and section 7.10 reports it. The same experiment "
+     "also establishes that five of the seven agronomic constants are "
+     "identifiable at this sample size and two are not, which is why no claim is "
+     "made about the yield response factor despite its narrow spread across "
+     "folds."),
+    ("p",
+     "The conclusion is that big onion yield in Sri Lanka's dry zone is not "
+     "agro-climatically limited at district-season resolution. The binding "
+     "constraints lie in inputs, management and policy. The 2022 collapse, in "
+     "which the four-district mean fell to 9.42 metric tons per hectare against "
+     "19.30 in other years, coincides with the April 2021 prohibition on "
+     "chemical fertilizer imports and the economic crisis that followed. This "
+     "report notes the coincidence and directs the reader to the policy "
+     "literature; the panel alone cannot establish the attribution, and no "
+     "weather-driven model could anticipate such an event in any case."),
+    ("p",
+     "The value of a mechanistic model in reaching this conclusion deserves "
+     "emphasis, because it is the answer to the question of why the project did "
+     "not simply report that its models failed. A Random Forest returning −0.556 "
+     "tells the reader nothing about the cause. A model that reports which "
+     "physiological mechanisms are inactive, by how much, with coefficients "
+     "estimated to agronomically plausible values and stable across every fold, "
+     "converts an uninformative predictive failure into a substantive scientific "
+     "claim about the system being studied. That decomposition is available only "
+     "because the model has interpretable internal structure."),
 
     ("h2", "8.3 How This Work Differs from Others"),
     ("p",
-     "Table 8.1 positions the work against the closest prior studies along the "
-     "dimensions that distinguish it."),
-    ("table", (
-        ["Dimension", "Closest prior work", "What this work does differently"],
-        [
-            ["Crop and region", "Iqbal et al. [9] — onion, Bangladesh, climate only",
-             "Big onion, four Sri Lankan districts, four integrated data streams"],
-            ["Sri Lankan context", "Amarasinghe et al. [5]; Wickramasinghe et al. [10] — rice",
-             "First yield-prediction system for a Sri Lankan vegetable crop"],
-            ["Model comparison", "Chikwendu et al. [3] — random split, no significance test",
-             "LOYO-CV with nested tuning and paired Wilcoxon testing"],
-            ["Deep architecture", "Rajpoot & Chandrakar [8] — hybrid CNN-LSTM at large n",
-             "Same family with season injection, and evidence it fails at small n"],
-            ["Mechanistic hybrid", "Shahhosseini et al. [33] — full crop simulator + ML",
-             "Closed-form FAO-33/GDD backbone + residual learner, measured ablation"],
-            ["Combination", "Standard stacking practice",
-             "Simplex-constrained convex blend with explicit puzzle benchmark"],
-            ["Uncertainty", "Point forecasts, typical in the reviewed literature",
-             "Distribution-free split-conformal intervals per model"],
-            ["Interpretability", "Post-hoc importance where reported",
-             "Exact SHAP attributions plus a served closed-form equation"],
-            ["Data-source value", "Not decomposed for vegetables in this region",
-             "Six-configuration controlled ablation, real and synthetic"],
-        ],
-        "Table 8.1: Positioning against the closest prior work",
-    )),
+     "The literature reviewed in Chapter 2 approaches yield prediction in three "
+     "broad ways, and this work is positioned against each."),
     ("p",
-     "The difference that matters most is one of posture rather than of "
-     "technique. Much of the reviewed literature reports the best score its "
-     "authors obtained. This work reports what a full family of methods "
-     "achieves under one protocol, including the methods that failed and the "
-     "combination strategies that did not pay, and states the sample-size "
-     "conditions under which each conclusion holds. In a field where "
-     "optimistic evaluation is common, that is a substantive difference."),
+     "Classical and deep supervised approaches [2], [8], [20] learn a mapping "
+     "from engineered covariates to yield, and are validated on panels of "
+     "thousands of county-year records. They assume labels are scarce but "
+     "adequate. The regime addressed here inverts that assumption: twenty-eight "
+     "labels against nearly thirty-eight thousand daily covariate records. The "
+     "methodological question is not which architecture fits best but how much "
+     "is identifiable at all, which is why this report leads with a variance "
+     "decomposition and an attainable ceiling rather than a leaderboard."),
+    ("p",
+     "Hybrid process-based approaches, of which Shahhosseini and colleagues [33] "
+     "are the clearest example, couple a mechanistic crop model to a statistical "
+     "learner by fitting the learner to the mechanistic model's residual. The "
+     "crop model's coefficients are treated as known. This work makes them the "
+     "object of estimation, which changes what the model produces: the fitted "
+     "coefficients are themselves a reportable result, checkable against the "
+     "agronomic literature, and the comparison against their published values is "
+     "what surfaces the finding of section 8.2.3."),
+    ("p",
+     "Conformal approaches to prediction uncertainty [39] provide "
+     "distribution-free intervals under exchangeability. This work observes that "
+     "record-level exchangeability fails on a district-year panel, because the "
+     "districts within a year share a year effect, and adopts a year-blocked "
+     "cross-conformal procedure [41] accordingly. The interim report's intervals "
+     "reported coverage of 1.000 because calibration and evaluation used the "
+     "same residuals; the corrected procedure reports 0.911 against a nominal "
+     "0.90."),
 
     ("h2", "8.4 Contributions of This Research"),
     ("p",
-     "The project makes five contributions, each mapping to a gap identified in "
-     "section 2.8."),
+     "The project makes five contributions, stated in the order of how much "
+     "confidence the evidence supports."),
     ("p",
-     "First, the first end-to-end yield prediction system for big onion in "
-     "Sri Lanka, integrating district yield records, reanalysis weather, "
-     "satellite vegetation and thermal indices and gridded soil properties into "
-     "a reproducible pipeline that runs on commodity hardware and serves "
-     "forecasts through a documented interface and a decision-support "
-     "dashboard. This addresses Gap 1."),
+     "First, a data integrity finding. The dataset on which the interim results "
+     "rested carried a target variable approximately forty per cent fabricated, "
+     "with fifty of one hundred and twenty-four month-rows marked synthetic and "
+     "the fabrication reaching the target rather than only the covariates. The "
+     "panel was rebuilt from eighty-seven genuine Department of Census and "
+     "Statistics records using the standard definition of yield as production "
+     "over harvested area. The corrected target correlates with its predecessor "
+     "at 0.68. Six further records implying physically impossible yields, the "
+     "worst at 442 metric tons per hectare, were identified and excluded."),
     ("p",
-     "Second, an empirical answer to the deep-versus-classical question in the "
-     "severely data-scarce vegetable yield regime. Nine model families under "
-     "one protocol with paired significance testing establish that classical "
-     "regularised learners dominate and that deep architectures fail below the "
-     "mean predictor, and the synthetic replication shows the finding is not an "
-     "artefact of extreme scarcity. This addresses Gap 2."),
+     "Second, a quantified account of what this panel can support. Sixty-four "
+     "per cent of the target's variance lies between years and is removed by the "
+     "validation protocol; measurement error in the target, estimated directly "
+     "from the spread of the month-records composing each cell, accounts for "
+     "over half the within-year variance that remains; the attainable "
+     "coefficient of determination is bounded at 0.162. This reframes a "
+     "collection of negative scores as a property of the data rather than of the "
+     "models, and the method of establishing it transfers to any short "
+     "agricultural panel."),
     ("p",
-     "Third, a lightweight physics-residual hybrid that couples a closed-form "
-     "FAO-33 and degree-day backbone [31], [32] to a learned residual, with a "
-     "controlled three-way ablation demonstrating a 0.070 improvement in R² "
-     "over the equivalent purely learned model, and independent corroboration "
-     "from the stacking weights. This addresses Gap 3 and is the project's "
-     "principal methodological novelty."),
+     "Third, a model whose agronomic coefficients are estimated rather than "
+     "assumed, and the finding that follows from it: standard FAO-33 "
+     "coefficients overstate weather sensitivity for this crop and irrigation "
+     "regime by roughly a factor of four in stress variability, and estimating "
+     "them locally improves the score by 0.566."),
     ("p",
-     "Fourth, a hybrid CNN-LSTM architecture with season-indicator injection "
-     "positioned after feature extraction, designed so that branch parameters "
-     "are shared across seasons while only the dense head learns "
-     "season-specific baselines. The design and its data-efficiency rationale "
-     "are contributed; its empirical validation is incomplete because the "
-     "collected data covers only one season, and this is stated as a limitation "
-     "rather than glossed. This addresses Gap 4 partially."),
+     "Fourth, the diagnosis that the agro-climatic channel is inactive in this "
+     "system, supported by a decomposition showing an eight per cent stress "
+     "variation against thirty-five per cent in observed yield, and by the "
+     "demonstration that removing the anomalous years worsens rather than "
+     "improves the fit."),
     ("p",
-     "Fifth, a six-configuration controlled ablation quantifying data-source "
-     "contribution for this crop and region, on both the real and the synthetic "
-     "record, together with a constrained-stacking benchmark that tests the "
-     "forecast-combination puzzle explicitly and distribution-free conformal "
-     "intervals attached to every model. This addresses Gap 5 and supplies the "
-     "methodological rigour that section 2.2 identified as frequently absent."),
+     "Fifth, a set of methodological corrections that are independently "
+     "reportable: the removal of four look-ahead leaks, the replacement of "
+     "fabricated sequence inputs with genuine daily records, the replacement of "
+     "a tautological conformal coverage calculation with a year-blocked "
+     "procedure, and the introduction of extent weighting on a panel whose cells "
+     "span a five-hundred-fold range in harvested area."),
 
     ("h2", "8.5 Threats to Validity and Limitations"),
     ("p",
-     "Six limitations bound the conclusions, and stating them precisely is part "
-     "of the contribution."),
+     "The sample is twenty-eight district-year records covering four districts "
+     "over seven years in a single season. There is no Maha data at all, which "
+     "makes the hybrid CNN-LSTM's season-indicator injection inert by "
+     "construction rather than merely untested, and which means nothing in this "
+     "report speaks to off-season behaviour."),
     ("p",
-     "Sample size. Twenty-eight records is the binding constraint on every "
-     "quantitative result. All accuracy figures should be read as lower bounds "
-     "on what the approach could achieve with a fuller record, and all "
-     "comparative conclusions as holding specifically in this regime."),
+     "The four districts are not four independent meteorological observations. "
+     "Kurunegala and Matale fall inside one NASA POWER grid cell and receive "
+     "identical daily weather at a correlation of exactly one, so there are "
+     "three distinct weather series for four districts. Kurunegala additionally "
+     "has no MODIS export of its own and borrows Matale's, and no SoilGrids "
+     "soil profile. Its inputs are therefore substantially those of its "
+     "neighbour, and conclusions specific to it should not be drawn."),
     ("p",
-     "Single season. The collected data covers Yala only. The season indicator "
-     "is constant across every real record, so the hybrid architecture's "
-     "central design claim cannot be tested on real data, and no conclusion "
-     "about Maha behaviour is supported."),
+     "Onion occupies between 0.002 and 0.89 per cent of any district's land "
+     "area, so district-mean satellite indices cannot carry a crop-specific "
+     "signal and should be understood throughout as regional agro-climatic "
+     "indicators. This is a property of the spatial resolution available, not of "
+     "the sensor, and would be addressed by field-boundary masking if cultivated "
+     "parcels were mapped."),
     ("p",
-     "Conformal calibration size. The empirical coverage of 1.00 reported in "
-     "section 7.10 is an artefact of calibrating and measuring on the same "
-     "twenty-eight residuals. The theoretical guarantee holds, but the "
-     "intervals are conservative and the empirical figure carries no "
-     "independent information."),
+     "Six month-records were excluded as physically impossible. The exclusion "
+     "rests on an agronomic upper bound rather than on verification against the "
+     "source, and this report does not establish whether extent or production "
+     "was mis-transcribed in each case. The affected cells are listed in the "
+     "data quality report and should be checked against the original "
+     "publication."),
     ("p",
-     "Unobserved drivers. Cultivar, irrigation scheduling, fertiliser regime, "
-     "pest and disease incidence and harvest timing are all unobserved and all "
-     "plausibly account for a substantial share of yield variance. No model "
-     "built on weather, satellite and soil proxies alone can recover them, "
-     "which places a ceiling on achievable accuracy that no amount of "
-     "additional modelling effort will lift."),
+     "The attribution of the 2022 collapse to the fertilizer import prohibition "
+     "is a coincidence of timing consistent with the data, not a result "
+     "established by it. No causal claim is made."),
     ("p",
-     "Target quality. The district yield figures used as ground truth are "
-     "themselves derived from subjective field assessment rather than from "
-     "crop-cutting measurement [4]. Error in the target propagates directly "
-     "into every reported metric, and part of the unexplained variance may be "
-     "measurement error in the label rather than in the model."),
+     "No fertilizer, irrigation, input-cost, cultivar or price data was "
+     "available. Given the finding that the agro-climatic channel is inactive, "
+     "these are precisely the variables most likely to matter, and their absence "
+     "is the single largest limitation on the project's explanatory reach."),
     ("p",
-     "Spatial aggregation. Yield is modelled at district level, but cultivation "
-     "within a district is heterogeneous in soil, irrigation access and "
-     "management. A district-mean prediction cannot represent that "
-     "heterogeneity, and satellite indices averaged over a district include "
-     "substantial non-onion land cover."),
+     "Finally, the phenological sensitivity curve of Figure 7.3 is estimated "
+     "from a stress signal that section 7.9 shows to be weak. Its shape is "
+     "stable across folds and agronomically plausible, but it should not be "
+     "treated as a well-identified estimate."),
 
     ("h2", "8.6 Further Work"),
     ("p",
-     "The single highest-value action is to extend the record. Every limitation "
-     "in section 8.5 except the last two is a consequence of sample size. "
-     "Extending backwards through the satellite archive to the early 2000s, "
-     "adding the Maha season, and including secondary producing districts would "
-     "plausibly bring the record to two or three hundred observations, which "
-     "section 7.12 indicates is the region where the methods begin to work as "
-     "designed."),
+     "The most valuable next step is not modelling but collection. The finding "
+     "that weather does not constrain yield in this system points directly at "
+     "what should be gathered: fertilizer application rates, irrigation "
+     "scheduling, cultivar identity, planting density and input prices at "
+     "district-season resolution. A panel of the same twenty-eight cells "
+     "carrying those variables would be far more informative than a longer "
+     "weather record."),
     ("p",
-     "Second, restrict the satellite aggregation to cultivated onion extent "
-     "rather than to whole districts. A crop mask derived from Sentinel-2 "
-     "[27] classification would substantially raise the signal-to-noise ratio "
-     "of every vegetation predictor, and this is likely the highest-value "
-     "improvement obtainable without new ground data."),
+     "Within the existing data, three extensions follow. The classical and deep "
+     "family comparison should be repeated properly on the genuine daily "
+     "sequences that have replaced the fabricated ones, which would either "
+     "restore or definitively retire the finding withdrawn in section 8.2.2. The "
+     "MODIS export should be re-run for Kurunegala and, if cultivated parcels "
+     "can be delineated, masked to onion fields so the vegetation index becomes "
+     "crop-specific. A finer-resolution reanalysis product would separate "
+     "Kurunegala from Matale meteorologically."),
     ("p",
-     "Third, extend the mechanistic backbone. Given that the closed-form "
-     "three-factor form already yields a measurable improvement, a fuller "
-     "formulation — radiation-use efficiency, an explicit soil water balance, a "
-     "phenology-stage-dependent water sensitivity following the full FAO-33 "
-     "treatment [31] — is the natural next step and is likely to pay more than "
-     "further work on the learned component."),
+     "Methodologically, the variance decomposition and attainable-ceiling "
+     "calculation reported in section 7.5 are cheap, general, and apparently not "
+     "standard practice in the yield prediction literature. Applying them "
+     "systematically across published short-panel studies would establish how "
+     "many report scores against benchmarks their protocols could not have "
+     "delivered."),
     ("p",
-     "Fourth, incorporate management data. Even coarse district-level "
-     "indicators of irrigation coverage, fertiliser distribution and cultivar "
-     "share would address the unobserved-driver limitation directly, and these "
-     "are collected administratively even where they are not published."),
-    ("p",
-     "Fifth, evaluate at operational lead time. All results here use predictors "
-     "aggregated over the complete growing season, which is the post-season "
-     "setting. An import planner needs a forecast four to eight weeks before "
-     "harvest. Re-running the protocol with predictors truncated at successive "
-     "points in the season would quantify the accuracy-versus-lead-time "
-     "trade-off, which is the question an operational user would actually ask."),
-    ("p",
-     "Sixth, conduct a field validation with the intended users. The dashboard "
-     "has been built but not evaluated with Department of Census and Statistics "
-     "or district agricultural officers. Whether a forecast of 16 plus or minus "
-     "7 metric tons per hectare changes any decision is an empirical question "
-     "about users, not about models, and it has not yet been asked."),
+     "Finally, the estimation of agronomic coefficients under shrinkage toward "
+     "literature values is not specific to onion or to this response function. "
+     "Applying it to crops and regions where FAO coefficients are used "
+     "uncritically would test whether the overstatement of weather sensitivity "
+     "found here is a local artefact or a general property of transplanting "
+     "coefficients across climatic regimes."),
 
     ("h2", "8.7 Conclusion"),
     ("p",
-     "This project set out to build a pre-harvest yield forecasting capability "
-     "for big onion in Sri Lanka, where none existed. It delivered a complete "
-     "system: a reproducible multi-source data pipeline, thirty-two engineered "
-     "predictors, nine model families evaluated under a single leakage-free "
-     "protocol, a constrained combination layer, distribution-free uncertainty "
-     "quantification, exact feature attribution, a REST serving interface and a "
-     "decision-support dashboard."),
+     "This project set out to predict big onion yield in Sri Lanka's dry zone "
+     "and to reach a coefficient of determination above 0.75. It did not, and "
+     "the more useful result is the demonstration that it could not have. Under "
+     "leave-one-year-out validation on this panel, with 63.6 per cent of "
+     "variance lying between years and measurement error accounting for over "
+     "half the remainder, the attainable ceiling is 0.162."),
     ("p",
-     "On the twenty-eight seasonal records that could be collected, the "
-     "physics-residual hybrid is the best predictor, explaining nine per cent "
-     "of district yield variance with a typical absolute error of 3.35 metric "
-     "tons per hectare. The proposal's accuracy target of 0.75 was not met on "
-     "real data, and the reason is the size of the available record rather than "
-     "the construction of the system: identical code reaches 0.842 on an "
-     "adequate sample."),
+     "Working within that constraint, the project built a phenology-aligned "
+     "differentiable response model whose agronomic coefficients are estimated "
+     "under agronomic bounds with shrinkage toward published values, using "
+     "seventeen parameters where the architecture it replaces used 44,929. The "
+     "estimated coefficients are stable across every fold and agronomically "
+     "plausible, and their comparison against published values shows that "
+     "FAO-33 materially overstates weather sensitivity for this crop under tank "
+     "irrigation."),
     ("p",
-     "The research findings are more durable than the accuracy figure. Deep "
-     "architectures fail comprehensively in this regime and the failure "
-     "persists at a fivefold larger sample, which is guidance the existing "
-     "literature does not provide. A lightweight mechanistic backbone drawn "
-     "from established agronomy measurably improves a purely learned model, "
-     "confirmed independently by the stacking weights, which argues that domain "
-     "knowledge belongs in model structure rather than in feature lists when "
-     "data is scarce. Estimated combination weights beat uniform averaging when "
-     "base learners differ sharply in quality, but no combination beats the "
-     "best single model when weights must be estimated from twenty-eight "
-     "points. Engineered interaction terms outrank the raw measurements they "
-     "were built from. And no single data stream suffices."),
+     "The model does not beat the mean, and the decomposition explains why. Its "
+     "stress index varies by eight per cent against thirty-five per cent in "
+     "observed yield, because thermal stress is near-constant in this climate "
+     "and water deficit almost never binds under irrigation. Big onion yield "
+     "here is not agro-climatically limited at district-season resolution, and "
+     "the variables that do constrain it were not available."),
     ("p",
-     "The system as it stands is a working foundation with an honest account of "
-     "what it can and cannot do. Its accuracy is bounded by an information "
-     "constraint, not an engineering one, and the path to improving it — a "
-     "longer record, a crop mask, a fuller mechanistic backbone, management "
-     "covariates — is identified and concrete. For a crop on which national "
-     "import decisions turn and for which no forecast currently exists, a "
-     "calibrated and explainable pre-harvest estimate with a stated interval is "
-     "a capability worth having, and this work establishes both that it can be "
-     "built and what it will take to make it good."),
+     "The project also found, and reports, that its own interim dataset carried "
+     "a target approximately forty per cent fabricated, that its deep learning "
+     "comparison had been conducted on manufactured inputs, and that its "
+     "uncertainty intervals had been computed tautologically. Each has been "
+     "corrected and each correction is documented. A final year project that "
+     "reports a well-diagnosed negative result, with the errors that preceded it "
+     "stated openly, is of more use to whoever picks up this problem next than "
+     "one reporting a favourable number it cannot defend."),
 
     ("h2", "8.8 Summary"),
     ("p",
-     "This chapter interpreted the results of Chapter 7, positioned the work "
-     "against the closest prior studies, stated five contributions mapped to "
-     "the five gaps of section 2.8, set out six limitations that bound the "
-     "conclusions, described six lines of further work in priority order, and "
-     "concluded. The report's references and four appendices follow."),
+     "The accuracy target was unattainable rather than merely unmet, and this "
+     "was established quantitatively rather than asserted. Two findings from the "
+     "interim report, concerning deep learning and the synthetic validation of "
+     "the architecture, have been withdrawn on the grounds that the inputs "
+     "supporting them were manufactured. The corrected analysis contributes a "
+     "data integrity finding, a quantified account of what the panel can "
+     "support, a locally calibrated set of agronomic coefficients showing that "
+     "published values overstate weather sensitivity, the diagnosis that the "
+     "agro-climatic channel is inactive in this system, and a set of "
+     "methodological corrections to leakage, sequence construction, uncertainty "
+     "calibration and observation weighting."),
 ]
 
 
@@ -2592,17 +2757,6 @@ ALL_CHAPTERS = [
 # Entry style: author initials FIRST then surname; article/paper titles in
 # double quotes; source, vol./no./pp. and year after; every entry ends with a
 # period.
-#
-# Each item is (authoring_number, sort_key, ieee_text). The authoring number is
-# what the prose above cites; the emitted number is assigned at build time by
-# REFERENCE_ORDER, and the in-text citations are remapped to match. sort_key is
-# given explicitly because IEEE initials-first names make the first-author
-# surname impossible to parse reliably, and several entries have corporate
-# authors.
-#
-# ORDERING NOTE: the Faculty guideline (Karunananda 2006, p.2) requires the list
-# to be alphabetical by first-author surname; the IEEE handout numbers entries in
-# order of first citation. Both cannot hold at once. REFERENCE_ORDER selects.
 # ============================================================================
 
 REFERENCE_ORDER = "alphabetical"   # "alphabetical" (Faculty guideline) | "citation" (strict IEEE)
@@ -2648,6 +2802,7 @@ REFERENCES = [
     (38, "Claeskens", '[38] G. Claeskens, J. R. Magnus, A. L. Vasnev, and W. Wang, "The forecast combination puzzle: a simple theoretical explanation," International Journal of Forecasting, vol. 32, no. 3, pp. 754-762, 2016.'),
     (39, "Vovk", '[39] V. Vovk, A. Gammerman, and G. Shafer, Algorithmic Learning in a Random World. New York, NY: Springer, 2005.'),
     (40, "Angelopoulos", '[40] A. N. Angelopoulos and S. Bates, "Conformal prediction: a gentle introduction," Foundations and Trends in Machine Learning, vol. 16, no. 4, pp. 494-591, 2023.'),
+    (41, "Barber", '[41] R. F. Barber, E. J. Candes, A. Ramdas, and R. J. Tibshirani, "Predictive inference with the jackknife+," The Annals of Statistics, vol. 49, no. 1, pp. 486-507, 2021.'),
 ]
 
 
@@ -2728,40 +2883,47 @@ APPENDIX_A = [
      "(Random Forest, XGBoost and Support Vector Regression), the four deep "
      "architectures (LSTM, Bidirectional LSTM, one-dimensional CNN and the "
      "hybrid CNN-LSTM with season-indicator injection), the symbolic "
-     "regression model, and the physics-residual hybrid that proved to be the "
-     "best-performing model on the collected data. I implemented the "
-     "Leave-One-Year-Out cross-validation harness with nested hyperparameter "
-     "search, the paired significance testing, the constrained convex stacking "
-     "layer with its forecast-combination-puzzle benchmark, the split-conformal "
-     "calibration, the SHAP explainability stage, the six-experiment ablation "
-     "study, and the Flask REST serving layer with its eight endpoints."),
+     "regression model, and the physics-residual hybrid. I later replaced that "
+     "hybrid with the phenology-aligned differentiable response model reported "
+     "in section 7.7. I implemented the Leave-One-Year-Out cross-validation "
+     "harness, the paired significance testing, the constrained convex stacking "
+     "layer, the conformal calibration, the SHAP explainability stage, the "
+     "ablation studies, and the Flask REST serving layer with its eight "
+     "endpoints. I also carried out the data integrity audit of section 7.2 and "
+     "the variance decomposition of section 7.5."),
     ("p",
-     "The two research contributions I consider most substantial are the "
-     "physics-residual hybrid and the honest evaluation protocol. For the "
-     "hybrid I formulated a mechanistic backbone from the FAO-33 water "
-     "production function [31] and the standard growing-degree-day formulation "
-     "[32], calibrated it inside each cross-validation fold with only two free "
-     "parameters, and trained a Random Forest on the residual. The controlled "
-     "three-way ablation in section 7.5 shows this lifts the coefficient of "
-     "determination from 0.020 to 0.091, and the convex stacking weights "
-     "independently assign it the largest share at 0.399. For the evaluation, "
-     "I insisted on Leave-One-Year-Out cross-validation rather than a random "
-     "split, because records from the same year share a weather regime and a "
-     "random split would have produced a far more flattering and entirely "
-     "misleading number."),
+     "The three research contributions I consider most substantial are the data "
+     "audit, the estimation of the agronomic coefficients, and the account of "
+     "what this panel can support. The audit established that the target "
+     "variable I had been modelling was approximately forty per cent "
+     "fabricated, and I rebuilt it from eighty-seven genuine Department of "
+     "Census and Statistics records using production over harvested area. For "
+     "the model, rather than fixing the FAO-33 [31] and growing-degree-day [32] "
+     "coefficients at their published values as the earlier hybrid did, I made "
+     "them estimable under agronomic bounds with a penalty shrinking each "
+     "toward its literature value; the ablation in section 7.8 shows this "
+     "improves the coefficient of determination by 0.566, and the comparison "
+     "against the published values shows those values overstate weather "
+     "sensitivity for this crop. For the evaluation, I decomposed the target's "
+     "variance and derived the attainable ceiling of 0.162, which established "
+     "that the proposal-stage target was not reachable by any model rather than "
+     "merely missed by mine."),
     ("p",
      "What I learned. Coming into this project I assumed that a more capable "
      "model would produce a better result, and that deep learning was the "
-     "natural destination for a problem involving sequences and images. The "
-     "data taught me otherwise. At twenty-eight records, every deep "
-     "architecture I built performed worse than predicting the mean, while a "
-     "three-line closed-form agronomic formula measurably improved the best "
-     "learned model. I now understand that the binding constraint in applied "
-     "machine learning is usually information, not capacity, and that the two "
-     "highest-leverage activities are feature construction and evaluation "
-     "design. I also learned how easily an evaluation can flatter a model, and "
-     "how much discipline it takes to keep every fitted quantity — including a "
-     "two-parameter calibration — inside the cross-validation fold."),
+     "natural destination for a problem involving sequences and images. What I "
+     "actually learned was harder and more useful: that before comparing models "
+     "at all, one has to establish that the data and the validation protocol "
+     "permit a meaningful comparison. I spent months ranking architectures "
+     "against a target of 0.75 that the panel could never have delivered, using "
+     "a target variable that was partly invented and sequence inputs that I had "
+     "manufactured from the very features the other models already received. "
+     "Finding those faults in my own work, and reporting them, taught me more "
+     "than any of the models did. I now understand that the binding constraint "
+     "in applied machine learning is information rather than capacity, that a "
+     "negative result which explains itself is worth more than a favourable one "
+     "that cannot be defended, and that the discipline of checking what a "
+     "number can possibly mean has to come before the effort of improving it."),
     ("p",
      "Problems encountered and how I addressed them. The first and largest was "
      "overfitting. My initial deep models achieved near-zero training error and "

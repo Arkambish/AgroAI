@@ -32,6 +32,7 @@ from reportlab.platypus import (BaseDocTemplate, Flowable, Frame, FrameBreak,
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 POSTER_FIGS = os.path.join(ROOT, "outputs", "poster")
 OUT_PATH = os.path.join(ROOT, "outputs", "Final_Poster_AgroAI.pdf")
+REAL_PLOTS = os.path.join(ROOT, "outputs", "plots_real", "results")
 
 # ---- Fields the guideline requires -----------------------------------------
 # NOTE: the group number is not recorded anywhere in the project repository.
@@ -208,17 +209,18 @@ class Result(Flowable):
         c.rect(0, 0, self.width, self.height, stroke=0, fill=1)
         c.setFillColor(WHITE)
         c.setFont(FB, 12)
-        c.drawString(6 * mm, self.height - 8 * mm, "BEST MODEL — Physics-residual hybrid")
+        c.drawString(6 * mm, self.height - 8 * mm,
+                     "HEADLINE — the R² > 0.75 target was unattainable, not merely unmet")
         c.setFont(F, 11)
         c.setFillColor(BLUE_PALE)
         c.drawString(6 * mm, self.height - 14.6 * mm,
-                     "RMSE 3.90 MT/Ha   ·   MAE 3.35 MT/Ha   ·   R² 0.091   "
-                     "·   MAPE 23.3 %   ·   90 % interval ±6.85 MT/Ha")
+                     "64 % of variance between years   ·   removed by LOYO by construction   "
+                     "·   measurement error 54 % of the rest   ·   attainable R² ≤ 0.162")
         c.setFont(FO, 9.6)
         c.setFillColor(HexColor("#86b6ef"))
         c.drawString(6 * mm, self.height - 20 * mm,
-                     "Leave-One-Year-Out cross-validation over 28 collected "
-                     "seasonal records (4 districts × 7 years, Yala).")
+                     "Leave-One-Year-Out over 28 corrected records (4 districts × 7 years, "
+                     "Yala). Every model scores below the train mean.")
 
 
 def fig(path: str, width: float, caption: str | None = None):
@@ -401,14 +403,15 @@ def story():
         "temperature via Google Earth Engine, and ISRIC SoilGrids — are reduced "
         "to one record per district, season and year.", BODY))
     s.append(Paragraph(
-        "<b>Features.</b> 32 predictors in five groups: weather aggregates (9), "
-        "vegetation dynamics (11), yield history (5), soil (4) and three "
-        "cross-modal interaction terms encoding agronomic hypotheses.", BODY))
+        "<b>Features.</b> 22 predictors derived from 37,988 real daily weather "
+        "records. Seven were removed as constants or exact linear transforms of "
+        "others, and the yield lags were dropped as unfixable leaks under LOYO.", BODY))
     s.append(Paragraph(
-        "<b>Models.</b> Nine predictors trained identically — Random Forest, "
-        "XGBoost, SVR, LSTM, BiLSTM, 1D-CNN, hybrid CNN-LSTM, symbolic "
-        "regression and a physics-residual hybrid — plus a constrained convex "
-        "stacking layer.", BODY))
+        "<b>Models.</b> Trained identically against two references — the train "
+        "mean (the bar) and an oracle year-mean (not achievable, bounding what "
+        "perfect year knowledge buys) — plus Random Forest, XGBoost, SVR and "
+        "<b>PADR</b>, a 17-parameter agronomic model whose crop constants are "
+        "estimated rather than assumed.", BODY))
     s.append(Paragraph(
         "<b>Evaluation.</b> <b>Leave-One-Year-Out cross-validation</b>: an entire "
         "year is held out, hyperparameters are tuned inside the training "
@@ -440,19 +443,19 @@ def story():
 
     s.append(SectionHeading("5", "Research Novelty", w, color=VIOLET))
     s.append(Callout(
-        "1 — Physics-residual hybrid",
-        ["A closed-form agronomic backbone (FAO-33 water response, growing",
-         "degree days, heat stress) supplies what would otherwise have to be",
-         "learned; a Random Forest models only the residual. Just two",
-         "parameters are fitted, and they are refitted inside every fold."],
+        "1 — The agronomic constants are ESTIMATED, not fixed",
+        ["Existing hybrids freeze the crop model at published coefficients and",
+         "fit a learner to its residual. PADR estimates Ky, T_base, T_opt, T_crit",
+         "and soil water capacity jointly, under agronomic box bounds, with an",
+         "L2 penalty shrinking each toward its textbook value. +0.566 R²."],
         w, VIOLET, VIOLET_PALE))
     s.append(Spacer(1, 3.5 * mm))
     s.append(Callout(
-        "2 — Season-aware hybrid CNN-LSTM",
-        ["A CNN branch reads the vegetation trajectory and an LSTM branch the",
-         "weather sequence. The Yala/Maha indicator is injected after feature",
-         "extraction, so both branches share parameters across seasons and",
-         "only the dense head learns season-specific yield baselines."],
+        "2 — Weather on a thermal clock, anchored on reported harvest",
+        ["Onion is 0.002–0.89 % of any district, so satellite phenology fails:",
+         "25 of 28 district-years would not anchor. Instead the harvest date comes",
+         "from the DCS monthly production record and planting is located by",
+         "accumulating degree-days backwards. 28 of 28 anchored."],
         w, BLUE, BLUE_PALE))
 
     s.append(FrameBreak())
@@ -467,31 +470,40 @@ def story():
     s.append(SectionHeading("7", "Key Results", w, color=ORANGE))
     s.append(Result(w))
     s.append(Spacer(1, 3.5 * mm))
-    s += fig(os.path.join(POSTER_FIGS, "results.png"), w)
+    s += fig(os.path.join(REAL_PLOTS, "variance_ceiling.png"), w,
+             "64 % of variance lies between years and LOYO removes it by design; "
+             "measurement error takes 54 % of what remains within a year.")
     s.append(Spacer(1, 2 * mm))
-    s += fig(os.path.join(POSTER_FIGS, "physics.png"), w,
-             "The agronomic prior lifts R² by +0.070 over the same learner "
-             "used alone — the project's clearest positive finding.")
+    s += fig(os.path.join(REAL_PLOTS, "stress_vs_yield.png"), w,
+             "The stress index varies 8 % while observed yield varies 35 % — the "
+             "agro-climatic channel cannot carry the signal.")
     s.append(Spacer(1, 4 * mm))
 
     s.append(SectionHeading("8", "Outcomes & Conclusion", w))
     for txt in [
-        "<b>Classical models win decisively.</b> Every deep architecture scores "
-        "below a constant-mean predictor; the paired Wilcoxon test rejects "
-        "parity at p &lt; 0.0001. At 28 records, capacity is a liability.",
-        "<b>Domain knowledge beats extra parameters.</b> The mechanistic "
-        "backbone improves R² from 0.020 to 0.091, and the convex stack "
-        "independently assigns it the largest weight (0.399).",
-        "<b>No single data stream suffices.</b> A six-configuration ablation "
-        "puts every individual source below the baseline; only the full set "
-        "approaches it, and the two engineered interaction terms outrank every "
-        "raw measurement in the SHAP ranking.",
-        "<b>The limit is data, not engineering.</b> Identical code reaches "
-        "R² 0.842 on a larger reference sample, so the constraint is the "
-        "size of the obtainable record.",
-        "<b>Next</b> — extend the record backwards and to the Maha season, mask "
-        "satellite aggregation to cultivated onion extent, and forecast at "
-        "operational lead time.",
+        "<b>We audited our own dataset and it did not survive.</b> 40 % of the "
+        "target was fabricated — 50 of 124 month-rows — and the fabrication "
+        "reached the target, not just the covariates. Rebuilt from 87 genuine "
+        "DCS records; the corrected target correlates with the old one at 0.68.",
+        "<b>The accuracy target was unattainable.</b> With 64 % of variance "
+        "between years and measurement error at 54 % of the rest, no model of "
+        "any architecture could exceed R² 0.162 under this protocol.",
+        "<b>Big onion here is not agro-climatically limited.</b> The stress index "
+        "varies 8 % against 35 % in observed yield. Thermal stress is near-constant "
+        "and water deficit almost never binds under tank irrigation. Removing the "
+        "anomalous years makes the fit relatively worse, so the signal is absent.",
+        "<b>The instrument was sensitive enough to be believed.</b> On simulated "
+        "panels PADR recovers a weather signal driving as little as 6 % of yield "
+        "variance at n = 28. It recovered none from the real data, so the true "
+        "agro-climatic signal is below 6 % of variance.",
+        "<b>FAO-33 overstates weather sensitivity for this crop.</b> Pinning the "
+        "coefficients to published values gives the right variation (35 %) but the "
+        "worst score of any arm (R² −1.54). Estimating them locally removes "
+        "spurious sensitivity — an argument for local calibration. Recovery testing "
+        "confirms T_opt and W_max are identifiable at this sample size; Ky and "
+        "T_crit are not, and are not claimed.",
+        "<b>Next</b> — collect fertilizer, irrigation and price data. Our finding "
+        "says precisely where the signal is not, and it is not in more weather.",
     ]:
         s.append(B(txt))
     return s
