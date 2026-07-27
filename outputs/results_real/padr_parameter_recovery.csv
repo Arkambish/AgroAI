@@ -1,0 +1,8 @@
+parameter,true,recovered_mean,recovered_sd,error_pct_of_range,identifiable
+T_base,10.239,11.1468,0.0476,9.1,True
+T_opt,28.9538,28.6006,0.1197,2.9,True
+T_crit,35.5818,33.6352,0.5057,16.2,False
+Ky,0.9664,1.1077,0.0096,12.8,False
+W_max,147.0964,145.3673,6.539,1.0,True
+gamma,0.006,0.0058,0.0003,0.4,True
+P_crit,96.0052,99.1838,0.1533,1.4,True

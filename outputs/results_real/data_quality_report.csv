@@ -1,0 +1,70 @@
+cell,flag,detail
+2019 Polonnaruwa,impossible_month_record,October: 240.0 MT / 2.9 ha = 84 MT/ha (max physical 60) — verify against the DCS publication
+2019 Polonnaruwa,impossible_month_record,November: 274.0 MT / 1.4 ha = 192 MT/ha (max physical 60) — verify against the DCS publication
+2021 Anuradhapura,impossible_month_record,August: 856.4 MT / 7.8 ha = 110 MT/ha (max physical 60) — verify against the DCS publication
+2025 Anuradhapura,impossible_month_record,October: 10698.6 MT / 156.9 ha = 68 MT/ha (max physical 60) — verify against the DCS publication
+2025 Matale,impossible_month_record,October: 13271.7 MT / 30.0 ha = 442 MT/ha (max physical 60) — verify against the DCS publication
+2025 Polonnaruwa,impossible_month_record,October: 2419.5 MT / 16.7 ha = 145 MT/ha (max physical 60) — verify against the DCS publication
+2019 Kurunegala,missing_soil,soil_ph has no SoilGrids export
+2019 Kurunegala,missing_soil,clay_pct has no SoilGrids export
+2019 Kurunegala,missing_soil,sand_pct has no SoilGrids export
+2019 Matale,missing_soil,soil_ph has no SoilGrids export
+2019 Matale,missing_soil,clay_pct has no SoilGrids export
+2019 Matale,missing_soil,sand_pct has no SoilGrids export
+2020 Kurunegala,missing_soil,soil_ph has no SoilGrids export
+2020 Kurunegala,missing_soil,clay_pct has no SoilGrids export
+2020 Kurunegala,missing_soil,sand_pct has no SoilGrids export
+2020 Matale,missing_soil,soil_ph has no SoilGrids export
+2020 Matale,missing_soil,clay_pct has no SoilGrids export
+2020 Matale,missing_soil,sand_pct has no SoilGrids export
+2021 Kurunegala,missing_soil,soil_ph has no SoilGrids export
+2021 Kurunegala,missing_soil,clay_pct has no SoilGrids export
+2021 Kurunegala,missing_soil,sand_pct has no SoilGrids export
+2021 Matale,missing_soil,soil_ph has no SoilGrids export
+2021 Matale,missing_soil,clay_pct has no SoilGrids export
+2021 Matale,missing_soil,sand_pct has no SoilGrids export
+2022 Kurunegala,missing_soil,soil_ph has no SoilGrids export
+2022 Kurunegala,missing_soil,clay_pct has no SoilGrids export
+2022 Kurunegala,missing_soil,sand_pct has no SoilGrids export
+2022 Matale,missing_soil,soil_ph has no SoilGrids export
+2022 Matale,missing_soil,clay_pct has no SoilGrids export
+2022 Matale,missing_soil,sand_pct has no SoilGrids export
+2023 Kurunegala,missing_soil,soil_ph has no SoilGrids export
+2023 Kurunegala,missing_soil,clay_pct has no SoilGrids export
+2023 Kurunegala,missing_soil,sand_pct has no SoilGrids export
+2023 Matale,missing_soil,soil_ph has no SoilGrids export
+2023 Matale,missing_soil,clay_pct has no SoilGrids export
+2023 Matale,missing_soil,sand_pct has no SoilGrids export
+2024 Kurunegala,missing_soil,soil_ph has no SoilGrids export
+2024 Kurunegala,missing_soil,clay_pct has no SoilGrids export
+2024 Kurunegala,missing_soil,sand_pct has no SoilGrids export
+2024 Matale,missing_soil,soil_ph has no SoilGrids export
+2024 Matale,missing_soil,clay_pct has no SoilGrids export
+2024 Matale,missing_soil,sand_pct has no SoilGrids export
+2025 Kurunegala,missing_soil,soil_ph has no SoilGrids export
+2025 Kurunegala,missing_soil,clay_pct has no SoilGrids export
+2025 Kurunegala,missing_soil,sand_pct has no SoilGrids export
+2025 Matale,missing_soil,soil_ph has no SoilGrids export
+2025 Matale,missing_soil,clay_pct has no SoilGrids export
+2025 Matale,missing_soil,sand_pct has no SoilGrids export
+2019 Kurunegala,thin_month_coverage,"only 2 month-record(s): September,October"
+2019 Matale,thin_month_coverage,"only 2 month-record(s): August,September"
+2019 Polonnaruwa,thin_month_coverage,"only 2 month-record(s): August,September"
+2021 Matale,thin_month_coverage,"only 2 month-record(s): September,October"
+2021 Polonnaruwa,thin_month_coverage,"only 2 month-record(s): September,October"
+2022 Kurunegala,thin_month_coverage,"only 2 month-record(s): September,October"
+2022 Polonnaruwa,thin_month_coverage,"only 2 month-record(s): September,October"
+2023 Anuradhapura,thin_month_coverage,"only 2 month-record(s): September,October"
+2023 Kurunegala,thin_month_coverage,"only 2 month-record(s): September,October"
+2023 Matale,thin_month_coverage,"only 2 month-record(s): September,October"
+2025 Anuradhapura,thin_month_coverage,"only 2 month-record(s): August,September"
+2025 Matale,thin_month_coverage,"only 2 month-record(s): August,September"
+2025 Polonnaruwa,thin_month_coverage,"only 2 month-record(s): August,September"
+2019 Kurunegala,tiny_extent,4.1 ha — yield estimate is inherently noisy
+2022 Kurunegala,tiny_extent,5.0 ha — yield estimate is inherently noisy
+2023 Kurunegala,tiny_extent,3.5 ha — yield estimate is inherently noisy
+2024 Kurunegala,tiny_extent,7.4 ha — yield estimate is inherently noisy
+2025 Kurunegala,tiny_extent,7.4 ha — yield estimate is inherently noisy
+2024 Kurunegala,yield_above_plausible,30.57 MT/ha from 226.2 MT / 7.4 ha (plausible <= 30.0)
+2024 Matale,yield_above_plausible,33.58 MT/ha from 13767.0 MT / 410.0 ha (plausible <= 30.0)
+2022 Matale,yield_below_plausible,3.63 MT/ha from 4994.7 MT / 1374.7 ha (plausible >= 5.0)

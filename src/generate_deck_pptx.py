@@ -399,9 +399,10 @@ def build() -> str:
         bullets=[
             ("The problem", "no pre-harvest yield forecast exists for big onion in Sri Lanka"),
             ("Related work", "what others have done, and the five gaps we target"),
-            ("Our approach", "multi-source data, 32 predictors, nine models, one honest protocol"),
-            ("Two novelties", "a physics-residual hybrid and a season-aware CNN-LSTM"),
-            ("Results", "what 28 real records actually support — including what failed"),
+            ("Our approach", "multi-source data, real daily weather, one honest protocol"),
+            ("The method", "PADR — an agronomic model whose crop constants are estimated, not assumed"),
+            ("Results", "what we found when we audited our own data, and what 28 records support"),
+            ("Two findings we withdraw", "and why reporting them is the point"),
             ("Contributions, limitations and what comes next", ""),
         ],
         notes="Keep this to 30 seconds. Signal early that we will report negative "
@@ -497,8 +498,8 @@ def build() -> str:
 
     # 9 — Section: approach
     section_slide(prs, number="02", title="Our approach",
-                  blurb="Four data streams reduced to one grain, 32 engineered predictors, "
-                        "nine models, and an evaluation protocol built to not flatter us.")
+                  blurb="Four data streams reduced to one grain, 37,988 real daily weather "
+                        "records, and an evaluation protocol built to not flatter us.")
 
     # 10 — Architecture
     image_slide(prs, title="Top-level system architecture", kicker="Our approach",
@@ -525,7 +526,7 @@ def build() -> str:
 
     # 12 — Features
     two_col_slide(
-        prs, title="32 engineered predictors", kicker="Our approach",
+        prs, title="Engineered predictors, after the cull", kicker="Our approach",
         left_head="Measured and derived",
         left_items=["Weather (9) — growing degree days, heat stress days, SPI drought index, "
                     "rainfall totals and extremes",
@@ -546,263 +547,289 @@ def build() -> str:
 
     # 13 — Models
     table_slide(
-        prs, title="Nine models, one protocol", kicker="Our approach",
+        prs, title="What we compare, and against what", kicker="Our approach",
         header=["Model", "Family", "Why it is in the comparison"],
-        rows=[["Random Forest", "Bagged trees", "Variance reduction; robust small-sample baseline"],
+        rows=[["Train mean", "Naive", "THE BAR — best available without knowing the held-out year"],
+              ["Oracle year-mean", "Reference", "NOT ACHIEVABLE — bounds what perfect year knowledge buys"],
+              ["Random Forest", "Bagged trees", "Variance reduction; robust small-sample baseline"],
               ["XGBoost", "Boosted trees", "Bias reduction under explicit regularisation"],
               ["SVR", "Kernel method", "Capacity independent of sample size"],
-              ["LSTM / BiLSTM", "Recurrent", "Temporal integration of the weather sequence"],
-              ["1D-CNN", "Convolutional", "Local shape of the NDVI trajectory"],
-              ["Hybrid CNN-LSTM", "Two-branch", "NOVELTY — season injected after feature extraction"],
-              ["Symbolic regression", "Genetic programming", "A human-readable closed-form equation"],
-              ["Physics-residual", "Mechanistic + ML", "NOVELTY — agronomic prior plus learned residual"],
-              ["Convex stacking", "Ensemble", "Constrained blend of all of the above"]],
-        col_widths=[2.4, 2.2, 4.9],
-        notes="Flag the two novelty rows now; the next two slides open them up.")
+              ["District mean / persistence", "Naive", "Do district identity or last year carry the signal?"],
+              ["PADR", "Mechanistic, estimated", "THE METHOD — 17 parameters, constants fitted from data"]],
+        col_widths=[2.6, 2.3, 4.6],
+        notes="The two reference rows matter more than the models. Without the oracle row nobody "
+              "can tell whether a negative score is the model's fault or the protocol's.")
 
-    # 14 — Section: novelty
-    section_slide(prs, number="03", title="Two novelties",
-                  blurb="One asks what to do when there is not enough data to learn from. "
-                        "The other asks how to represent two monsoon seasons in one network.")
+    # 14 — Section: the method
+    section_slide(prs, number="03", title="The method",
+                  blurb="A seventeen-parameter agronomic response model whose crop "
+                        "constants are estimated from data rather than assumed.")
 
-    # 15 — Novelty 1
+    # 15 — PADR
     bullets_slide(
-        prs, title="Novelty 1 — the physics-residual hybrid", kicker="Novelty",
+        prs, title="PADR — phenology-aligned differentiable response", kicker="The method",
         bullets=[
-            ("The problem", "with 28 records, every relationship learned from data spends "
-                            "statistical budget we do not have"),
-            ("The idea", "supply the agronomy instead of learning it, and let the model "
-                         "learn only what the physics cannot explain"),
-            ("Stage 1 — mechanistic backbone", "thermal time (growing degree days), water "
-                                               "limitation (FAO-33, onion Ky ≈ 1.1), heat stress — "
-                                               "multiplied into one suitability term"),
-            ("Calibration", "only two parameters — an intercept and a slope — are fitted, "
-                            "and they are refitted inside every cross-validation fold"),
-            ("Stage 2 — learned residual", "a Random Forest on the difference between "
-                                           "observed yield and the calibrated backbone"),
+            ("The shape", "yield = attainable yield × ∫ β(τ) · f_temp · f_water · f_waterlog dτ"),
+            ("What is new", "the FAO-33 and thermal constants are ESTIMATED, not fixed — "
+                            "existing hybrids freeze the crop model and fit ML on its residual"),
+            ("Shrinkage to physics", "each constant is penalised toward its textbook value, so it "
+                                     "moves only when the data pay for the move"),
+            ("Seventeen parameters", "against 44,929 in the CNN-LSTM it replaces — a model this "
+                                     "small is the only kind 24 training rows can support"),
+            ("Fitted by L-BFGS-B", "multi-start, agronomic box bounds, refit from scratch inside "
+                                   "every fold"),
         ],
-        takeaway="A prior that is only approximately right is worth more than the degrees of freedom it saves.",
-        notes="If asked why not a full crop simulator like APSIM: it needs parameterisation "
-              "and calibration data we do not have. Our backbone is three lines of arithmetic "
-              "and gets a measurable part of the same benefit.")
+        takeaway="The fitted constants are the scientific output. They survive even when the "
+                 "prediction does not.",
+        notes="The distinction to hammer: Shahhosseini et al. run a crop model with published "
+              "coefficients and fit a learner to the residual. We estimate the coefficients. "
+              "That is a method claim, not a domain claim, and it is what the supervisor asked "
+              "for.")
 
-    # 16 — Novelty 2
-    image_slide(prs, title="Novelty 2 — season-aware hybrid CNN-LSTM", kicker="Novelty",
-                image=os.path.join(FIGS, "figure_5_2_cnn_lstm_hybrid.png"),
-                caption="The season indicator is concatenated AFTER both branches finish feature "
-                        "extraction — so the branches share parameters across seasons and only the "
-                        "small dense head learns season-specific baselines.",
-                max_h=Inches(4.35),
-                notes="The data-efficiency argument: separate per-season models would halve the "
-                      "sample per parameter. Appending season to the input would let the filters "
-                      "specialise on season and dissipate the same advantage more subtly. "
-                      "IMPORTANT — be upfront that the collected data is Yala-only, so this "
-                      "specific claim is tested on synthetic data, not real. Do not oversell it.")
+    # 16 — Phenological time
+    bullets_slide(
+        prs, title="Weather on a thermal clock, not a calendar", kicker="The method",
+        bullets=[
+            ("The problem", "'September rainfall' means a different developmental moment in "
+                            "each district-year"),
+            ("Satellite could not solve it", "onion is 0.002–0.89% of any district's land area, so "
+                                             "district-mean NDVI measures paddy and scrub — "
+                                             "25 of 28 district-years failed to anchor"),
+            ("What worked instead", "harvest date from the DCS monthly production distribution — "
+                                    "genuinely crop-specific, and it moves across 51 days"),
+            ("Thermal time backwards", "planting located by accumulating degree-days back from "
+                                       "harvest; 28 of 28 anchored, zero fallbacks"),
+            ("It behaves like physics", "hot Anuradhapura completes a season in 78–86 days; "
+                                        "cooler Matale needs 90–99 for the same heat"),
+        ],
+        notes="If asked why not NDVI: it is an area argument, not a sensor argument. A crop on "
+              "0.1% of the pixels cannot move a district mean. We tried it, measured the "
+              "failure, and report it.")
 
-    # 17 — Evaluation protocol
-    two_col_slide(
+    # 17 — Protocol
+    bullets_slide(
         prs, title="How we evaluate — and why it lowers our score", kicker="Protocol",
-        left_head="What most papers do",
-        left_items=["Split records at random into train and test",
-                    "Districts from the same year land on both sides",
-                    "They share a weather regime and a monsoon anomaly",
-                    "The model effectively sees the answer for the year it predicts",
-                    "Reported scores are optimistic and do not survive deployment"],
-        right_head="What we do",
-        right_items=["Leave-One-Year-Out: hold out an entire year, rotate through all seven",
-                     "Hyperparameters chosen by an inner search inside the training partition only",
-                     "Every fitted quantity — including the physics calibration — refitted per fold",
-                     "Models compared with the paired Wilcoxon signed-rank test",
-                     "Split-conformal prediction intervals attached to every forecast"],
-        takeaway="A random split would have given us far better-looking numbers. It would also have been wrong.",
-        notes="This is the most important methodological slide. If a panel member questions "
-              "the low R², return here.")
+        bullets=[
+            ("Leave-one-year-out", "hold out a whole year; every fitted quantity, including all "
+                                   "scaling, estimated inside the fold"),
+            ("Why not a random split", "records from one year share a weather regime; a random "
+                                       "split would report a far more flattering and entirely "
+                                       "misleading number"),
+            ("Four leaks found and removed", "anomalies had been standardised on the full panel; "
+                                             "the target had been winsorised at full-sample "
+                                             "percentiles"),
+            ("Yield lags dropped, not repaired", "under LOYO the row for year k+1 carries year k's "
+                                                 "observed yield — no clean fix inside this protocol"),
+            ("Observations weighted by area", "cells span 3.5 to 1,765 hectares; treating them as "
+                                              "equally reliable is not defensible"),
+        ],
+        takeaway="An honest protocol is why our numbers are lower than published work using random splits.",
+        notes="This slide is our insurance. Every low number later is a consequence of choices "
+              "defended here.")
 
     # 18 — Section: results
     section_slide(prs, number="04", title="Results",
-                  blurb="Everything that follows is measured on the 28 seasonal records we "
-                        "actually collected. One slide, clearly labelled, uses synthetic data.")
+                  blurb="What we found when we audited our own data — and what the corrected "
+                        "panel can and cannot support.")
 
-    # 19 — Dataset reality
+    # 19 — Data integrity
     stat_slide(
-        prs, title="What the data actually is", kicker="Results",
-        stats=[("28", "seasonal records collected — 4 districts × 7 years", VIOLET),
-               ("32", "candidate predictors — more features than observations", ORANGE),
-               ("1", "season only — Yala; no Maha in the collected record", BLUE)],
-        footnote="Anuradhapura, Kurunegala, Matale and Polonnaruwa, 2019–2025. Mean yield "
-                 "16.39 MT/Ha (range 8.50–24.06). Each cross-validation fold trains on 24 records. "
-                 "Read every result that follows against this slide.",
-        notes="Do not apologise for this. State it as a finding about the domain: this is how "
-              "much trustworthy data exists for this crop. The Yala-only limitation is what "
-              "prevents us validating the season-injection claim on real data — say so before "
-              "anyone asks.")
+        prs, title="We audited our own dataset. It did not survive.", kicker="Results",
+        stats=[("40%", "of the target variable was fabricated — 50 of 124 month-rows", ORANGE),
+               ("442", "MT/ha implied by one record; onion's world record is ~100", VIOLET),
+               ("0.68", "correlation between the old target and the corrected one", BLUE)],
+        footnote="The fabrication reached the TARGET, not just the covariates: yield varies "
+                 "month to month within every cell and the target was their unweighted mean. "
+                 "Rebuilt from 87 genuine DCS records as total production over total harvested area.",
+        notes="Lead with this. It is the least comfortable slide and the most credible one. A "
+              "panel that sees us find and report our own contamination will trust everything "
+              "that follows.")
 
-    # 20 — Model comparison
-    image_slide(prs, title="Model comparison under Leave-One-Year-Out CV", kicker="Results",
-                image=os.path.join(DECK, "model_comparison.png"),
-                caption="Physics-residual hybrid leads at RMSE 3.90 MT/Ha, R² 0.091. "
-                        "Every deep architecture falls below the mean predictor.",
-                notes="Two things to say. First, the winner is the physics hybrid — the novelty "
-                      "pays. Second, the whole deep family is below the baseline and the two "
-                      "convolutional models are catastrophic at R² near −7.")
+    # 20 — The ceiling
+    image_slide(prs, title="The 0.75 target was not difficult. It was unattainable.",
+                kicker="Results",
+                image=os.path.join(REAL_PLOTS, "variance_ceiling.png"),
+                caption="64% of variance lies between years and leave-one-year-out removes it by "
+                        "construction; measurement error is 54% of what remains within a year.",
+                notes="This is the single most important slide in the deck. The proposal target "
+                      "was set before anyone knew the structure of the record. No model of any "
+                      "architecture could have reached 0.75 here. Say the number: the ceiling is "
+                      "0.162.")
 
-    # 21 — DL finding
-    bullets_slide(
-        prs, title="Finding 1 — deep learning fails at this scale", kicker="Results",
-        bullets=[
-            ("The outcome", "all four deep architectures score below a constant-mean predictor; "
-                            "the paired Wilcoxon test rejects parity with the classical family at p < 0.0001"),
-            ("The hybrid CNN-LSTM does not beat its own components", "it sits between the CNN and the LSTM"),
-            ("Why", "representation learning trades sample efficiency for expressive power — "
-                    "at 24 training records per fold there is nothing to trade with"),
-            ("It is not a bug", "the same code reaches R² 0.842 on a larger sample (slide 27)"),
-            ("It survives scale", "even at ~160 records the classical models still lead 0.842 to 0.271"),
-        ],
-        takeaway="Actionable guidance the literature does not give: at this sample size, do not start with deep learning.",
-        notes="Own this result rather than defending it. The published hybrid architectures are "
-              "validated on datasets three orders of magnitude larger. Showing where the "
-              "advantage disappears is a genuine contribution.")
+    # 21 — Scoreboard
+    image_slide(prs, title="Every model loses to predicting the mean", kicker="Results",
+                image=os.path.join(REAL_PLOTS, "padr_scoreboard.png"),
+                caption="Leave-one-year-out R² on the corrected target. The oracle row uses the "
+                        "held-out year's own mean and is not achievable — it bounds what perfect "
+                        "knowledge of the year effect would buy.",
+                notes="Do not apologise for this slide. Read against the ceiling it is the "
+                      "expected outcome, and the next slide explains the mechanism.")
 
-    # 22 — Physics ablation
-    image_slide(prs, title="Finding 2 — the agronomic prior earns its place", kicker="Results",
-                image=os.path.join(DECK, "physics_ablation.png"),
-                caption="Backbone alone is worse than the mean. Learner alone reaches 0.020. "
-                        "Together they reach 0.091 — a +0.070 lift over the same learner.",
-                max_h=Inches(4.3),
-                notes="The mechanism matters more than the magnitude. The backbone helps not "
-                      "because it is accurate — it is not — but because it removes work from "
-                      "the learner. Honest caveat: heat stress days are zero throughout the "
-                      "Yala data, so the benefit comes from thermal time and water only.")
+    # 22 — Why
+    image_slide(prs, title="Why: the stress index cannot move far enough", kicker="Results",
+                image=os.path.join(REAL_PLOTS, "stress_vs_yield.png"),
+                caption="Stress index varies 8%. Observed yield varies 35%. Thermal stress is "
+                        "near-constant in the tropics, and water deficit almost never binds under "
+                        "tank irrigation.",
+                notes="The key sentence: a model whose output varies eight per cent cannot "
+                      "explain a target that varies thirty-five, whatever coefficients you give "
+                      "it. This is structural, not a tuning failure. And removing 2022 and 2024 "
+                      "makes it relatively WORSE, so the signal is absent, not masked.")
 
-    # 23 — Stacking
-    image_slide(prs, title="Finding 3 — stacking beats the mean, not the best model", kicker="Results",
-                image=os.path.join(DECK, "stacking.png"),
-                caption="The learned convex blend clearly beats the equal-weight mean — the "
-                        "forecast-combination puzzle does not hold here — but no blend beats "
-                        "the single physics-residual hybrid.",
-                max_h=Inches(4.3),
-                notes="The convex optimiser assigned 0.399 to the physics hybrid and exactly "
-                      "zero to the CNN — an independent confirmation of Finding 2 by a "
-                      "completely different route. We report this as a negative result and "
-                      "serve the single model, not the stack.")
+    # 23 — Power
+    image_slide(prs, title="Would we have found a signal if one were there?",
+                kicker="Results — the linchpin",
+                image=os.path.join(REAL_PLOTS, "power_curve.png"),
+                caption="On simulated panels PADR recovers a weather signal driving as "
+                        "little as 6% of yield variance at n=28. It recovered none from the "
+                        "real data — so the true signal is below 6%.",
+                notes="This is the slide that turns 'our model failed' into 'the signal is "
+                      "not there'. A negative result from an underpowered instrument says "
+                      "nothing about the world; this measures the instrument. Two honesty "
+                      "points if pressed: the curve is non-monotonic because we ran only two "
+                      "replicates per amplitude, and we used a single optimiser start from the "
+                      "literature values — which is deliberately OPTIMISTIC, so failing to "
+                      "detect under those conditions errs the safe way.")
 
-    # 24 — Ablation
-    image_slide(prs, title="Which data source is worth paying for?", kicker="Results",
-                image=os.path.join(DECK, "ablation_sources.png"),
-                caption="Six configurations, identical model, protocol and seed. Only the "
-                        "full set approaches the baseline.",
-                max_h=Inches(4.3),
-                notes="Two honest readings. Soil alone looks strongest among single sources, "
-                      "but static per-district features act as a district identifier — that is "
-                      "a baseline effect, not soil science. And weather+satellite is worse than "
-                      "either alone: adding features adds variance faster than information. "
-                      "Textbook curse of dimensionality, made visible.")
+    # 24 — Learned constants
+    image_slide(prs, title="FAO-33 overstates weather sensitivity for this crop",
+                kicker="Results — the positive finding",
+                image=os.path.join(REAL_PLOTS, "learned_constants.png"),
+                caption="Pinning the coefficients to published values produces the right amount "
+                        "of variation (35%) but the worst score of any configuration (R² −1.54). "
+                        "T_opt and W_max are recovered to within 3%; Ky and T_crit are NOT "
+                        "identifiable at n=28 and are not claimed.",
+                notes="Strongest positive result, and transferable: learning the constants does "
+                      "not add explanatory power so much as REMOVE spurious sensitivity — stress "
+                      "CV falls 22.4% to 8.1% while R² improves 0.57. IMPORTANT CAVEAT: our "
+                      "recovery experiment shows Ky returns its prior (1.108) when fitted to data "
+                      "generated with 0.966. The tight fold spread on Ky was the shrinkage prior, "
+                      "not evidence — precision without accuracy. So we claim T_opt and W_max, "
+                      "not Ky. The FAO-overstatement finding survives because it rests on the "
+                      "ablation contrast, not on any single point estimate.")
 
-    # 25 — Per district
-    image_slide(prs, title="Predictability varies sharply by district", kicker="Results",
-                image=os.path.join(DECK, "per_district.png"),
-                caption="Anuradhapura is most predictable; Kurunegala is worst by R² but "
-                        "better than Matale by absolute error.",
-                max_h=Inches(4.2),
-                notes="Explain the apparent contradiction — it is a good sign of understanding. "
-                      "R² is normalised by each district's own variance and Kurunegala's spread "
-                      "is narrowest, so a moderate absolute error consumes a large share of a "
-                      "small variance. For an operational user, absolute error is what matters.")
+    # 25 — Ablations
+    image_slide(prs, title="Two claims survived. Two did not.", kicker="Results",
+                image=os.path.join(REAL_PLOTS, "ablation_claims.png"),
+                caption="Each design claim tested against its own control. Learning the physics "
+                        "and moderate shrinkage are supported; thermal-time indexing and the "
+                        "waterlogging term are not.",
+                notes="Volunteer the nulls. An ablation in which every proposed component happens "
+                      "to help is not a credible ablation, and a panel knows it. Thermal time is "
+                      "negligible because temperature barely varies here; waterlogging binds in "
+                      "3.5% of intervals in one year.")
 
-    # 26 — SHAP
-    image_slide(prs, title="What drives the forecast", kicker="Results",
-                image=os.path.join(DECK, "shap_top.png"),
-                caption="Two of the three engineered interaction terms outrank every raw "
-                        "measurement they were built from.",
-                max_h=Inches(4.3),
-                notes="This validates the feature engineering directly. In a regime where the "
-                      "model cannot discover interactions from data, the interactions have to "
-                      "be supplied. Caveat if pressed: attributions describe what the fitted "
-                      "model does, not necessarily what nature does.")
+    # 26 — Beta curve
+    image_slide(prs, title="When does weather matter for onion?", kicker="Results",
+                image=os.path.join(REAL_PLOTS, "beta_curve.png"),
+                caption="Estimated sensitivity declines monotonically — roughly seven times more "
+                        "weight on establishment than on harvest. Band shows the range across folds.",
+                notes="Hedge this one appropriately: the underlying stress signal is weak, so the "
+                      "curve is estimated from little information. The shape is stable across "
+                      "folds and agronomically plausible for a crop whose bulb is set early, but "
+                      "it is not a well-identified estimate.")
 
     # 27 — Uncertainty
-    image_slide(prs, title="Every forecast ships with a calibrated interval", kicker="Results",
-                image=os.path.join(DECK, "conformal.png"),
-                caption="Split-conformal, distribution-free, at 90% nominal coverage. "
-                        "Interval width ranks the models the same way point error does.",
-                max_h=Inches(4.3),
-                notes="Be honest about the coverage figure: empirical coverage is 1.00 because "
-                      "we calibrate and measure on the same 28 residuals, and the finite-sample "
-                      "correction lands near the maximum residual. The intervals are "
-                      "conservative, not tight. But a wide honest interval beats a narrow "
-                      "dishonest one — ±6.85 on a mean of 16.39 tells a planner to hedge.")
+    table_slide(
+        prs, title="Honest intervals — and what they reveal", kicker="Results",
+        header=["Model", "Coverage", "Half-width (MT/ha)"],
+        rows=[["Oracle year-mean (not achievable)", "0.929", "6.70"],
+              ["Train mean", "0.893", "14.90"],
+              ["PADR", "0.893", "15.29"],
+              ["XGBoost", "0.929", "16.42"],
+              ["Random Forest", "0.929", "17.63"]],
+        col_widths=[4.2, 2.4, 2.9],
+        notes="The interim report said coverage was 1.000 for all twelve models. That was a "
+              "tautology — the quantile was computed from the same residuals it was then "
+              "measured on. Year-blocked cross-conformal gives 0.911 against a nominal 0.90. "
+              "But the width is the finding: plus or minus 15.3 on a mean of 17.9 is plus or "
+              "minus 85%. These forecasts are not decision-useful, and the interval is the "
+              "evidence for saying so.")
 
-    # 28 — Synthetic validation
-    image_slide(prs, title="Is the pipeline correct? Yes — and here is the proof", kicker="Architecture validation",
-                image=os.path.join(DECK, "sample_size.png"),
-                caption="SYNTHETIC REFERENCE. The right-hand bar is not a claim about Sri Lankan "
-                        "onion yield — it shows the same code on an adequate sample.",
-                max_h=Inches(4.2),
-                notes="This is the answer to 'is your low R² a bug?'. Identical pipeline, "
-                      "identical code, only the input differs. 0.020 on 28 records becomes "
-                      "0.842 on ~160. The limiting factor is the sample, not the "
-                      "implementation. Be scrupulous that this bar is labelled synthetic.")
+    # 28 — What we withdrew
+    bullets_slide(
+        prs, title="Two findings we are withdrawing", kicker="Corrections",
+        bullets=[
+            ("Withdrawn — 'deep learning fails at this scale'",
+             "the sequence tensor fed to the LSTM and CNN models was manufactured from the "
+             "seasonal aggregates through a fixed sine curve; it was a deterministic, invertible "
+             "function of the tabular features the classical models already had, carrying zero "
+             "extra information"),
+            ("Withdrawn — 'synthetic R² 0.842 validates the architecture'",
+             "that data was generated by a known functional form inside our own data loader, with "
+             "the vegetation index built as a function of the yield it later predicted — "
+             "recovering it proves only that an estimator can invert a function it was handed"),
+            ("What replaced them",
+             "37,988 genuine daily NASA POWER records now feed the sequence models; a proper "
+             "comparison is stated as further work rather than claimed here"),
+        ],
+        takeaway="Reporting this is better than letting a convenient negative result stand unexamined.",
+        notes="Expect a question here. The answer: we found these ourselves, before submission, "
+              "by auditing our own inputs. That is the process working.")
 
     # 29 — Contributions
     table_slide(
-        prs, title="Contributions against the five gaps", kicker="Contributions",
-        header=["Gap", "What we delivered"],
-        rows=[["1  No system for big onion in Sri Lanka",
-               "First end-to-end pipeline, REST service and dashboard for the crop"],
-              ["2  No small-sample model guidance",
-               "Nine families, one protocol, paired significance tests — with a replication at larger n"],
-              ["3  Mechanistic + learned rarely combined",
-               "Closed-form FAO-33 / GDD backbone + residual learner, +0.070 R², independently confirmed by stacking weights"],
-              ["4  Bimodal seasonality not architectural",
-               "Season-injection design contributed; validation incomplete — collected data is Yala-only"],
-              ["5  No data-source decomposition",
-               "Six-configuration ablation on real and synthetic data, plus conformal intervals per model"]],
+        prs, title="What this work contributes", kicker="Contributions",
+        header=["Contribution", "Evidence"],
+        rows=[["Data integrity finding",
+               "40% fabricated target identified and rebuilt from 87 genuine DCS records"],
+              ["A quantified account of what the panel supports",
+               "64% year / 2% district variance split; measurement error 54% of within-year; "
+               "attainable R² bounded at 0.162"],
+              ["Locally estimated agronomic coefficients",
+               "+0.566 R² over fixed physics; FAO-33 shown to overstate weather sensitivity ~4×"],
+              ["Diagnosis that the agro-climatic channel is inactive",
+               "8% stress variation against 35% in yield; removing anomalous years worsens the fit"],
+              ["Methodological corrections",
+               "four leaks removed, fabricated sequences replaced, tautological conformal fixed, "
+               "extent weighting introduced"]],
         col_widths=[3.4, 6.1],
-        notes="Note gap 4 honestly — design contributed, validation incomplete. A panel will "
-              "respect the distinction far more than an overclaim, and they will find it anyway.")
+        notes="Note that four of five contributions are things we found by being sceptical of our "
+              "own pipeline. That is the story of this project.")
 
     # 30 — Limitations
     two_col_slide(
         prs, title="What bounds these conclusions", kicker="Limitations",
         left_head="Limitations",
-        left_items=["28 records is the binding constraint on every number",
-                    "Yala only — the season-injection claim is untested on real data",
-                    "Conformal coverage of 1.00 is an artefact of a 28-point calibration set",
-                    "Cultivar, irrigation, fertiliser and pest pressure are all unobserved",
-                    "Ground-truth yield is itself subjectively estimated",
-                    "District-level aggregation hides within-district heterogeneity"],
+        left_items=["28 records, 4 districts, 7 years, Yala only — no Maha data exists",
+                    "Kurunegala and Matale share one weather grid cell — identical daily series",
+                    "Kurunegala's NDVI is a Matale proxy; its soil profile is absent entirely",
+                    "Six records excluded on an agronomic bound, not source verification",
+                    "The 2022 fertilizer-ban attribution is timing, not established causation",
+                    "No fertilizer, irrigation, cultivar or price data was available"],
         right_head="Further work, in priority order",
-        right_items=["Extend the record — backfill the satellite archive, add Maha and more districts",
-                     "Mask satellite aggregation to cultivated onion extent, not whole districts",
-                     "Extend the mechanistic backbone — soil water balance, stage-dependent sensitivity",
-                     "Add management covariates, even coarse district-level ones",
-                     "Evaluate at operational lead time — forecast 4–8 weeks before harvest",
-                     "Field-validate the dashboard with DCS and district officers"],
-        notes="Leading with limitations is a strength in a defence. Every one of these is "
-              "specific and most trace back to sample size. The lead-time point is the one a "
-              "practitioner would actually raise: we currently use full-season predictors.")
+        right_items=["Collect input and management data — this is where the signal actually is",
+                     "Re-run the ML vs DL comparison properly on the real daily sequences",
+                     "Mask satellite aggregation to cultivated onion parcels",
+                     "Finer reanalysis to separate Kurunegala from Matale meteorologically",
+                     "Verify the six flagged records against the DCS publication",
+                     "Apply the ceiling calculation across published short-panel yield studies"],
+        notes="The first item is the real conclusion. Our finding tells the next person exactly "
+              "what to collect, and it is not more weather data.")
 
     # 31 — Conclusion
     bullets_slide(
         prs, title="Conclusion", kicker="Wrapping up",
         bullets=[
-            ("We built the capability", "reproducible pipeline, nine models, leakage-free protocol, "
-                                        "calibrated uncertainty, attribution, REST service and dashboard"),
-            ("Best model", "physics-residual hybrid — R² 0.091, MAE 3.35 MT/Ha, 23.3% MAPE on real data"),
-            ("The 0.75 target was not met", "and the reason is the size of the obtainable record, "
-                                            "not the construction of the system"),
-            ("The durable findings are methodological", "deep learning fails at this scale; a lightweight "
-                                                        "agronomic prior measurably helps; estimated blend "
-                                                        "weights beat uniform averaging; engineered "
-                                                        "interactions outrank raw measurements"),
-            ("The path forward is concrete", "a longer record, a crop mask, a fuller backbone, "
-                                             "management covariates"),
+            ("We asked whether weather predicts onion yield here", "and answered it: it does not, "
+                                                                   "at district-season resolution"),
+            ("The target was unattainable, and we proved it", "64% of variance is removed by the "
+                                                              "protocol; measurement error takes half "
+                                                              "the rest; the ceiling is 0.162"),
+            ("The mechanistic model is what made the answer possible", "a random forest scoring "
+                                                                       "−0.56 tells you nothing; PADR "
+                                                                       "reports which mechanisms are "
+                                                                       "inactive and by how much"),
+            ("One transferable positive result", "FAO-33 coefficients overstate weather sensitivity "
+                                                 "for big onion under tank irrigation — calibrate locally"),
+            ("We corrected our own record", "a fabricated target, a manufactured input tensor and a "
+                                            "tautological uncertainty calculation, all found and reported"),
         ],
-        takeaway="Accuracy is bounded by an information constraint, not an engineering one — and we can name what would lift it.",
-        notes="Land on the framing: for a crop on which national import decisions turn and for "
-              "which no forecast exists at all, a calibrated and explainable pre-harvest "
-              "estimate with a stated interval is worth having. We established that it can be "
-              "built and what it will take to make it good.")
+        takeaway="A well-diagnosed negative result, with its errors stated openly, is worth more "
+                 "than a favourable number that cannot be defended.",
+        notes="Land here. We did not get the number we wanted. We got something more useful: an "
+              "explanation of why that number was never available, and a clear statement of what "
+              "the next person should collect.")
 
     # 32 — Close
     closing_slide(
