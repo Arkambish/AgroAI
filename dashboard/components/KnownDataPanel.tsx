@@ -88,11 +88,22 @@ export default function KnownDataPanel({
         </p>
       )}
 
+      {/* This toggle is the only button in this file present during
+          hydration — the per-group buttons below only mount once
+          `detailsOpen` flips true via a client click, well after hydration
+          completes, so they can't hit a mismatch. suppressHydrationWarning:
+          autofill/password-manager browser extensions stamp
+          fdprocessedid="..." onto every <button> they scan post-mount,
+          which React otherwise reports as a mismatch even though nothing
+          here renders differently server vs. client — see
+          LanguageSwitcher.tsx/Navbar.tsx for the same, already-confirmed
+          case. */}
       <button
         type="button"
         aria-expanded={detailsOpen}
         onClick={() => setDetailsOpen((v) => !v)}
         className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-sky-700 transition-colors hover:bg-sky-50"
+        suppressHydrationWarning
       >
         <span>{detailsOpen ? t("hideDetails") : t("viewDetails")}</span>
         <ChevronDown

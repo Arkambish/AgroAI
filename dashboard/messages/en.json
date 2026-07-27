@@ -185,7 +185,8 @@
     "dataConfidence": "Confidence range",
     "dataTopFactors": "Top factors",
     "dataHistory": "Recent yield history",
-    "dataBaseline": "District average"
+    "dataBaseline": "District average",
+    "close": "Close"
   },
 
   "recommend": {

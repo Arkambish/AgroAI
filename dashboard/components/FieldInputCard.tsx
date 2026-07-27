@@ -87,6 +87,14 @@ export default function FieldInputCard({
 
       <p className="text-sm text-slate-500">{t("fieldSectionHelp")}</p>
 
+      {/* suppressHydrationWarning on the fields below: autofill/password-
+          manager browser extensions (LastPass, Dashlane, 1Password, Fillr,
+          ...) stamp fdprocessedid="..." onto every <select>/<input> they
+          scan right after the DOM is available, before React hydrates —
+          React then reports that as a mismatch even though nothing here
+          actually renders differently server vs. client (see
+          LanguageSwitcher.tsx/Navbar.tsx for the same, already-confirmed
+          case). This only silences that one false-positive attribute. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="space-y-1.5">
           <label htmlFor="district" className="text-xs font-bold text-slate-700">
@@ -98,6 +106,7 @@ export default function FieldInputCard({
             value={value.district}
             onChange={(e) => onChange({ district: e.target.value })}
             className={selectClass}
+            suppressHydrationWarning
           >
             {districts.map((d) => (
               <option key={d.name} value={d.name}>
@@ -117,6 +126,7 @@ export default function FieldInputCard({
             value={value.season}
             onChange={(e) => onChange({ season: e.target.value })}
             className={selectClass}
+            suppressHydrationWarning
           >
             {availableSeasons.map((s) => (
               <option key={s} value={s}>
@@ -136,6 +146,7 @@ export default function FieldInputCard({
             value={value.year}
             onChange={(e) => onChange({ year: Number(e.target.value) })}
             className={selectClass}
+            suppressHydrationWarning
           >
             {years.map((y) => (
               <option key={y} value={y}>
@@ -168,6 +179,7 @@ export default function FieldInputCard({
               value={value.extentHa}
               onChange={(e) => onChange({ extentHa: e.target.value })}
               className={selectClass}
+              suppressHydrationWarning
             />
             <p className="text-[11px] text-slate-400">{t("extentHelp")}</p>
           </div>
@@ -189,6 +201,7 @@ export default function FieldInputCard({
               value={value.lastSeasonYield}
               onChange={(e) => onChange({ lastSeasonYield: e.target.value })}
               className={selectClass}
+              suppressHydrationWarning
             />
             <p className="text-[11px] text-slate-400">{t("lastYieldHelp")}</p>
           </div>

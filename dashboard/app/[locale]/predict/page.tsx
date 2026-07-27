@@ -379,11 +379,19 @@ export default function PredictPage() {
           />
 
           <div className="flex gap-3">
+            {/* suppressHydrationWarning: this button is always rendered, so
+                (unlike "New Prediction" below, gated on `result` which is
+                `null` during hydration via useSyncExternalStore's server
+                snapshot) it's exposed to autofill/password-manager browser
+                extensions stamping fdprocessedid="..." onto it post-mount —
+                see LanguageSwitcher.tsx/Navbar.tsx for the same,
+                already-confirmed case. */}
             <button
               type="button"
               onClick={handlePredict}
               disabled={loading || !isValid}
               className="flex flex-1 items-center justify-center space-x-2 rounded-2xl bg-emerald-600 py-4 text-lg font-bold text-white shadow-lg transition-all hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+              suppressHydrationWarning
             >
               {loading ? (
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
