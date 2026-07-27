@@ -263,8 +263,19 @@
 
     "positive": "helped increase",
     "negative": "reduced",
-    "impactPositive": "Raised the prediction",
-    "impactNegative": "Lowered the prediction",
+    "impactLabel": "Impact",
+    "impactPositive": "↑ Increased yield",
+    "impactNegative": "↓ Reduced yield",
+
+    "effectLabel": "Effect",
+    "effect": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+
+    "technicalDetails": "Technical details",
+    "technicalFeatures": "Underlying model features",
 
     "keyInsight": "Key Insight",
     "insightPositive": "{feature} was the strongest influence and it helped your yield. Keeping those conditions steady is the surest way to hold this level.",
@@ -286,7 +297,13 @@
       "viewSimple": "Simple view",
       "viewReliability": "Reliability view",
       "legend": "Faded / hatched bars = less reliable explanation",
-      "unknown": "N/A"
+      "unknown": "N/A",
+      "cardLabel": "Explanation reliability",
+      "cardHigh": "High reliability",
+      "cardGood": "Good reliability",
+      "cardModerate": "Moderate reliability",
+      "cardLow": "Low reliability",
+      "cardUnknown": "Not available"
     },
     "features": {
       "rainfall": "Rainfall",
