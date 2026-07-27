@@ -204,7 +204,13 @@ export default function DistrictMap({
 
   return (
     <div
-      className="relative overflow-hidden rounded-3xl border border-slate-200 shadow-xl  "
+      // isolate: Leaflet's own CSS gives its panes/controls z-index up to
+      // 1000 (leaflet/dist/leaflet.css) with no stacking context of their
+      // own, so without this they compete directly against the app shell
+      // (e.g. Navbar.tsx's sticky z-50) instead of staying scoped to the
+      // map — isolate confines all of Leaflet's z-index values inside this
+      // element, so the whole map can never render above anything outside it.
+      className="relative isolate overflow-hidden rounded-3xl border border-slate-200 shadow-xl"
       style={{ height }}
     >
       <MapContainer

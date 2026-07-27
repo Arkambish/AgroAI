@@ -275,6 +275,17 @@
 
     "district": "District",
     "yield": "Yield",
+    "reliability": {
+      "badge": "Explanation reliability: {value}% — {level}",
+      "badgeUnknown": "Explanation reliability isn't available for this prediction",
+      "levelHigh": "high",
+      "levelMedium": "medium",
+      "levelLow": "low, interpret with caution",
+      "viewSimple": "Simple view",
+      "viewReliability": "Reliability view",
+      "legend": "Faded / hatched bars = less reliable explanation",
+      "unknown": "N/A"
+    },
     "features": {
       "rainfall": "Rainfall",
       "temperature": "Temperature",

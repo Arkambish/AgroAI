@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { Brain, TrendingUp, TrendingDown, AlertTriangle, RotateCcw } from "lucide-react";
@@ -11,6 +11,9 @@ import {
 } from "@/lib/api";
 import { useLocalJSON, resetPrediction, PREDICTION_KEY } from "@/lib/use-local-flag";
 import clsx from "clsx";
+import ReliabilityWaterfall, {
+  type ReliabilityBarDatum,
+} from "@/components/charts/ReliabilityWaterfall";
 
 export type { ExplanationItem };
 
@@ -37,6 +40,50 @@ export default function ExplainPage() {
         : [],
     [prediction]
   );
+
+  // Same top-5 selection as the bars above, with a per-row ERI attached: each
+  // displayed factor can fold in several raw model features (e.g. NDVI's 3
+  // variants), so its reliability is the |SHAP|-weighted average of
+  // per_feature_eri across just those raw features — the same weighting the
+  // backend uses to roll per-feature ERI up into one prediction-level score.
+  const reliabilityItems = useMemo<ReliabilityBarDatum[]>(() => {
+    if (!prediction?.shap_values) return [];
+    const shapValues = prediction.shap_values;
+    const perFeatureEri = prediction.per_feature_eri;
+
+    return explanations.map((item) => {
+      const rawFeatures = item.feature.split(", ");
+      let weightedEriSum = 0;
+      let absShapSum = 0;
+      for (const raw of rawFeatures) {
+        const absShap = Math.abs(shapValues[raw] ?? 0);
+        const eriForRaw = perFeatureEri?.[raw];
+        absShapSum += absShap;
+        if (eriForRaw !== undefined) {
+          weightedEriSum += absShap * eriForRaw;
+        }
+      }
+      return {
+        name: item.name,
+        label: t(`features.${item.name}`),
+        value: item.raw,
+        magnitude: item.magnitude,
+        eri: absShapSum > 0 ? weightedEriSum / absShapSum : undefined,
+      };
+    });
+  }, [explanations, prediction, t]);
+
+  const [view, setView] = useState<"simple" | "reliability">("simple");
+
+  const eriScore = prediction?.eri;
+  const eriLevel =
+    eriScore === undefined
+      ? undefined
+      : eriScore < 0.4
+        ? "levelLow"
+        : eriScore < 0.7
+          ? "levelMedium"
+          : "levelHigh";
 
   if (!prediction) {
     return (
@@ -76,6 +123,25 @@ export default function ExplainPage() {
           <p className="text-slate-500">
             {t("subtitle")} — {prediction.predicted_yield_MT_per_Ha} MT/Ha
           </p>
+
+          {/* Overall Explanation Reliability Index for this prediction — see
+              src/xai/eri.py. Shown regardless of which view (below) is active. */}
+          <span
+            className={clsx(
+              "inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-semibold",
+              eriLevel === "levelHigh" && "bg-emerald-100 text-emerald-700",
+              eriLevel === "levelMedium" && "bg-amber-100 text-amber-700",
+              eriLevel === "levelLow" && "bg-red-100 text-red-700",
+              eriLevel === undefined && "bg-slate-100 text-slate-500"
+            )}
+          >
+            {eriScore !== undefined && eriLevel
+              ? t("reliability.badge", {
+                  value: Math.round(eriScore * 100),
+                  level: t(`reliability.${eriLevel}`),
+                })
+              : t("reliability.badgeUnknown")}
+          </span>
         </div>
 
         <button
@@ -90,11 +156,52 @@ export default function ExplainPage() {
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         <section className="space-y-6">
-          <h2 className="text-xl font-bold text-slate-800">
-            {t("keyFactors")}
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl font-bold text-slate-800">
+              {t("keyFactors")}
+            </h2>
 
-          <div className="grid gap-4">
+            {/* Simple view (unchanged bars below) vs. Reliability view
+                (ReliabilityWaterfall) — defaults to Simple, today's behavior. */}
+            <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setView("simple")}
+                className={clsx(
+                  "rounded-lg px-3 py-1.5 transition-colors",
+                  view === "simple"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                {t("reliability.viewSimple")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("reliability")}
+                className={clsx(
+                  "rounded-lg px-3 py-1.5 transition-colors",
+                  view === "reliability"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                {t("reliability.viewReliability")}
+              </button>
+            </div>
+          </div>
+
+          {view === "reliability" && (
+            <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <ReliabilityWaterfall
+                items={reliabilityItems}
+                legendLabel={t("reliability.legend")}
+                unknownLabel={t("reliability.unknown")}
+              />
+            </div>
+          )}
+
+          <div className={clsx("grid gap-4", view !== "simple" && "hidden")}>
             {explanations.map((item) => {
               // SHAP contribution is in the model's own units (MT/Ha), so it
               // converts directly to kg/Ha for a number a farmer can picture.

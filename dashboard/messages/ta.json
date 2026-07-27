@@ -256,6 +256,17 @@
 
     "district": "மாவட்டம்",
     "yield": "விளைச்சல்",
+    "reliability": {
+      "badge": "விளக்க நம்பகத்தன்மை: {value}% — {level}",
+      "badgeUnknown": "இந்த கணிப்புக்கு விளக்க நம்பகத்தன்மை கிடைக்கவில்லை",
+      "levelHigh": "அதிகம்",
+      "levelMedium": "நடுத்தரம்",
+      "levelLow": "குறைவு, எச்சரிக்கையுடன் விளக்கவும்",
+      "viewSimple": "எளிய காட்சி",
+      "viewReliability": "நம்பகத்தன்மை காட்சி",
+      "legend": "மங்கலான / கோடிட்ட பட்டைகள் = குறைவான நம்பகமான விளக்கம்",
+      "unknown": "N/A"
+    },
     "features": {
       "rainfall": "மழை",
       "temperature": "வெப்பநிலை",

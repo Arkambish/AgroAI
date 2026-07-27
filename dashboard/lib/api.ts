@@ -55,6 +55,11 @@ export interface PredictResponse {
   /** The values actually fed to the model */
   resolved_features?: Record<string, number>;
   data_completeness?: DataCompleteness;
+  /** Explanation Reliability Index (src/xai/eri.py), 0-1: how much this
+   * prediction's SHAP explanation should be trusted. Absent from mock data. */
+  eri?: number;
+  /** Per raw-feature ERI, 0-1, keyed the same way as shap_values. */
+  per_feature_eri?: Record<string, number>;
 }
 
 /** One district as advertised by GET /districts (dataset-derived). */
@@ -372,14 +377,17 @@ export const predictYieldsForAllDistricts = async (
   // from its per-district defaults. (This previously sent `rainfall`,
   // `temperature`, `soil_moisture` etc., which are UI names, not model feature
   // names, so the model silently ignored them.)
-  const requests = districts.map((district) =>
-    predictYield({ district, season, year, ...basePayload })
+  const requests = districts.map((district) => {
+    const payload = { district, season, year, ...basePayload };
+    // TEMP DEBUG — remove once district/year propagation is verified.
+    console.log("[predictYieldsForAllDistricts] payload:", payload);
+    return predictYield(payload)
       .then((res) => ({ ok: true as const, district, res }))
       .catch((err) => {
         console.warn(`Failed prediction for ${district}:`, err);
         return { ok: false as const, district, res: null };
-      })
-  );
+      });
+  });
 
   const settled = await Promise.all(requests);
   const succeeded = settled.filter((s) => s.ok);

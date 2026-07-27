@@ -8,6 +8,9 @@ Endpoints:
   GET  /context
   GET  /baseline
   GET  /districts
+  GET  /explanation-reliability
+  GET  /stability
+  GET  /consensus
   POST /api/chat
   POST /api/recommend
 """
@@ -43,6 +46,7 @@ from config import (
     INTERACTION_FEATURES,
 )
 import explanation_context
+from xai.eri import compute_eri
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Loads OPENROUTER_API_KEY (and anything else) from a git-ignored .env at the
@@ -419,6 +423,12 @@ def run_prediction(data: dict):
     )
     n_zero = sum(1 for s in feature_sources.values() if s == 'zero_fallback')
 
+    # Explanation Reliability Index — per-feature and SHAP-weighted aggregate
+    # trust score for this specific prediction's explanation (see
+    # src/xai/eri.py). Falls back gracefully to neutral component scores if
+    # `python -m src.xai.run_xai` hasn't been run yet for this DATA_VARIANT.
+    eri_result = compute_eri(shap_dict)
+
     response = {
         'district': data.get('district'),
         'season': data.get('season'),
@@ -441,6 +451,8 @@ def run_prediction(data: dict):
             'n_zero_filled': n_zero,
             'fraction_grounded': round(n_grounded / len(ALL_FEATURES), 3),
         },
+        'eri': eri_result['eri'],
+        'per_feature_eri': eri_result['per_feature_eri'],
     }
 
     # TODO: Implement PostgreSQL storage here
@@ -482,6 +494,45 @@ def equation():
     if not os.path.exists(eq_path):
         return jsonify({'error': 'symbolic_equation.json not found — run the pipeline first.'}), 404
     with open(eq_path) as f:
+        return jsonify(json.load(f))
+
+
+@app.route('/explanation-reliability', methods=['GET'])
+def explanation_reliability():
+    """Dataset-level Explanation Reliability Index (src/xai/eri.py), computed
+    once by `python -m src.xai.run_xai` using the dataset's aggregate SHAP
+    importance as the feature weighting. For a single prediction's own ERI,
+    see the `eri` / `per_feature_eri` fields on POST /predict instead."""
+    path = os.path.join(RESULTS_DIR, 'eri.json')
+    if not os.path.exists(path):
+        return jsonify({'error': 'eri.json not found — run `python -m src.xai.run_xai` first.'}), 404
+    with open(path) as f:
+        return jsonify(json.load(f))
+
+
+@app.route('/stability', methods=['GET'])
+def stability():
+    """Per-feature LOYO-refit explanation stability + the global Explanation
+    Stability Coefficient (src/xai/stability.py)."""
+    path = os.path.join(RESULTS_DIR, 'explanation_stability.json')
+    if not os.path.exists(path):
+        return jsonify({
+            'error': 'explanation_stability.json not found — run `python -m src.xai.run_xai` first.',
+        }), 404
+    with open(path) as f:
+        return jsonify(json.load(f))
+
+
+@app.route('/consensus', methods=['GET'])
+def consensus():
+    """Per-feature agreement between SHAP, permutation importance, and the
+    symbolic-regression equation (src/xai/consensus.py)."""
+    path = os.path.join(RESULTS_DIR, 'explanation_consensus.json')
+    if not os.path.exists(path):
+        return jsonify({
+            'error': 'explanation_consensus.json not found — run `python -m src.xai.run_xai` first.',
+        }), 404
+    with open(path) as f:
         return jsonify(json.load(f))
 
 
