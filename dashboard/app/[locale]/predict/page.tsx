@@ -9,6 +9,7 @@ import {
   getContext,
   getDistricts,
   getBaseline,
+  TARGET_DISTRICTS,
   type PredictResponse,
   type ContextResponse,
   type BaselineResponse,
@@ -89,12 +90,34 @@ export default function PredictPage() {
   // Prediction" reset — which clears farmerInputs but doesn't need a fresh
   // fetch, since `districts` is already loaded — can re-trigger seeding on
   // its own without an extra network round-trip.
+  //
+  // The catalog is filtered down to TARGET_DISTRICTS rather than used as-is:
+  // the backend's /districts list is DATA_VARIANT-dependent (synthetic data
+  // has Jaffna, no Kurunegala; real data has Kurunegala, no Jaffna — see
+  // src/data_loader.py), but this app only ever supports the 4 fixed target
+  // districts. Passing the raw catalog through let "Jaffna" leak into the
+  // dropdown and, via persisted form state, become the district actually
+  // sent to /predict even when the farmer meant to pick Kurunegala. Any
+  // target district missing its own catalog entry (e.g. Kurunegala under the
+  // synthetic variant) still gets listed, backed by the dataset-wide
+  // seasons/years — /predict resolves its features from broader averages in
+  // that case, but the request still names the district the farmer picked.
   useEffect(() => {
     let active = true;
 
     getDistricts()
       .then((data) => {
-        if (active && data.districts?.length) setDistricts(data.districts);
+        if (!active) return;
+        const byName = new Map(data.districts.map((d) => [d.name, d]));
+        const merged: DistrictInfo[] = TARGET_DISTRICTS.map(
+          (name) =>
+            byName.get(name) ?? {
+              name,
+              seasons: data.seasons,
+              years: data.years,
+            }
+        );
+        setDistricts(merged);
       })
       .catch(() => {
         if (active) setContextError(t("predict.districtsError"));
@@ -117,12 +140,18 @@ export default function PredictPage() {
     if (current.district && stillValid) return;
 
     const first = districts[0];
-    setFarmerInputs({
+    // Current year, not the dataset's last recorded year (which for the
+    // synthetic variant is 2023) — the farmer is predicting for now unless
+    // they explicitly pick another year.
+    const seeded = {
       ...current,
       district: first.name,
       season: first.seasons[0] ?? "Yala",
-      year: first.years[first.years.length - 1] ?? current.year,
-    });
+      year: new Date().getFullYear(),
+    };
+    // TEMP DEBUG — remove once district/year propagation is verified.
+    console.log("[Predict] seeding default district/season/year:", seeded);
+    setFarmerInputs(seeded);
   }, [districts, storedFarmerInputs, setFarmerInputs]);
 
   const { district, season, year } = farmerInputs;
@@ -173,14 +202,24 @@ export default function PredictPage() {
       // Reconcile season/year against the new district's actual coverage, so
       // the form can never request a combination the dataset lacks.
       if (patch.district) {
+        // TEMP DEBUG — remove once district/year propagation is verified.
+        console.log("[Predict] district selected:", patch.district);
         const info = districts.find((d) => d.name === patch.district);
         if (info) {
           if (!info.seasons.includes(next.season)) {
             next.season = info.seasons[0] ?? next.season;
           }
           const maxYear = info.years[info.years.length - 1];
-          if (maxYear !== undefined && next.year > maxYear + 2) {
-            next.year = maxYear;
+          // Never clamp below the current year — a target district backed
+          // only by dataset-wide averages (e.g. Kurunegala under the
+          // synthetic variant, whose own years stop at 2023) would otherwise
+          // silently reset the year the farmer is predicting for.
+          const upperBound =
+            maxYear !== undefined
+              ? Math.max(maxYear + 2, new Date().getFullYear())
+              : undefined;
+          if (upperBound !== undefined && next.year > upperBound) {
+            next.year = upperBound;
           }
         }
       }
@@ -262,7 +301,14 @@ export default function PredictPage() {
         payload.prev_year_yield = lastYield;
       }
 
+      // TEMP DEBUG — remove once district/year propagation is verified.
+      console.log("[Predict] request payload:", payload);
+
       const res = await predictYield(payload);
+
+      // TEMP DEBUG — remove once district/year propagation is verified.
+      console.log("[Predict] response district:", res.district, "year:", res.year);
+
       // A full overwrite, not a merge — localStorage.setItem inside setResult
       // always replaces the previous value wholesale, so a re-predict can
       // never leave a stale SHAP value or field lingering from the last one.

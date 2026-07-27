@@ -54,12 +54,19 @@ export default function FieldInputCard({
 
   const selected = districts.find((d) => d.name === value.district);
   const availableSeasons = selected?.seasons ?? [];
-  // Offer the dataset's years plus two projection years beyond the last.
+  // Offer the dataset's years plus projection years beyond the last, always
+  // reaching at least two years past *today* (not just past the dataset) —
+  // otherwise a district whose data ends in the past (e.g. the synthetic
+  // variant's 2023 cutoff) would never offer the current year the form
+  // defaults to, leaving the dropdown out of sync with the selected value.
   const datasetYears = selected?.years ?? [];
   const lastYear = datasetYears.length
     ? datasetYears[datasetYears.length - 1]
     : new Date().getFullYear();
-  const years = [...datasetYears, lastYear + 1, lastYear + 2];
+  const projectionEnd = Math.max(lastYear + 2, new Date().getFullYear() + 2);
+  const projectedYears = [];
+  for (let y = lastYear + 1; y <= projectionEnd; y++) projectedYears.push(y);
+  const years = [...datasetYears, ...projectedYears];
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
@@ -139,51 +146,52 @@ export default function FieldInputCard({
         </div>
       </div>
 
-      {/* The only two model features a farmer genuinely owns. Both optional. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-1">
-        <div className="space-y-1.5">
-          <label htmlFor="extentHa" className="text-xs font-bold text-slate-700">
-            {t("extentLabel")}
-            <span className="ml-1.5 font-normal text-slate-400">
-              {t("optional")}
-            </span>
-          </label>
-          <input
-            id="extentHa"
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step={0.1}
-            placeholder={t("useDistrictAverage")}
-            value={value.extentHa}
-            onChange={(e) => onChange({ extentHa: e.target.value })}
-            className={selectClass}
-          />
-          <p className="text-[11px] text-slate-400">{t("extentHelp")}</p>
-        </div>
+      {/* The only two model features a farmer genuinely owns. Both optional
+          — set off by a dashed divider and a lighter label weight so the
+          three required fields above stay the primary focus. */}
+      <div className="space-y-3 border-t border-dashed border-slate-100 pt-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label
+              htmlFor="extentHa"
+              className="text-xs font-semibold text-slate-500"
+            >
+              {t("extentLabel")}
+            </label>
+            <input
+              id="extentHa"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={0.1}
+              placeholder={t("useDistrictAverage")}
+              value={value.extentHa}
+              onChange={(e) => onChange({ extentHa: e.target.value })}
+              className={selectClass}
+            />
+            <p className="text-[11px] text-slate-400">{t("extentHelp")}</p>
+          </div>
 
-        <div className="space-y-1.5">
-          <label
-            htmlFor="lastSeasonYield"
-            className="text-xs font-bold text-slate-700"
-          >
-            {t("lastYieldLabel")}
-            <span className="ml-1.5 font-normal text-slate-400">
-              {t("optional")}
-            </span>
-          </label>
-          <input
-            id="lastSeasonYield"
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step={0.1}
-            placeholder={t("useDistrictAverage")}
-            value={value.lastSeasonYield}
-            onChange={(e) => onChange({ lastSeasonYield: e.target.value })}
-            className={selectClass}
-          />
-          <p className="text-[11px] text-slate-400">{t("lastYieldHelp")}</p>
+          <div className="space-y-1.5">
+            <label
+              htmlFor="lastSeasonYield"
+              className="text-xs font-semibold text-slate-500"
+            >
+              {t("lastYieldLabel")}
+            </label>
+            <input
+              id="lastSeasonYield"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={0.1}
+              placeholder={t("useDistrictAverage")}
+              value={value.lastSeasonYield}
+              onChange={(e) => onChange({ lastSeasonYield: e.target.value })}
+              className={selectClass}
+            />
+            <p className="text-[11px] text-slate-400">{t("lastYieldHelp")}</p>
+          </div>
         </div>
       </div>
     </div>

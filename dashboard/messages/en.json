@@ -16,24 +16,26 @@
 
   "form": {
     "district": "District",
-    "season": "Cultivation Season",
-    "year": "Target Year",
+    "season": "Season",
+    "year": "Year",
     "optional": "(optional)",
     "on": "On",
     "off": "Off",
 
-    "fieldSectionTitle": "Tell us about your field",
-    "fieldSectionHelp": "Choose where and when you are growing. Everything else is filled in from records for your area.",
+    "fieldSectionTitle": "Select your farm details",
+    "fieldSectionHelp": "We collect weather, satellite and soil information automatically for your area.",
     "loadingArea": "Loading your area…",
 
-    "extentLabel": "How much land did you plant?",
-    "extentHelp": "In hectares. Leave blank to use the district average.",
-    "lastYieldLabel": "What did you harvest last season?",
-    "lastYieldHelp": "In MT per hectare. This is one of the strongest signals you can give.",
+    "extentLabel": "Farm size (optional)",
+    "extentHelp": "Leave blank to use the area average.",
+    "lastYieldLabel": "Previous harvest (optional)",
+    "lastYieldHelp": "Helps improve prediction accuracy.",
     "useDistrictAverage": "Use district average",
 
     "knownSectionTitle": "What we already know about your area",
-    "knownSectionHelp": "These come from satellites, weather stations and official harvest records — you do not need to enter them.",
+    "knownSectionHelp": "We automatically collect weather, satellite, soil and historical harvest information for your area.",
+    "viewDetails": "View details",
+    "hideDetails": "Hide details",
     "contextUnavailable": "No records found for this area yet. The prediction will use wider district and seasonal averages.",
 
     "provenanceExact": "Exact {year} record",
@@ -156,9 +158,8 @@
     "vsDistrictAverage": "vs district average",
     "previousSeason": "Previous Season",
 
-    "dataSourcesTitle": "Where this prediction came from",
-    "dataSourcesBody": "Built from {user} of {total} values you supplied and {records} filled in from records for your area.",
-    "zeroFillWarning": "{n} values had no record at all and were left empty — treat this prediction with extra caution.",
+    "dataSourcesTitle": "Data used for prediction",
+    "dataSourcesBody": "This prediction uses weather, satellite, soil and historical harvest information from your selected area.",
 
     "success": "Prediction Completed",
     "successDescription": "AI has successfully generated yield prediction",

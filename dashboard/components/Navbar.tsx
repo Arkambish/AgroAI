@@ -74,6 +74,11 @@ export default function Navbar() {
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="inline-flex items-center justify-center rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-500 focus:outline-none"
+              // See LanguageSwitcher.tsx — autofill browser extensions stamp
+              // fdprocessedid onto <button> elements post-mount, which React
+              // otherwise reports as a hydration mismatch even though this
+              // button renders identically on server and client.
+              suppressHydrationWarning
             >
               {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
