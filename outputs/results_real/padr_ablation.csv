@@ -1,0 +1,8 @@
+arm,description,RMSE,R2,R2_wt,stress_cv_pct,target_cv_pct
+full,"PADR as specified: learned physics, thermal time, waterlogging, learned beta",7.3338,-0.3741,-0.4559,8.14,34.97
+fixed_physics,N1 control — FAO/thermal constants frozen at literature values,8.7149,-0.9404,-0.8905,22.39,34.97
+calendar_time,"N2 control — same season, tau spaced in days instead of accumulated heat",7.3624,-0.3848,-0.4533,8.31,34.97
+no_waterlogging,"N3 control — gamma pinned to 0, excess-water penalty switched off",7.3229,-0.37,-0.4521,8.04,34.97
+flat_beta,beta(tau) forced uniform — no phenological weighting at all,7.4795,-0.4293,-0.4608,9.78,34.97
+no_shrinkage,"N4 control — lambda_phys = 0, constants free to chase noise",7.3294,-0.3725,-0.4057,11.57,34.97
+strong_shrinkage,"N4 control — lambda_phys = 100, constants effectively pinned to literature",9.9709,-1.54,-1.3257,35.33,34.97

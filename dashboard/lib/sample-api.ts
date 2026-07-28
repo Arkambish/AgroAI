@@ -3,7 +3,7 @@ import { PredictResponse } from "./api";
 export const predictYieldMock = async (payload: any): Promise<PredictResponse> => {
   // You can customize the mock response as needed
   return {
-    district: payload.district || "Colombo",
+    district: payload.district || "Matale",
     season: payload.season || "Yala",
     year: payload.year || 2024,
     predicted_yield_MT_per_Ha: 14.8,
@@ -17,7 +17,7 @@ export const predictYieldMock = async (payload: any): Promise<PredictResponse> =
       soil_moisture: 0.05,
       soil_ph: 0.09,
     },
-    model: "XGBoost",
+    model: "XGBoost (Mock)",
     model_r2: 0.91,
   };
 };

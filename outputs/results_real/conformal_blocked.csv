@@ -1,0 +1,9 @@
+Model,blocked_coverage,blocked_half_width,naive_coverage,naive_half_width,nominal
+Oracle_YearMean,0.9286,6.7003,0.9643,6.743,0.9
+TrainMean,0.8929,14.8962,0.9643,15.7224,0.9
+PADR,0.8929,15.2891,0.9643,16.1787,0.9
+DistrictMean,0.8929,15.8398,0.9643,16.8709,0.9
+XGBoost,0.9286,16.4163,0.9643,17.5705,0.9
+SVR_rbf,0.8929,17.2408,0.9643,17.8923,0.9
+RandomForest,0.9286,17.6337,0.9643,18.8012,0.9
+Persistence,0.9286,17.7397,0.9643,17.8927,0.9

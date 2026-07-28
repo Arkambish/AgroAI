@@ -1,0 +1,8 @@
+{
+  "N1 learned physics vs fixed": "dR2 = +0.5663 (fixed_physics -0.9404 -> full -0.3741), stress_cv 22.39% -> 8.14%",
+  "N2 thermal time vs calendar": "dR2 = +0.0107 (calendar_time -0.3848 -> full -0.3741), stress_cv 8.31% -> 8.14%",
+  "N3 waterlogging term": "dR2 = -0.0041 (no_waterlogging -0.3700 -> full -0.3741), stress_cv 8.04% -> 8.14%",
+  "beta(tau) learned vs flat": "dR2 = +0.0552 (flat_beta -0.4293 -> full -0.3741), stress_cv 9.78% -> 8.14%",
+  "N4 shrinkage vs none": "dR2 = -0.0016 (no_shrinkage -0.3725 -> full -0.3741), stress_cv 11.57% -> 8.14%",
+  "N4 shrinkage vs pinned": "dR2 = +1.1659 (strong_shrinkage -1.5400 -> full -0.3741), stress_cv 35.33% -> 8.14%"
+}

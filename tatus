@@ -1,0 +1,15 @@
+* [33mb2b8a82[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Remove unused SVG files and TypeScript configuration
+* [33m6f7c154[m Add model evaluation results for CNN_LSTM_Hybrid, LSTM, RandomForest, SVR, and XGBoost
+* [33m28df809[m datas
+*   [33m0a8d4cf[m Merge pull request #1 from Arkambish/shathurya
+[32m|[m[33m\[m  
+[32m|[m * [33m19951f2[m[33m ([m[1;36mHEAD -> [m[1;32mshathurya[m[33m, [m[1;31morigin/shathurya[m[33m)[m style and mock api
+[32m|[m * [33m9aea3a8[m District and language translation
+[32m|[m * [33me973eda[m ui changed- theme changed , home dashboard layout chnaged
+[32m|[m * [33m6f6bc4b[m update
+[32m|[m * [33m1ef9df2[m Dashboard
+[32m|[m * [33me2b48a4[m dashboard- sample data used
+[32m|[m * [33m324307f[m dashboard initial
+[32m|[m[32m/[m  
+* [33m26634d9[m[33m ([m[1;32mmain[m[33m)[m Add SVG icons and TypeScript configuration
+* [33m7c4c2b6[m Initial commit: Big Onion Yield Prediction pipeline

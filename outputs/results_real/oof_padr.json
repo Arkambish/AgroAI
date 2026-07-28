@@ -1,0 +1,201 @@
+{
+  "model_name": "PADR",
+  "rows": [
+    {
+      "Year": 2019,
+      "District": "Anuradhapura",
+      "actual": 21.7291132678628,
+      "predicted": 15.74468862605864,
+      "obs_weight": 1.1589
+    },
+    {
+      "Year": 2020,
+      "District": "Anuradhapura",
+      "actual": 11.191878172588833,
+      "predicted": 20.214719671671485,
+      "obs_weight": 1.9519
+    },
+    {
+      "Year": 2021,
+      "District": "Anuradhapura",
+      "actual": 20.152256431885284,
+      "predicted": 17.508036652694816,
+      "obs_weight": 2.1414
+    },
+    {
+      "Year": 2022,
+      "District": "Anuradhapura",
+      "actual": 12.70202955314225,
+      "predicted": 20.585088892778767,
+      "obs_weight": 1.474
+    },
+    {
+      "Year": 2023,
+      "District": "Anuradhapura",
+      "actual": 19.42793129200896,
+      "predicted": 13.97294132018801,
+      "obs_weight": 0.7197
+    },
+    {
+      "Year": 2024,
+      "District": "Anuradhapura",
+      "actual": 21.83445013795822,
+      "predicted": 18.176570676734155,
+      "obs_weight": 0.9906
+    },
+    {
+      "Year": 2025,
+      "District": "Anuradhapura",
+      "actual": 21.066882734236888,
+      "predicted": 15.366988446314398,
+      "obs_weight": 1.1458
+    },
+    {
+      "Year": 2019,
+      "District": "Kurunegala",
+      "actual": 21.549636803874094,
+      "predicted": 17.70066266122636,
+      "obs_weight": 0.1264
+    },
+    {
+      "Year": 2020,
+      "District": "Kurunegala",
+      "actual": 16.627118644067796,
+      "predicted": 17.845919126576334,
+      "obs_weight": 0.4777
+    },
+    {
+      "Year": 2021,
+      "District": "Kurunegala",
+      "actual": 17.380952380952383,
+      "predicted": 15.260516617693245,
+      "obs_weight": 0.3372
+    },
+    {
+      "Year": 2022,
+      "District": "Kurunegala",
+      "actual": 8.18,
+      "predicted": 19.586609093866535,
+      "obs_weight": 0.1391
+    },
+    {
+      "Year": 2023,
+      "District": "Kurunegala",
+      "actual": 14.314285714285713,
+      "predicted": 17.079238698837255,
+      "obs_weight": 0.1164
+    },
+    {
+      "Year": 2024,
+      "District": "Kurunegala",
+      "actual": 30.56756756756757,
+      "predicted": 16.19311804036769,
+      "obs_weight": 0.1692
+    },
+    {
+      "Year": 2025,
+      "District": "Kurunegala",
+      "actual": 13.256756756756756,
+      "predicted": 15.763127108494974,
+      "obs_weight": 0.1692
+    },
+    {
+      "Year": 2019,
+      "District": "Matale",
+      "actual": 19.122602521987922,
+      "predicted": 18.21124381041681,
+      "obs_weight": 1.351
+    },
+    {
+      "Year": 2020,
+      "District": "Matale",
+      "actual": 12.16306954436451,
+      "predicted": 18.119566503278577,
+      "obs_weight": 2.1997
+    },
+    {
+      "Year": 2021,
+      "District": "Matale",
+      "actual": 22.1492833267237,
+      "predicted": 15.299542046375537,
+      "obs_weight": 2.6129
+    },
+    {
+      "Year": 2022,
+      "District": "Matale",
+      "actual": 3.6333018113042845,
+      "predicted": 19.772768036714766,
+      "obs_weight": 2.3059
+    },
+    {
+      "Year": 2023,
+      "District": "Matale",
+      "actual": 21.502895752895753,
+      "predicted": 17.131281691174255,
+      "obs_weight": 0.633
+    },
+    {
+      "Year": 2024,
+      "District": "Matale",
+      "actual": 33.578048780487805,
+      "predicted": 16.341226237239287,
+      "obs_weight": 1.2593
+    },
+    {
+      "Year": 2025,
+      "District": "Matale",
+      "actual": 21.94733194733195,
+      "predicted": 15.785719706352399,
+      "obs_weight": 1.4942
+    },
+    {
+      "Year": 2019,
+      "District": "Polonnaruwa",
+      "actual": 9.480696959344037,
+      "predicted": 13.808801200845924,
+      "obs_weight": 0.4758
+    },
+    {
+      "Year": 2020,
+      "District": "Polonnaruwa",
+      "actual": 15.409756097560976,
+      "predicted": 19.54847181636685,
+      "obs_weight": 0.8905
+    },
+    {
+      "Year": 2021,
+      "District": "Polonnaruwa",
+      "actual": 16.23705408515535,
+      "predicted": 17.449547964523287,
+      "obs_weight": 1.0042
+    },
+    {
+      "Year": 2022,
+      "District": "Polonnaruwa",
+      "actual": 13.162067455102935,
+      "predicted": 19.626691560503833,
+      "obs_weight": 0.9397
+    },
+    {
+      "Year": 2023,
+      "District": "Polonnaruwa",
+      "actual": 18.077125328659072,
+      "predicted": 12.98783738168316,
+      "obs_weight": 0.6643
+    },
+    {
+      "Year": 2024,
+      "District": "Polonnaruwa",
+      "actual": 21.61896243291592,
+      "predicted": 18.193655274460852,
+      "obs_weight": 0.465
+    },
+    {
+      "Year": 2025,
+      "District": "Polonnaruwa",
+      "actual": 22.846240179573513,
+      "predicted": 15.270236272176525,
+      "obs_weight": 0.5871
+    }
+  ]
+}

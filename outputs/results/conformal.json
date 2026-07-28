@@ -1,0 +1,58 @@
+{
+  "BiLSTM": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 8.572,
+    "empirical_coverage": 0.919,
+    "n": 136
+  },
+  "CNN": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 7.4031,
+    "empirical_coverage": 0.919,
+    "n": 136
+  },
+  "CNN_LSTM_Hybrid": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 8.256,
+    "empirical_coverage": 0.919,
+    "n": 136
+  },
+  "LSTM": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 8.6083,
+    "empirical_coverage": 0.919,
+    "n": 136
+  },
+  "RandomForest": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 3.3984,
+    "empirical_coverage": 0.919,
+    "n": 136
+  },
+  "SVR": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 4.8871,
+    "empirical_coverage": 0.919,
+    "n": 136
+  },
+  "SymbolicRegression": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 3.6597,
+    "empirical_coverage": 0.919,
+    "n": 136
+  },
+  "XGBoost": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 3.9354,
+    "empirical_coverage": 0.919,
+    "n": 136
+  }
+}

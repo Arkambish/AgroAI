@@ -127,19 +127,26 @@ def train_random_forest(X, y, feature_names, df: pd.DataFrame) -> dict:
 def train_xgboost(X, y, feature_names, df: pd.DataFrame) -> dict:
     print('\n--- XGBoost (2/3) ---')
     t0 = time.time()
+    # Agronomic constraint: predicted yield must be NON-DECREASING in greenness (mean/max/min
+    # NDVI and mean EVI). Enforced natively via XGBoost monotone_constraints so predictions
+    # always obey crop science, regardless of the small/noisy training set.
+    mono_up = {'season_mean_ndvi', 'season_max_ndvi', 'season_min_ndvi', 'season_mean_evi'}
+    mono = tuple(1 if f in mono_up else 0 for f in feature_names)
     factory = lambda: XGBRegressor(
         random_state=RANDOM_STATE, n_jobs=-1,
-        objective='reg:squarederror', verbosity=0,
+        objective='reg:squarederror', verbosity=0, monotone_constraints=mono,
     )
     best, params = _tune_with_gridsearch(factory, XGB_PARAMS_FAST, X, y)
-    print(f'  Tuned params: {params}')
+    print(f'  Tuned params: {params} | monotone(NDVI/EVI↑)={sum(mono)} features')
 
     oof = _loyo_predictions(
-        lambda: XGBRegressor(random_state=RANDOM_STATE, n_jobs=-1, verbosity=0, **params),
+        lambda: XGBRegressor(random_state=RANDOM_STATE, n_jobs=-1, verbosity=0,
+                             monotone_constraints=mono, **params),
         X, y, df['Year'].values,
     )
 
-    final = XGBRegressor(random_state=RANDOM_STATE, n_jobs=-1, verbosity=0, **params)
+    final = XGBRegressor(random_state=RANDOM_STATE, n_jobs=-1, verbosity=0,
+                         monotone_constraints=mono, **params)
     final.fit(X, y)
     joblib.dump(final, os.path.join(MODELS_DIR, 'xgb_best.pkl'))
 

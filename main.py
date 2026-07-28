@@ -53,6 +53,16 @@ def main(args: argparse.Namespace) -> None:
         from ml_models import train_all_ml_models
         train_all_ml_models(X, y, feature_names, df)
 
+    if not args.skip_symbolic:
+        from symbolic import train_symbolic_regression
+        train_symbolic_regression(X, y, feature_names, df)
+
+    # Novelty 1: physics-residual hybrid (mechanistic agronomic backbone + ML on residual).
+    # Runs after the plain RF so its with/without-backbone ablation can reference RF's R².
+    if not args.skip_physics:
+        from physics_residual import train_physics_residual
+        train_physics_residual(X, y, feature_names, df)
+
     if not args.skip_dl:
         from dl_models import train_all_dl_models
         train_all_dl_models(seq_payload, df)
@@ -67,8 +77,19 @@ def main(args: argparse.Namespace) -> None:
         from explainer import run_shap_analysis
         run_shap_analysis(X, feature_names)
 
+    # Novelty 2: constrained convex stacking + forecast-combination-puzzle benchmark.
+    # Runs BEFORE the final comparison so the stack combiners appear in model_comparison.csv
+    # (it reads the base learners' oof_*.json written above and writes its own).
+    if not args.skip_stacking:
+        from stacking import run_stacking
+        run_stacking()
+
     from evaluator import generate_final_comparison
     generate_final_comparison(ablation=ablation_df)
+
+    # Calibrated (conformal) uncertainty intervals from the LOYO out-of-fold residuals.
+    from conformal import compute_conformal
+    compute_conformal()
 
     elapsed = time.time() - start
     print('\n' + '=' * 60)
@@ -84,6 +105,12 @@ if __name__ == '__main__':
                              'artifacts to outputs/*_real/. Without this flag the synthetic '
                              'pipeline runs and writes to outputs/* (unchanged).')
     parser.add_argument('--skip-eda', action='store_true')
+    parser.add_argument('--skip-symbolic', action='store_true',
+                        help='Skip the symbolic-regression interpretable-equation model.')
+    parser.add_argument('--skip-physics', action='store_true',
+                        help='Skip the physics-residual hybrid (mechanistic backbone + ML residual).')
+    parser.add_argument('--skip-stacking', action='store_true',
+                        help='Skip the constrained stacking + forecast-combination-puzzle benchmark.')
     parser.add_argument('--skip-ml', action='store_true')
     parser.add_argument('--skip-dl', action='store_true')
     parser.add_argument('--skip-ablation', action='store_true')

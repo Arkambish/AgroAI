@@ -1,0 +1,17 @@
+{
+  "total_ss": 1095.96,
+  "year_ss": 696.89,
+  "district_ss": 24.09,
+  "residual_ss": 374.97,
+  "year_pct": 63.6,
+  "district_pct": 2.2,
+  "residual_pct": 34.2,
+  "target_sd": 6.371,
+  "measurement_error_var": 7.916,
+  "measurement_error_sd": 2.813,
+  "measurement_share_of_total_var": 0.195,
+  "within_year_var": 14.78,
+  "measurement_share_of_within_year_var": 0.5356,
+  "implied_loyo_r2_ceiling": 0.1619,
+  "n_cells_with_error_estimate": 27
+}

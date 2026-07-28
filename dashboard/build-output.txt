@@ -1,0 +1,44 @@
+﻿
+> dashboard@0.1.0 build
+> next build
+
+npm : ÔÜá Warning: Next.js inferred your workspace root, but it may not be 
+correct.
+At line:1 char:57
++ ... -Path 'd:\Academics\FYP\AgroAI\dashboard'; npm run build 2>&1 | Out-F ...
++                                                ~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ÔÜá Warning: Ne...not be correct. 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ We detected multiple lockfiles and selected the directory of 
+D:\Academics\FYP\AgroAI\package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or 
+consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopac
+k#root-directory for more information.
+ Detected additional lockfiles: 
+   * D:\Academics\FYP\AgroAI\dashboard\package-lock.json
+
+Ôû▓ Next.js 16.2.6 (Turbopack)
+
+ÔÜá The "middleware" file convention is deprecated. Please use "proxy" 
+instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+Ô£ô Compiled successfully in 10.7s
+  Running TypeScript ...
+Failed to type check.
+
+./tailwind.config.ts:4:3
+Type error: Type '"never"' is not assignable to type 'DarkModeStrategy | 
+undefined'.
+
+  [90m2 |[0m
+  [90m3 |[0m [36mconst[0m config: [33mConfig[0m = {
+[31m[1m>[0m [90m4 |[0m   darkMode: [32m"never"[0m, [90m// Disable dark 
+mode[0m
+  [90m  |[0m   [31m[1m^[0m
+  [90m5 |[0m   content: [
+  [90m6 |[0m     [32m"./app/**/*.{js,ts,jsx,tsx}"[0m,
+  [90m7 |[0m     [32m"./components/**/*.{js,ts,jsx,tsx}"[0m,
+Next.js build worker exited with code: 1 and signal: null

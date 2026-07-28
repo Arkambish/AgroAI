@@ -1,0 +1,15 @@
+{
+  "min_detectable_amplitude": 0.25,
+  "min_detectable_variance_share": 0.0625,
+  "identifiable_parameters": [
+    "T_base",
+    "T_opt",
+    "W_max",
+    "gamma",
+    "P_crit"
+  ],
+  "unidentifiable_parameters": [
+    "T_crit",
+    "Ky"
+  ]
+}
