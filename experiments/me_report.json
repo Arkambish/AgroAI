@@ -1,0 +1,37 @@
+{
+  "nested_cv_r2": -0.326290153758908,
+  "nested_cv_rmse": 7.034742056889104,
+  "chosen": {
+    "2019": "trim6+mean[equal]",
+    "2020": "me0[p0.75]",
+    "2021": "trim8+mean[equal]",
+    "2022": "me[p1.0]",
+    "2023": "trim6+mean[equal]",
+    "2024": "pool[equal,lam0.5]",
+    "2025": "huber[sat400,c1.345]"
+  },
+  "n_configs": 520,
+  "pre_registered": {
+    "climatology (unweighted)": {
+      "r2": -0.21495511524333555,
+      "rmse": 6.733006317448089
+    },
+    "w ~ sqrt(extent_ha)   [repo default]": {
+      "r2": -0.2673590233755201,
+      "rmse": 6.876678738907542
+    },
+    "w ~ extent_ha         [1/var if var~1/A]": {
+      "r2": -0.3466499382527999,
+      "rmse": 7.088531323270491
+    },
+    "w ~ 1/(tau2+se_i^2)   [direct ME, exact IV]": {
+      "r2": -0.222772688645396,
+      "rmse": 6.754633195321771
+    },
+    "w ~ sqrt(eff_extent)": {
+      "r2": -0.18515598984230208,
+      "rmse": 6.649923709477568
+    }
+  },
+  "random_null_frac_beating_clim": 0.2705
+}

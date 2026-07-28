@@ -1,0 +1,32 @@
+{
+  "nested": {
+    "r2": -0.2683260684731934,
+    "rmse": 6.879301827653272,
+    "chosen": {
+      "2019": "trim6+mean[equal]",
+      "2020": "trim6+mean[equal]",
+      "2021": "mean[sat50]",
+      "2022": "ridge[sqrt,k1,l30]",
+      "2023": "trim6+mean[equal]",
+      "2024": "trim2+mean[equal]",
+      "2025": "ridge[sat50,k1,l100,log]"
+    }
+  },
+  "apriori_eb_lin": {
+    "r2": -0.19273060521288365,
+    "rmse": 6.671140489497461
+  },
+  "apriori_eb_equal": {
+    "r2": -0.21495511524333555,
+    "rmse": 6.733006317448089
+  },
+  "climatology": {
+    "r2": -0.21495511524333555,
+    "rmse": 6.733006317448089
+  },
+  "weighted_climatology": {
+    "r2": -0.19273060521288365,
+    "rmse": 6.671140489497461
+  },
+  "n_configs": 182
+}
