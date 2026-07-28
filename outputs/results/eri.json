@@ -1,0 +1,910 @@
+{
+  "eri": 0.7434,
+  "per_feature_eri": {
+    "season_avg_temp": 0.6729,
+    "season_total_rainfall": 0.5252,
+    "season_avg_humidity": 0.5175,
+    "season_avg_solar_rad": 0.2176,
+    "growing_degree_days": 0.5314,
+    "heat_stress_days": 0.5465,
+    "drought_index_spi": 0.4481,
+    "temp_range": 0.552,
+    "max_daily_rainfall": 0.7007,
+    "season_mean_ndvi": 0.9561,
+    "season_max_ndvi": 0.9159,
+    "season_min_ndvi": 0.9386,
+    "ndvi_std": 0.5403,
+    "ndvi_anomaly": 0.7124,
+    "time_to_peak_ndvi": 0.5631,
+    "ndvi_growth_rate": 0.5572,
+    "season_mean_evi": 0.823,
+    "season_mean_ndwi": 0.2423,
+    "season_mean_lst_day": 0.2409,
+    "season_mean_lst_night": 0.3771,
+    "prev_season_yield": 0.487,
+    "prev_year_yield": 0.4525,
+    "yield_3yr_avg": 0.7463,
+    "season_indicator": 0.5556,
+    "extent_prev_season": 0.2638,
+    "soil_ph": 0.5913,
+    "organic_carbon": 0.2174,
+    "clay_pct": 0.5249,
+    "sand_pct": 0.614,
+    "rainfall_x_ndvi": 0.2231,
+    "temp_x_humidity": 0.332,
+    "ndvi_x_lst": 0.6601
+  },
+  "weight_sensitivity": {
+    "baseline_top5": [
+      "season_mean_ndvi",
+      "season_min_ndvi",
+      "season_max_ndvi",
+      "season_mean_evi",
+      "yield_3yr_avg"
+    ],
+    "n_weight_combinations": 66,
+    "n_diff_from_baseline": 60,
+    "fraction_ranking_changed": 0.9091,
+    "n_distinct_top5_sets": 21,
+    "sweep": [
+      {
+        "w_stability": 0.0,
+        "w_grounding": 0.0,
+        "w_consensus": 1.0,
+        "top5": [
+          "season_mean_ndvi",
+          "season_max_ndvi",
+          "season_min_ndvi",
+          "yield_3yr_avg",
+          "ndvi_x_lst"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.0,
+        "w_grounding": 0.1,
+        "w_consensus": 0.9,
+        "top5": [
+          "season_mean_ndvi",
+          "season_max_ndvi",
+          "season_min_ndvi",
+          "yield_3yr_avg",
+          "ndvi_x_lst"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.0,
+        "w_grounding": 0.2,
+        "w_consensus": 0.8,
+        "top5": [
+          "season_mean_ndvi",
+          "season_max_ndvi",
+          "season_min_ndvi",
+          "yield_3yr_avg",
+          "ndvi_x_lst"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.0,
+        "w_grounding": 0.3,
+        "w_consensus": 0.7,
+        "top5": [
+          "season_mean_ndvi",
+          "season_max_ndvi",
+          "season_min_ndvi",
+          "yield_3yr_avg",
+          "season_mean_evi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.0,
+        "w_grounding": 0.4,
+        "w_consensus": 0.6,
+        "top5": [
+          "season_mean_ndvi",
+          "season_max_ndvi",
+          "season_min_ndvi",
+          "yield_3yr_avg",
+          "season_mean_evi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.0,
+        "w_grounding": 0.5,
+        "w_consensus": 0.5,
+        "top5": [
+          "season_mean_ndvi",
+          "season_max_ndvi",
+          "season_min_ndvi",
+          "yield_3yr_avg",
+          "season_mean_evi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.0,
+        "w_grounding": 0.6,
+        "w_consensus": 0.4,
+        "top5": [
+          "season_mean_ndvi",
+          "season_max_ndvi",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "season_indicator"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.0,
+        "w_grounding": 0.7,
+        "w_consensus": 0.3,
+        "top5": [
+          "season_mean_ndvi",
+          "season_max_ndvi",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "season_indicator"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.0,
+        "w_grounding": 0.8,
+        "w_consensus": 0.2,
+        "top5": [
+          "season_mean_ndvi",
+          "season_max_ndvi",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "season_indicator"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.0,
+        "w_grounding": 0.9,
+        "w_consensus": 0.1,
+        "top5": [
+          "season_mean_ndvi",
+          "season_max_ndvi",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "season_indicator"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.0,
+        "w_grounding": 1.0,
+        "w_consensus": 0.0,
+        "top5": [
+          "season_avg_temp",
+          "season_total_rainfall",
+          "season_avg_humidity",
+          "growing_degree_days",
+          "heat_stress_days"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.1,
+        "w_grounding": 0.0,
+        "w_consensus": 0.9,
+        "top5": [
+          "season_mean_ndvi",
+          "ndvi_x_lst",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.1,
+        "w_grounding": 0.1,
+        "w_consensus": 0.8,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "yield_3yr_avg",
+          "ndvi_x_lst"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.1,
+        "w_grounding": 0.2,
+        "w_consensus": 0.7,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "yield_3yr_avg",
+          "ndvi_x_lst"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.1,
+        "w_grounding": 0.3,
+        "w_consensus": 0.6,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "yield_3yr_avg",
+          "season_mean_evi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.1,
+        "w_grounding": 0.4,
+        "w_consensus": 0.5,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "yield_3yr_avg",
+          "season_mean_evi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.1,
+        "w_grounding": 0.5,
+        "w_consensus": 0.4,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": false
+      },
+      {
+        "w_stability": 0.1,
+        "w_grounding": 0.6,
+        "w_consensus": 0.3,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "season_indicator"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.1,
+        "w_grounding": 0.7,
+        "w_consensus": 0.2,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.1,
+        "w_grounding": 0.8,
+        "w_consensus": 0.1,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.1,
+        "w_grounding": 0.9,
+        "w_consensus": 0.0,
+        "top5": [
+          "season_mean_ndvi",
+          "sand_pct",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.2,
+        "w_grounding": 0.0,
+        "w_consensus": 0.8,
+        "top5": [
+          "season_mean_ndvi",
+          "ndvi_x_lst",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.2,
+        "w_grounding": 0.1,
+        "w_consensus": 0.7,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "ndvi_x_lst",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.2,
+        "w_grounding": 0.2,
+        "w_consensus": 0.6,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "yield_3yr_avg",
+          "ndvi_x_lst"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.2,
+        "w_grounding": 0.3,
+        "w_consensus": 0.5,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "yield_3yr_avg",
+          "season_mean_evi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.2,
+        "w_grounding": 0.4,
+        "w_consensus": 0.4,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": false
+      },
+      {
+        "w_stability": 0.2,
+        "w_grounding": 0.5,
+        "w_consensus": 0.3,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": false
+      },
+      {
+        "w_stability": 0.2,
+        "w_grounding": 0.6,
+        "w_consensus": 0.2,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.2,
+        "w_grounding": 0.7,
+        "w_consensus": 0.1,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.2,
+        "w_grounding": 0.8,
+        "w_consensus": 0.0,
+        "top5": [
+          "season_mean_ndvi",
+          "sand_pct",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.3,
+        "w_grounding": 0.0,
+        "w_consensus": 0.7,
+        "top5": [
+          "season_mean_ndvi",
+          "ndvi_x_lst",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.3,
+        "w_grounding": 0.1,
+        "w_consensus": 0.6,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "ndvi_x_lst",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.3,
+        "w_grounding": 0.2,
+        "w_consensus": 0.5,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "yield_3yr_avg",
+          "ndvi_x_lst"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.3,
+        "w_grounding": 0.3,
+        "w_consensus": 0.4,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": false
+      },
+      {
+        "w_stability": 0.3,
+        "w_grounding": 0.4,
+        "w_consensus": 0.3,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": false
+      },
+      {
+        "w_stability": 0.3,
+        "w_grounding": 0.5,
+        "w_consensus": 0.2,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.3,
+        "w_grounding": 0.6,
+        "w_consensus": 0.1,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.3,
+        "w_grounding": 0.7,
+        "w_consensus": 0.0,
+        "top5": [
+          "season_mean_ndvi",
+          "sand_pct",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.4,
+        "w_grounding": 0.0,
+        "w_consensus": 0.6,
+        "top5": [
+          "season_mean_ndvi",
+          "ndvi_x_lst",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.4,
+        "w_grounding": 0.1,
+        "w_consensus": 0.5,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "ndvi_x_lst",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.4,
+        "w_grounding": 0.2,
+        "w_consensus": 0.4,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "ndvi_x_lst"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.4,
+        "w_grounding": 0.3,
+        "w_consensus": 0.3,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": false
+      },
+      {
+        "w_stability": 0.4,
+        "w_grounding": 0.4,
+        "w_consensus": 0.2,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.4,
+        "w_grounding": 0.5,
+        "w_consensus": 0.1,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.4,
+        "w_grounding": 0.6,
+        "w_consensus": 0.0,
+        "top5": [
+          "season_mean_ndvi",
+          "sand_pct",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.5,
+        "w_grounding": 0.0,
+        "w_consensus": 0.5,
+        "top5": [
+          "season_mean_ndvi",
+          "ndvi_x_lst",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "yield_3yr_avg"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.5,
+        "w_grounding": 0.1,
+        "w_consensus": 0.4,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "ndvi_x_lst",
+          "season_mean_evi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.5,
+        "w_grounding": 0.2,
+        "w_consensus": 0.3,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "ndvi_x_lst"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.5,
+        "w_grounding": 0.3,
+        "w_consensus": 0.2,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.5,
+        "w_grounding": 0.4,
+        "w_consensus": 0.1,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "sand_pct"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.5,
+        "w_grounding": 0.5,
+        "w_consensus": 0.0,
+        "top5": [
+          "season_mean_ndvi",
+          "sand_pct",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.6,
+        "w_grounding": 0.0,
+        "w_consensus": 0.4,
+        "top5": [
+          "season_mean_ndvi",
+          "ndvi_x_lst",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.6,
+        "w_grounding": 0.1,
+        "w_consensus": 0.3,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "ndvi_x_lst",
+          "season_mean_evi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.6,
+        "w_grounding": 0.2,
+        "w_consensus": 0.2,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "ndvi_anomaly"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.6,
+        "w_grounding": 0.3,
+        "w_consensus": 0.1,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi",
+          "sand_pct"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.6,
+        "w_grounding": 0.4,
+        "w_consensus": 0.0,
+        "top5": [
+          "season_mean_ndvi",
+          "sand_pct",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.7,
+        "w_grounding": 0.0,
+        "w_consensus": 0.3,
+        "top5": [
+          "season_mean_ndvi",
+          "ndvi_x_lst",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.7,
+        "w_grounding": 0.1,
+        "w_consensus": 0.2,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "ndvi_x_lst",
+          "season_mean_evi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.7,
+        "w_grounding": 0.2,
+        "w_consensus": 0.1,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "season_max_ndvi",
+          "sand_pct"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.7,
+        "w_grounding": 0.3,
+        "w_consensus": 0.0,
+        "top5": [
+          "season_mean_ndvi",
+          "sand_pct",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.8,
+        "w_grounding": 0.0,
+        "w_consensus": 0.2,
+        "top5": [
+          "season_mean_ndvi",
+          "ndvi_x_lst",
+          "season_min_ndvi",
+          "season_max_ndvi",
+          "season_mean_evi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.8,
+        "w_grounding": 0.1,
+        "w_consensus": 0.1,
+        "top5": [
+          "season_mean_ndvi",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "season_max_ndvi",
+          "ndvi_x_lst"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.8,
+        "w_grounding": 0.2,
+        "w_consensus": 0.0,
+        "top5": [
+          "season_mean_ndvi",
+          "sand_pct",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.9,
+        "w_grounding": 0.0,
+        "w_consensus": 0.1,
+        "top5": [
+          "season_mean_ndvi",
+          "ndvi_x_lst",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "season_max_ndvi"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 0.9,
+        "w_grounding": 0.1,
+        "w_consensus": 0.0,
+        "top5": [
+          "season_mean_ndvi",
+          "sand_pct",
+          "season_min_ndvi",
+          "season_mean_evi",
+          "max_daily_rainfall"
+        ],
+        "differs_from_baseline": true
+      },
+      {
+        "w_stability": 1.0,
+        "w_grounding": 0.0,
+        "w_consensus": 0.0,
+        "top5": [
+          "season_mean_ndvi",
+          "temp_x_humidity",
+          "sand_pct",
+          "ndvi_x_lst",
+          "season_min_ndvi"
+        ],
+        "differs_from_baseline": true
+      }
+    ]
+  }
+}

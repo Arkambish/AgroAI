@@ -16,24 +16,26 @@
 
   "form": {
     "district": "District",
-    "season": "Cultivation Season",
-    "year": "Target Year",
+    "season": "Season",
+    "year": "Year",
     "optional": "(optional)",
     "on": "On",
     "off": "Off",
 
-    "fieldSectionTitle": "Tell us about your field",
-    "fieldSectionHelp": "Choose where and when you are growing. Everything else is filled in from records for your area.",
+    "fieldSectionTitle": "Select your farm details",
+    "fieldSectionHelp": "We collect weather, satellite and soil information automatically for your area.",
     "loadingArea": "Loading your area…",
 
-    "extentLabel": "How much land did you plant?",
-    "extentHelp": "In hectares. Leave blank to use the district average.",
-    "lastYieldLabel": "What did you harvest last season?",
-    "lastYieldHelp": "In MT per hectare. This is one of the strongest signals you can give.",
+    "extentLabel": "Farm size (optional)",
+    "extentHelp": "Leave blank to use the area average.",
+    "lastYieldLabel": "Previous harvest (optional)",
+    "lastYieldHelp": "Helps improve prediction accuracy.",
     "useDistrictAverage": "Use district average",
 
     "knownSectionTitle": "What we already know about your area",
-    "knownSectionHelp": "These come from satellites, weather stations and official harvest records — you do not need to enter them.",
+    "knownSectionHelp": "We automatically collect weather, satellite, soil and historical harvest information for your area.",
+    "viewDetails": "View details",
+    "hideDetails": "Hide details",
     "contextUnavailable": "No records found for this area yet. The prediction will use wider district and seasonal averages.",
 
     "provenanceExact": "Exact {year} record",
@@ -108,7 +110,8 @@
   "button": {
     "predict": "Predict Yield",
     "start": "Start Prediction",
-    "go_to_predict": "Go to Prediction"
+    "go_to_predict": "Go to Prediction",
+    "newPrediction": "New Prediction"
   },
 
   "dashboard": {
@@ -155,9 +158,8 @@
     "vsDistrictAverage": "vs district average",
     "previousSeason": "Previous Season",
 
-    "dataSourcesTitle": "Where this prediction came from",
-    "dataSourcesBody": "Built from {user} of {total} values you supplied and {records} filled in from records for your area.",
-    "zeroFillWarning": "{n} values had no record at all and were left empty — treat this prediction with extra caution.",
+    "dataSourcesTitle": "Data used for prediction",
+    "dataSourcesBody": "This prediction uses weather, satellite, soil and historical harvest information from your selected area.",
 
     "success": "Prediction Completed",
     "successDescription": "AI has successfully generated yield prediction",
@@ -166,9 +168,34 @@
     "districtsError": "Could not load districts — backend unavailable."
   },
 
+  "chat": {
+    "title": "Ask about this prediction",
+    "subtitle": "Ask in plain language — answers are grounded in the prediction and history for your selected district, season and year.",
+    "placeholder": "e.g. Why is this yield lower than last year?",
+    "send": "Send",
+    "emptyState": "Ask a question about the current prediction, e.g. \"How confident are you?\" or \"Why is this the estimate?\"",
+    "needsPrediction": "Run a prediction first so the assistant has something to explain.",
+    "thinking": "Thinking…",
+    "error": "The assistant is unavailable right now. Please try again later.",
+    "notConfigured": "The assistant isn't configured on the server yet.",
+    "basedOnData": "Based on this data",
+    "hidePrediction": "Hide details",
+    "showPrediction": "Show details",
+    "dataPrediction": "Predicted yield",
+    "dataConfidence": "Confidence range",
+    "dataTopFactors": "Top factors",
+    "dataHistory": "Recent yield history",
+    "dataBaseline": "District average",
+    "close": "Close"
+  },
+
   "recommend": {
     "title": "Actionable Advice",
     "subtitle": "Steps you can take to improve your yield based on AI analysis",
+    "aiTitle": "AI Recommendation",
+    "aiLoading": "Working out the best next step for your field…",
+    "aiError": "We couldn't reach the recommendation service. Please try again.",
+    "aiRetry": "Try again",
 
     "noTitle": "No Recommendations Yet",
     "noDescription": "Please make a prediction first to see personalized agricultural advice.",
@@ -236,18 +263,48 @@
 
     "positive": "helped increase",
     "negative": "reduced",
-    "impactPositive": "Raised the prediction",
-    "impactNegative": "Lowered the prediction",
+    "impactLabel": "Impact",
+    "impactPositive": "↑ Increased yield",
+    "impactNegative": "↓ Reduced yield",
+
+    "effectLabel": "Effect",
+    "effect": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+
+    "technicalDetails": "Technical details",
+    "technicalFeatures": "Underlying model features",
 
     "keyInsight": "Key Insight",
     "insightPositive": "{feature} was the strongest influence and it helped your yield. Keeping those conditions steady is the surest way to hold this level.",
     "insightNegative": "{feature} was the strongest influence and it held your yield back. See the Recommendations page for what to do about it.",
+    "perFactorPositive": "{feature} increased your predicted yield by about {amount} kg/Ha.",
+    "perFactorNegative": "{feature} decreased your predicted yield by about {amount} kg/Ha.",
     "overallGood": "Overall conditions are favorable",
     "overallMedium": "Overall conditions are moderate",
     "limitingFactor": "Main limiting factor",
 
     "district": "District",
     "yield": "Yield",
+    "reliability": {
+      "badge": "Explanation reliability: {value}% — {level}",
+      "badgeUnknown": "Explanation reliability isn't available for this prediction",
+      "levelHigh": "high",
+      "levelMedium": "medium",
+      "levelLow": "low, interpret with caution",
+      "viewSimple": "Simple view",
+      "viewReliability": "Reliability view",
+      "legend": "Faded / hatched bars = less reliable explanation",
+      "unknown": "N/A",
+      "cardLabel": "Explanation reliability",
+      "cardHigh": "High reliability",
+      "cardGood": "Good reliability",
+      "cardModerate": "Moderate reliability",
+      "cardLow": "Low reliability",
+      "cardUnknown": "Not available"
+    },
     "features": {
       "rainfall": "Rainfall",
       "temperature": "Temperature",

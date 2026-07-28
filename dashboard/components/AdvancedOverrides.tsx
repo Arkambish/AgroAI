@@ -67,12 +67,21 @@ export default function AdvancedOverrides({
           <span className="text-xs font-semibold text-slate-600">
             {enabled ? t("on") : t("off")}
           </span>
+          {/* suppressHydrationWarning: autofill/password-manager browser
+              extensions stamp fdprocessedid="..." onto every form control
+              they scan post-mount (this is the only one in this file always
+              present during hydration — the overrides below only mount once
+              `enabled` is toggled true), which React otherwise reports as a
+              mismatch even though nothing here renders differently server
+              vs. client — see LanguageSwitcher.tsx/Navbar.tsx for the same,
+              already-confirmed case. */}
           <input
             type="checkbox"
             role="switch"
             checked={enabled}
             onChange={(e) => onToggle(e.target.checked)}
             className="peer sr-only"
+            suppressHydrationWarning
           />
           <span className="relative h-6 w-11 rounded-full bg-slate-200 transition-colors peer-checked:bg-emerald-600 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-5" />
         </label>

@@ -41,7 +41,9 @@ export default function PredictionResultCard({
   const districtName = tDistricts.has(districtKey)
     ? tDistricts(districtKey)
     : result.district;
-  const seasonName = tSeasons.has(seasonKey) ? tSeasons(seasonKey) : result.season;
+  const seasonName = tSeasons.has(seasonKey)
+    ? tSeasons(seasonKey)
+    : result.season;
 
   const point = result.predicted_yield_MT_per_Ha;
   const completeness = result.data_completeness;
@@ -70,7 +72,9 @@ export default function PredictionResultCard({
   })();
 
   const delta =
-    baseline && baseline.mean > 0 ? ((point - baseline.mean) / baseline.mean) * 100 : null;
+    baseline && baseline.mean > 0
+      ? ((point - baseline.mean) / baseline.mean) * 100
+      : null;
   const isDown = delta !== null && delta < 0;
 
   return (
@@ -82,9 +86,13 @@ export default function PredictionResultCard({
         </p>
 
         <h2 className="mt-2 flex flex-wrap items-baseline gap-x-3 text-4xl font-black text-emerald-950">
-          <span className="tabular-nums">{result.confidence_lower.toFixed(1)}</span>
+          <span className="tabular-nums">
+            {result.confidence_lower.toFixed(1)}
+          </span>
           <span className="text-2xl font-medium text-emerald-700">–</span>
-          <span className="tabular-nums">{result.confidence_upper.toFixed(1)}</span>
+          <span className="tabular-nums">
+            {result.confidence_upper.toFixed(1)}
+          </span>
           <span className="text-lg font-medium text-emerald-800">MT/Ha</span>
         </h2>
 
@@ -116,7 +124,8 @@ export default function PredictionResultCard({
                 "h-3.5 w-3.5 rounded-full shadow-sm",
                 reliability === "high" && "bg-emerald-500",
                 reliability === "medium" && "bg-amber-500",
-                (reliability === "low" || reliability === "unknown") && "bg-red-500"
+                (reliability === "low" || reliability === "unknown") &&
+                  "bg-red-500",
               )}
             />
             <span className="text-base font-bold text-slate-900">
@@ -147,9 +156,9 @@ export default function PredictionResultCard({
                 {baseline.mean.toFixed(2)} MT/Ha
               </span>
             </div>
-            <p className="mt-1.5 text-[11px] text-slate-400">
+            {/* <p className="mt-1.5 text-[11px] text-slate-400">
               {t("baselineYears", { n: baseline.n_years })}
-            </p>
+            </p> */}
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -163,7 +172,7 @@ export default function PredictionResultCard({
               <span
                 className={clsx(
                   "text-lg font-bold tabular-nums",
-                  isDown ? "text-red-600" : "text-emerald-600"
+                  isDown ? "text-red-600" : "text-emerald-600",
                 )}
               >
                 {delta !== null
@@ -171,48 +180,35 @@ export default function PredictionResultCard({
                   : "—"}
               </span>
             </div>
-            <p className="mt-1.5 text-[11px] text-slate-400">
+            {/* <p className="mt-1.5 text-[11px] text-slate-400">
               {t("vsDistrictAverage")}
-            </p>
+            </p> */}
           </div>
         </div>
       )}
 
-      {/* Where the 32 features came from. */}
-      {completeness && (
-        <div
-          className={clsx(
-            "rounded-2xl border p-5 shadow-sm",
-            completeness.n_zero_filled > 0
-              ? "border-amber-200 bg-amber-50"
-              : "border-slate-200 bg-white"
-          )}
-        >
+      {/* Data sources used for prediction */}
+      {/* {completeness && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center space-x-2">
-            {completeness.n_zero_filled > 0 ? (
-              <AlertTriangle size={16} className="text-amber-600" />
-            ) : (
-              <Database size={16} className="text-slate-400" />
-            )}
+            <Database size={16} className="text-emerald-600" />
             <p className="text-xs font-bold text-slate-700">
               {t("dataSourcesTitle")}
             </p>
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-slate-600">
-            {t("dataSourcesBody", {
-              user: completeness.n_user_supplied,
-              records: completeness.n_features - completeness.n_user_supplied,
-              total: completeness.n_features,
-            })}
-          </p>
-          {completeness.n_zero_filled > 0 && (
-            <p className="mt-2 text-xs font-semibold text-amber-800">
-              {t("zeroFillWarning", { n: completeness.n_zero_filled })}
-            </p>
-          )}
-        </div>
-      )}
 
+          <p className="mt-2 text-xs leading-relaxed text-slate-600">
+            {t("dataSourcesBody")}
+          </p>
+
+          <div className="mt-3 space-y-1.5 text-xs text-slate-600">
+            <p>✓ Weather information</p>
+            <p>✓ Satellite vegetation data</p>
+            <p>✓ Soil characteristics</p>
+            <p>✓ Historical harvest records</p>
+          </div>
+        </div>
+      )} */}
       <div className="space-y-3 rounded-2xl bg-slate-900 p-6 text-white shadow-xl">
         <h4 className="flex items-center space-x-2 font-bold text-emerald-400">
           <CheckCircle2 size={20} />

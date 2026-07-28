@@ -47,6 +47,15 @@ export default function LanguageSwitcher() {
           key={lang.code}
           onClick={() => handleChange(lang.code)}
           className={`px-3 py-1 rounded-lg font-bold border transition-colors duration-150 ${selected === lang.code ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-emerald-600 border-emerald-300 hover:bg-emerald-50"}`}
+          // Password-manager/autofill browser extensions (LastPass, Dashlane,
+          // 1Password, Fillr, ...) tag every <button> they scan with
+          // fdprocessedid="..." right after the DOM is available — before
+          // React hydrates. React then reports that as a hydration mismatch
+          // even though nothing in this component actually renders
+          // differently server vs. client (see investigation notes). This
+          // does not affect real hydration correctness, only silences the
+          // false-positive console warning for that one attribute.
+          suppressHydrationWarning
         >
           {lang.label}
         </button>

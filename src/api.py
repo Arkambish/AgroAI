@@ -8,16 +8,35 @@ Endpoints:
   GET  /context
   GET  /baseline
   GET  /districts
+  GET  /explanation-reliability
+  GET  /stability
+  GET  /consensus
+  POST /api/chat
+  POST /api/recommend
 """
 
 import json
 import math
 import os
+import re
 import sys
+
+# Non-ASCII (Sinhala/Tamil, plus whatever a free-tier LLM writes) now flows
+# through this process's stdout/stderr regularly — a print() containing it
+# raises UnicodeEncodeError and 500s the request on Windows, where console
+# output defaults to the legacy codepage (cp1252) rather than UTF-8 even
+# when redirected to a file. Reconfigure once at startup instead of hoping
+# every deployment remembers PYTHONIOENCODING=utf-8.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, 'reconfigure'):
+        _stream.reconfigure(encoding='utf-8', errors='replace', line_buffering=True)
+
 import numpy as np
 import pandas as pd
 import joblib
 import shap
+import requests
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -26,8 +45,15 @@ from config import (
     ALL_FEATURES, DISTRICTS, SEASONS, DATA_VARIANT, TARGET_COLUMN,
     INTERACTION_FEATURES,
 )
+import explanation_context
+from xai.eri import compute_eri
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Loads OPENROUTER_API_KEY (and anything else) from a git-ignored .env at the
+# project root, if present. Real env vars set another way still win — this
+# only fills in what's missing.
+load_dotenv(os.path.join(ROOT, '.env'))
+
 # Serve the variant selected by DATA_VARIANT (default 'synthetic'). Set
 # DATA_VARIANT=real to serve the models trained on the real collected data.
 _SUFFIX = '' if DATA_VARIANT == 'synthetic' else f'_{DATA_VARIANT}'
@@ -37,6 +63,78 @@ PROCESSED_DIR = os.path.join(ROOT, 'data', f'processed{_SUFFIX}')
 
 app = Flask(__name__)
 CORS(app)
+
+# Set in the environment (or .env) before starting the server, e.g.
+#   OPENROUTER_API_KEY=sk-or-... python src/api.py
+# /api/chat returns 503 until this is set — no key is bundled or defaulted.
+# Uses OpenRouter (openrouter.ai) instead of a paid provider directly, so the
+# chat assistant can run on a free-tier model. OPENROUTER_MODEL is
+# overridable so a deprecated/rate-limited free model can be swapped without
+# a code change — check https://openrouter.ai/models?max_price=0 for what's
+# currently free; the list changes over time.
+#
+# Models tried and rejected:
+#   openai/gpt-oss-20b:free    — reliably produced garbled tokens mid-sentence
+#                                 (stray non-English characters spliced into
+#                                 English words).
+#   nvidia/nemotron-3-super-120b-a12b:free — clean for short English chat
+#                                 replies, but for the (longer, non-English)
+#                                 /api/recommend prompt its chain-of-thought
+#                                 leaked directly into `content` ahead of the
+#                                 real answer, with no distinct `reasoning`
+#                                 field to exclude — so a small max_tokens
+#                                 budget truncated the response mid-reasoning,
+#                                 before the real answer was ever written.
+#   nvidia/nemotron-3-nano-30b-a3b:free — same leakage, and the eventual
+#                                 Sinhala text itself was incoherent.
+#   nvidia/nemotron-3-ultra-550b-a55b:free — reasoning correctly separated
+#                                 into its own field and content was clean,
+#                                 fluent Sinhala, but its reasoning is long
+#                                 enough that even 1800 max_tokens wasn't
+#                                 enough budget to reach a complete answer.
+# inclusionai/ling-3.0-flash:free correctly separates reasoning from content
+# (so `message['content']` is just the answer) and reliably finishes within
+# a ~1800-token budget. Every free model currently on OpenRouter declares
+# reasoning support, so "avoid reasoning models" isn't an available option —
+# picking one that puts reasoning in its own field, not inline in `content`,
+# is what actually matters.
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
+OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'inclusionai/ling-3.0-flash:free')
+OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
+# OpenRouter attributes usage to a site for its public model rankings.
+# Neither value needs to be publicly reachable.
+OPENROUTER_SITE_URL = os.environ.get('OPENROUTER_SITE_URL', 'http://localhost:3000')
+OPENROUTER_SITE_NAME = 'AgriSense'
+
+OPENROUTER_FALLBACK_MESSAGE = (
+    "I'm having trouble reaching the assistant right now. Please try again "
+    "in a moment."
+)
+OPENROUTER_RATE_LIMIT_MESSAGE = (
+    "The assistant is getting a lot of requests right now (it runs on a "
+    "free model with limited capacity). Please try again in a minute."
+)
+
+CHAT_SYSTEM_PROMPT = """You are the assistant embedded in a crop yield prediction \
+dashboard for Sri Lankan onion farmers. Your job is to explain the dashboard's \
+own prediction, feature-importance, and historical-yield data in plain, \
+farmer-friendly language.
+
+Rules:
+- Only use the structured data given to you in the user message. Never invent \
+numbers, and never draw on general agricultural knowledge that isn't in that data.
+- Avoid ML jargon (SHAP, model, feature, R2, conformal interval). Translate \
+technical drivers into plain-language causes, e.g. "rainfall was lower than \
+usual this season" rather than "season_total_rainfall had a negative SHAP \
+contribution".
+- Only state raw numbers (SHAP values, R2, exact interval bounds) if the \
+farmer's question specifically asks for exact figures. Otherwise describe \
+them qualitatively (e.g. "we're fairly confident" vs "the estimate could \
+vary quite a bit").
+- Keep answers short: 2-4 sentences, unless the question needs a year-by-year \
+comparison.
+- If the provided data contains an "error" key, say plainly that a prediction \
+isn't available for that district/season/year rather than guessing."""
 
 _state = {
     'model': None, 'metrics': None, 'model_name': None, 'scaler': None,
@@ -264,11 +362,18 @@ def health():
     })
 
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    data = request.get_json(silent=True) or {}
+def run_prediction(data: dict):
+    """Core prediction logic: resolve features, predict, SHAP, interval.
+
+    `data` must contain 'district'/'season'/'year' and may contain any
+    ALL_FEATURES overrides — the same shape POST /predict accepts. Extracted
+    from the /predict route so the chat assistant (explanation_context.py)
+    can reuse it without duplicating the model/SHAP/interval logic.
+
+    Returns (payload: dict, status: int).
+    """
     if _state['model'] is None:
-        return jsonify({'error': 'Model not loaded'}), 503
+        return {'error': 'Model not loaded'}, 503
 
     resolved, feature_sources = _resolve_features(data)
     feature_vec = np.array([[resolved[f] for f in ALL_FEATURES]],
@@ -318,6 +423,12 @@ def predict():
     )
     n_zero = sum(1 for s in feature_sources.values() if s == 'zero_fallback')
 
+    # Explanation Reliability Index — per-feature and SHAP-weighted aggregate
+    # trust score for this specific prediction's explanation (see
+    # src/xai/eri.py). Falls back gracefully to neutral component scores if
+    # `python -m src.xai.run_xai` hasn't been run yet for this DATA_VARIANT.
+    eri_result = compute_eri(shap_dict)
+
     response = {
         'district': data.get('district'),
         'season': data.get('season'),
@@ -340,13 +451,22 @@ def predict():
             'n_zero_filled': n_zero,
             'fraction_grounded': round(n_grounded / len(ALL_FEATURES), 3),
         },
+        'eri': eri_result['eri'],
+        'per_feature_eri': eri_result['per_feature_eri'],
     }
 
     # TODO: Implement PostgreSQL storage here
     # with db_session() as session:
     #     save_prediction(response)
 
-    return jsonify(response)
+    return response, 200
+
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    data = request.get_json(silent=True) or {}
+    payload, status = run_prediction(data)
+    return jsonify(payload), status
 
 
 @app.route('/models/compare', methods=['GET'])
@@ -374,6 +494,45 @@ def equation():
     if not os.path.exists(eq_path):
         return jsonify({'error': 'symbolic_equation.json not found — run the pipeline first.'}), 404
     with open(eq_path) as f:
+        return jsonify(json.load(f))
+
+
+@app.route('/explanation-reliability', methods=['GET'])
+def explanation_reliability():
+    """Dataset-level Explanation Reliability Index (src/xai/eri.py), computed
+    once by `python -m src.xai.run_xai` using the dataset's aggregate SHAP
+    importance as the feature weighting. For a single prediction's own ERI,
+    see the `eri` / `per_feature_eri` fields on POST /predict instead."""
+    path = os.path.join(RESULTS_DIR, 'eri.json')
+    if not os.path.exists(path):
+        return jsonify({'error': 'eri.json not found — run `python -m src.xai.run_xai` first.'}), 404
+    with open(path) as f:
+        return jsonify(json.load(f))
+
+
+@app.route('/stability', methods=['GET'])
+def stability():
+    """Per-feature LOYO-refit explanation stability + the global Explanation
+    Stability Coefficient (src/xai/stability.py)."""
+    path = os.path.join(RESULTS_DIR, 'explanation_stability.json')
+    if not os.path.exists(path):
+        return jsonify({
+            'error': 'explanation_stability.json not found — run `python -m src.xai.run_xai` first.',
+        }), 404
+    with open(path) as f:
+        return jsonify(json.load(f))
+
+
+@app.route('/consensus', methods=['GET'])
+def consensus():
+    """Per-feature agreement between SHAP, permutation importance, and the
+    symbolic-regression equation (src/xai/consensus.py)."""
+    path = os.path.join(RESULTS_DIR, 'explanation_consensus.json')
+    if not os.path.exists(path):
+        return jsonify({
+            'error': 'explanation_consensus.json not found — run `python -m src.xai.run_xai` first.',
+        }), 404
+    with open(path) as f:
         return jsonify(json.load(f))
 
 
@@ -426,33 +585,30 @@ def context():
     return jsonify(payload)
 
 
-@app.route('/baseline', methods=['GET'])
-def baseline():
+def get_district_baseline(district: str, season: str):
     """Historical yield stats for a (district, season).
 
     The dashboard used to compare every prediction against a hardcoded
-    13.5 MT/Ha. This serves the real per-district figure instead.
+    13.5 MT/Ha. This serves the real per-district figure instead. Extracted
+    from the /baseline route so explanation_context.py can reuse it.
+
+    Returns (payload: dict, status: int).
     """
     baselines = _state.get('baselines')
     if not baselines:
-        return jsonify({'error': 'baseline data not loaded'}), 503
-
-    district = request.args.get('district', type=str)
-    season = request.args.get('season', type=str)
-    if not district or not season:
-        return jsonify({'error': 'query params district and season are required'}), 400
+        return {'error': 'baseline data not loaded'}, 503
 
     stats = baselines.get((district, season))
     if stats is None:
         # Fall back to the district across all seasons before giving up.
         across = [v for (d, _), v in baselines.items() if d == district]
         if not across:
-            return jsonify({
+            return {
                 'error': f'no yield history for district={district}',
                 'district': district, 'season': season,
-            }), 404
+            }, 404
         means = [v['mean'] for v in across]
-        return jsonify({
+        return {
             'district': district,
             'season': season,
             'mean': round(sum(means) / len(means), 2),
@@ -461,9 +617,39 @@ def baseline():
             'n_years': sum(v['n_years'] for v in across),
             'years': sorted({y for v in across for y in v['years']}),
             'source': 'district_all_seasons',
-        }), 200
+        }, 200
 
-    return jsonify({**stats, 'source': 'district_season'})
+    return {**stats, 'source': 'district_season'}, 200
+
+
+def get_yield_history(district: str, season: str, years_back: int = 5) -> list:
+    """Actual yield per year for a (district, season), most recent
+    `years_back` years, ascending by year. Reads the same context_df that
+    /context and /baseline already load — powers the chat assistant's
+    historical-comparison answers.
+    """
+    df = _state.get('context_df')
+    if df is None or TARGET_COLUMN not in df.columns:
+        return []
+    sub = df[(df['District'] == district) & (df['Season'] == season)]
+    sub = sub[['Year', TARGET_COLUMN]].dropna().sort_values('Year')
+    tail = sub.tail(years_back)
+    return [
+        {'year': int(row['Year']), 'yield_MT_per_Ha': round(float(row[TARGET_COLUMN]), 2)}
+        for _, row in tail.iterrows()
+    ]
+
+
+@app.route('/baseline', methods=['GET'])
+def baseline():
+    """Historical yield stats for a (district, season)."""
+    district = request.args.get('district', type=str)
+    season = request.args.get('season', type=str)
+    if not district or not season:
+        return jsonify({'error': 'query params district and season are required'}), 400
+
+    payload, status = get_district_baseline(district, season)
+    return jsonify(payload), status
 
 
 @app.route('/districts', methods=['GET'])
@@ -495,6 +681,263 @@ def list_districts():
         'variant': DATA_VARIANT,
         'source': 'dataset',
     })
+
+
+def _call_openrouter(
+    system_prompt: str,
+    user_message: str,
+    fallback_message: str = OPENROUTER_FALLBACK_MESSAGE,
+    rate_limit_message: str = OPENROUTER_RATE_LIMIT_MESSAGE,
+    max_tokens: int = 1200,
+) -> str:
+    """POST to OpenRouter's OpenAI-compatible chat completions endpoint.
+
+    Returns the assistant's reply text — or `fallback_message` /
+    `rate_limit_message` if the free-tier model is rate-limited,
+    unavailable, or the request fails outright. This is the only external
+    network call /api/chat and /api/recommend make, so it's the one place
+    that has to degrade gracefully (a busy free model is routine, not
+    exceptional) rather than 500 the whole request. Callers whose response
+    must be in a specific language (e.g. /api/recommend) pass their own
+    localized fallback text; both default to English for /api/chat.
+    """
+    try:
+        resp = requests.post(
+            OPENROUTER_URL,
+            headers={
+                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                'Content-Type': 'application/json',
+                # Required by OpenRouter to attribute free-tier usage.
+                'HTTP-Referer': OPENROUTER_SITE_URL,
+                'X-Title': OPENROUTER_SITE_NAME,
+            },
+            json={
+                'model': OPENROUTER_MODEL,
+                'messages': [
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': user_message},
+                ],
+                'max_tokens': max_tokens,
+                # nemotron-3-super is a reasoning model — without this, its
+                # chain-of-thought (in English, regardless of the requested
+                # output language) is spliced into `content` ahead of the
+                # actual answer, and a small max_tokens budget can truncate
+                # the response mid-reasoning before the real answer is ever
+                # written. Excluding it keeps `content` to just the answer.
+                'reasoning': {'exclude': True},
+            },
+            timeout=30,
+        )
+    except requests.exceptions.RequestException as e:
+        print(f'[api] OpenRouter request failed: {e}')
+        return fallback_message
+
+    if resp.status_code == 429:
+        print(f'[api] OpenRouter rate limited: {resp.text[:300]}')
+        return rate_limit_message
+    if resp.status_code != 200:
+        print(f'[api] OpenRouter error {resp.status_code}: {resp.text[:300]}')
+        return fallback_message
+
+    try:
+        body = resp.json()
+        choices = body.get('choices') or []
+        # For reasoning models, `content` can be None (not just absent) when
+        # reasoning consumes the whole max_tokens budget before the model
+        # reaches an actual answer — confirmed via direct testing. That's
+        # not a parse error the except clause below would catch (.strip()
+        # on None raises AttributeError, not KeyError/IndexError), so it's
+        # checked explicitly rather than left to crash the request.
+        content = (choices[0]['message'].get('content') if choices else None)
+        if body.get('error') or not choices or not content:
+            print(f'[api] OpenRouter returned no usable content: {body}')
+            return fallback_message
+        return content.strip()
+    except (ValueError, KeyError, IndexError) as e:
+        print(f'[api] OpenRouter response parsing failed: {e}')
+        return fallback_message
+
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    """Context-Aware XAI RAG Assistant.
+
+    Not a general agricultural chatbot: every answer is grounded in the
+    structured prediction/SHAP/historical data assembled by
+    explanation_context.get_prediction_context for the specific
+    district/season/year in the request — no vector store, no document
+    retrieval, no general-knowledge answers.
+    """
+    if not OPENROUTER_API_KEY:
+        return jsonify({'error': 'OPENROUTER_API_KEY is not configured on the server'}), 503
+
+    data = request.get_json(silent=True) or {}
+    query = (data.get('query') or '').strip()
+    district = data.get('district')
+    season = data.get('season')
+    year = data.get('year')
+
+    if not query or not district or not season or year is None:
+        return jsonify({
+            'error': 'query, district, season, and year are all required',
+        }), 400
+
+    intent = explanation_context.extract_intent(query)
+    context_used = explanation_context.get_prediction_context(district, season, year)
+    if intent == 'comparison':
+        context_used['comparison'] = explanation_context.get_historical_comparison(
+            district, season, years_back=5
+        )
+    context_used['intent'] = intent
+
+    user_message = (
+        f'Farmer\'s question: {query}\n\n'
+        f'Structured data for {district}, {season} season, {year}:\n'
+        f'{json.dumps(context_used, indent=2, default=str)}'
+    )
+
+    answer = _call_openrouter(CHAT_SYSTEM_PROMPT, user_message)
+    return jsonify({'answer': answer, 'context_used': context_used})
+
+
+RECOMMEND_LANGUAGE_NAMES = {'en': 'English', 'si': 'Sinhala', 'ta': 'Tamil'}
+
+_SINHALA_SCRIPT_RE = re.compile(r'[඀-෿]')
+_TAMIL_SCRIPT_RE = re.compile(r'[஀-௿]')
+
+
+def _looks_like_target_language(text: str, locale: str) -> bool:
+    """Sanity check, not a translator: free-tier reasoning models don't
+    reliably keep their chain-of-thought out of `content` (confirmed via
+    direct testing — the same model produced a clean Sinhala answer on one
+    call and a raw, truncated English reasoning dump on the next, for an
+    identical request). Rather than ever show a farmer that broken text,
+    require the response to actually be in Sinhala/Tamil script before
+    trusting it; fall back to a translated static message otherwise.
+
+    Uses a proportion of script characters, not a raw count: a leaked
+    English reasoning trace is long enough that it can rack up 40+
+    incidental Sinhala/Tamil characters (measured directly — real leaks
+    scored a 0.04-0.46 script ratio) while still being overwhelmingly
+    English. A genuine short answer measured ~0.78.
+    """
+    if locale not in ('si', 'ta'):
+        return True
+    pattern = _SINHALA_SCRIPT_RE if locale == 'si' else _TAMIL_SCRIPT_RE
+    non_space = text.replace(' ', '').replace('\n', '')
+    if not non_space:
+        return False
+    script_chars = len(pattern.findall(text))
+    return (script_chars / len(non_space)) >= 0.5
+
+# The LLM call itself is asked to answer in the target language (rather than
+# always generating English and translating client-side) — simpler, and
+# avoids a second network call per request.
+RECOMMEND_SYSTEM_PROMPT_TEMPLATE = """You are an agricultural advisor embedded in a crop \
+yield prediction dashboard for Sri Lankan onion farmers. Given a yield \
+prediction and its key contributing factors, write ONE short, actionable \
+recommendation.
+
+Rules:
+- Only use the structured data given to you in the user message. Never invent \
+numbers, and never draw on general agricultural knowledge that contradicts \
+what the data shows.
+- Avoid ML jargon (SHAP, model, feature, R2, conformal interval). Talk about \
+plain-language causes, e.g. "rainfall was lower than usual" rather than \
+"season_total_rainfall had a negative SHAP contribution".
+- Be concrete and actionable: name a specific action the farmer can take this \
+season, tied to the specific factor(s) pulling the prediction down. If nothing \
+is pulling it down, recommend what to keep doing to maintain the yield.
+- Keep it to 2-4 sentences. No headers, no bullet lists, no markdown.
+- Respond entirely in {language}. Do not mix in English words, and do not \
+mention or explain that you are responding in {language}.
+- If the provided data contains an "error" key, say plainly (in {language}) \
+that a recommendation isn't available for that district/season/year rather \
+than guessing."""
+
+# Backend-generated fallback text for when the LLM call itself fails — kept
+# out of the dashboard's messages/*.json since it's server-rendered, not
+# client i18n, but still needs to match whatever language the farmer is
+# using rather than always falling back to English.
+RECOMMEND_FALLBACK_MESSAGES = {
+    'en': "We couldn't generate a recommendation right now. Please try again in a moment.",
+    'si': "දැනට නිර්දේශයක් ජනනය කළ නොහැක. කරුණාකර මොහොතකින් නැවත උත්සාහ කරන්න.",
+    'ta': "இப்போது பரிந்துரையை உருவாக்க முடியவில்லை. தயவுசெய்து சிறிது நேரத்தில் மீண்டும் முயற்சிக்கவும்.",
+}
+RECOMMEND_RATE_LIMIT_MESSAGES = {
+    'en': (
+        "The recommendation service is busy right now (it runs on a free "
+        "model with limited capacity). Please try again in a minute."
+    ),
+    'si': (
+        "නිර්දේශ සේවාව දැනට කාර්යබහුලයි (එය සීමිත ධාරිතාවකින් යුත් නොමිලේ "
+        "ආකෘතියක් මත ක්‍රියාත්මක වේ). කරුණාකර මිනිත්තුවකින් නැවත උත්සාහ කරන්න."
+    ),
+    'ta': (
+        "பரிந்துரை சேவை தற்போது பரபரப்பாக உள்ளது (இது வரம்புக்குட்பட்ட "
+        "திறன் கொண்ட இலவச மாதிரியில் இயங்குகிறது). தயவுசெய்து ஒரு "
+        "நிமிடத்தில் மீண்டும் முயற்சிக்கவும்."
+    ),
+}
+
+
+@app.route('/api/recommend', methods=['POST'])
+def recommend():
+    """LLM-generated, SHAP-grounded farming recommendation for one
+    (district, season, year), in the requested UI language.
+
+    Reuses explanation_context.get_prediction_context — the same grounding
+    data /api/chat uses — rather than a separate data path, so the
+    recommendation can't drift from what the Predict/Explain tabs show.
+    """
+    if not OPENROUTER_API_KEY:
+        return jsonify({'error': 'OPENROUTER_API_KEY is not configured on the server'}), 503
+
+    data = request.get_json(silent=True) or {}
+    district = data.get('district')
+    season = data.get('season')
+    year = data.get('year')
+    locale = data.get('locale') if data.get('locale') in RECOMMEND_LANGUAGE_NAMES else 'en'
+
+    if not district or not season or year is None:
+        return jsonify({
+            'error': 'district, season, and year are all required',
+        }), 400
+
+    context_used = explanation_context.get_prediction_context(district, season, year)
+
+    user_message = (
+        f'Structured data for {district}, {season} season, {year}:\n'
+        f'{json.dumps(context_used, indent=2, default=str)}'
+    )
+
+    system_prompt = RECOMMEND_SYSTEM_PROMPT_TEMPLATE.format(
+        language=RECOMMEND_LANGUAGE_NAMES[locale]
+    )
+    recommendation = _call_openrouter(
+        system_prompt,
+        user_message,
+        fallback_message=RECOMMEND_FALLBACK_MESSAGES[locale],
+        rate_limit_message=RECOMMEND_RATE_LIMIT_MESSAGES[locale],
+        max_tokens=1800,
+    )
+    if not _looks_like_target_language(recommendation, locale):
+        print(f'[api] Recommendation failed the {locale} script check, using fallback: {recommendation[:200]}')
+        recommendation = RECOMMEND_FALLBACK_MESSAGES[locale]
+
+    return jsonify({'recommendation': recommendation, 'context_used': context_used})
+
+
+# Hand explanation_context.py the prediction/baseline/history functions it
+# needs. Passed explicitly rather than `import api` from inside
+# explanation_context.py — this file can run as module `api` (gunicorn) or as
+# `__main__` (`python src/api.py`), and a self-import by name would load this
+# module a second time under the other name, loading the model twice.
+explanation_context.configure(
+    run_prediction=run_prediction,
+    get_district_baseline=get_district_baseline,
+    get_yield_history=get_yield_history,
+)
 
 
 # Load at import time so a WSGI/gunicorn server serves a ready model. Previously

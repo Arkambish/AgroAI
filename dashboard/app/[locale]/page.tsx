@@ -18,6 +18,7 @@ import { useTranslations } from "next-intl";
 import {
   predictYieldsForAllDistricts,
   getDistricts,
+  TARGET_DISTRICTS,
   type BatchPredictionResult,
   getYieldCategory,
 } from "@/lib/api";
@@ -58,21 +59,36 @@ export default function Home() {
       setError(null);
 
       try {
-        // Ask the API which districts and seasons it actually has data for,
-        // rather than assuming a hardcoded list that may not match the variant.
+        // Ask the API which seasons it actually has data for, rather than
+        // assuming "Yala" unconditionally. NOTE: districts deliberately do
+        // NOT come from this catalog — the backend's district list is
+        // DATA_VARIANT-dependent (synthetic data has Jaffna, no Kurunegala;
+        // real data has Kurunegala, no Jaffna, see src/data_loader.py), but
+        // this dashboard's map/cards are hardcoded to the 4 TARGET_DISTRICTS.
+        // Using the catalog's districts here silently substituted Jaffna for
+        // Kurunegala under the default synthetic variant, so selecting
+        // Kurunegala on the map never had a matching prediction.
         const catalog = await getDistricts();
-        const names = catalog.districts.map((d) => d.name);
         const season = catalog.seasons.includes("Yala")
           ? "Yala"
           : (catalog.seasons[0] ?? "Yala");
-        const latestYear =
-          catalog.years[catalog.years.length - 1] ?? new Date().getFullYear();
+        // Always the current year unless the user explicitly picks another
+        // (there's no year selector on this page yet) — NOT the dataset's
+        // last year, which for the synthetic variant is 2023.
+        const requestYear = new Date().getFullYear();
+
+        // TEMP DEBUG — remove once district/year propagation is verified.
+        console.log("[Home] requesting predictions", {
+          districts: TARGET_DISTRICTS,
+          season,
+          year: requestYear,
+        });
 
         const result = await predictYieldsForAllDistricts(
           season,
-          latestYear,
+          requestYear,
           {},
-          names
+          TARGET_DISTRICTS
         );
 
         if (mounted) {
@@ -137,16 +153,6 @@ export default function Home() {
     : error
     ? "Unavailable"
     : "--";
-
-  const yieldTrend = batchResult
-    ? `Min: ${batchResult.lowestYield.toFixed(
-        1
-      )} — Max: ${batchResult.highestYield.toFixed(1)} MT/Ha`
-    : "Calculating multi-district forecast";
-
-  const bestDistrictTrend = batchResult
-    ? `${batchResult.highestYield.toFixed(1)} MT/Ha potential`
-    : "Ranking target districts";
 
   const selectedPrediction =
     selectedDistrict && batchResult?.predictions[selectedDistrict]
@@ -263,7 +269,11 @@ export default function Home() {
           <DistrictMap
             predictions={districtPredictions}
             selectedDistrict={selectedDistrict}
-            onSelectDistrict={(name) => setSelectedDistrict(name)}
+            onSelectDistrict={(name) => {
+              // TEMP DEBUG — remove once district/year propagation is verified.
+              console.log("[Home] district selected:", name);
+              setSelectedDistrict(name);
+            }}
           />
         </div>
       </div>
@@ -280,18 +290,7 @@ export default function Home() {
             label={t("dashboard.current_season")}
             value={seasonValue}
             icon={Calendar}
-            trend={`Forecast Year ${currentYear}`}
             color="bg-emerald-600"
-          />
-        </motion.div>
-        <motion.div variants={item}>
-          <StatCard
-            label="Average Expected Yield"
-            value={averageYieldValue}
-            icon={TrendingUp}
-            trend={yieldTrend}
-            trendType="up"
-            color="bg-lime-500"
           />
         </motion.div>
         <motion.div variants={item}>
@@ -299,8 +298,7 @@ export default function Home() {
             label={t("dashboard.best_district") || "Best District"}
             value={bestDistrictValue}
             icon={MapPin}
-            trend={bestDistrictTrend}
-            color="bg-emerald-600"
+            color="bg-lime-500"
           />
         </motion.div>
         <motion.div variants={item}>
@@ -308,8 +306,14 @@ export default function Home() {
             label="Peak Target Yield"
             value={highestYieldValue}
             icon={BarChart3}
-            trend={`Highest in ${batchResult?.bestDistrict || "Target Zone"}`}
-            trendType="up"
+            color="bg-emerald-600"
+          />
+        </motion.div>
+        <motion.div variants={item}>
+          <StatCard
+            label="Average Yield"
+            value={averageYieldValue}
+            icon={TrendingUp}
             color="bg-lime-500"
           />
         </motion.div>

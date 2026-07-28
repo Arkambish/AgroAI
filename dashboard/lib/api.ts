@@ -1,17 +1,20 @@
 import axios from "axios";
 import { predictYieldMock } from "./sample-api";
-
 /** One SHAP factor, ready to render. Defined here (not in the explain page) so
  * lib/ never imports from app/. */
 export type ExplanationItem = {
   /** Translation key suffix under `explain.features.*` */
   name: string;
-  /** The raw model feature this came from */
+  /** The raw model feature(s) this came from — several raw features can
+   * share one display label (e.g. season_mean_ndvi/season_max_ndvi/
+   * season_min_ndvi all render as "Greenness (NDVI)"), so this is a
+   * comma-joined list, not necessarily a single feature name. */
   feature: string;
   impact: "Positive" | "Negative";
   color?: string;
+  /** Sum of SHAP values across every raw feature mapped to this label. */
   raw: number;
-  /** |shap| normalised to the largest factor, 0–1 */
+  /** |raw| normalised to the largest combined factor, 0–1 */
   magnitude: number;
 };
 
@@ -52,6 +55,11 @@ export interface PredictResponse {
   /** The values actually fed to the model */
   resolved_features?: Record<string, number>;
   data_completeness?: DataCompleteness;
+  /** Explanation Reliability Index (src/xai/eri.py), 0-1: how much this
+   * prediction's SHAP explanation should be trusted. Absent from mock data. */
+  eri?: number;
+  /** Per raw-feature ERI, 0-1, keyed the same way as shap_values. */
+  per_feature_eri?: Record<string, number>;
 }
 
 /** One district as advertised by GET /districts (dataset-derived). */
@@ -89,6 +97,89 @@ export interface BaselineResponse {
   years: number[];
   source: string;
 }
+
+// --- Context-Aware XAI Chat Assistant ---------------------------------
+// Grounded in the same structured prediction/SHAP/baseline data /predict
+// and /baseline already serve for this district/season/year — never a
+// general-knowledge chatbot reply.
+
+export interface ChatRequest {
+  query: string;
+  district: string;
+  season: string;
+  year: number;
+}
+
+export interface ChatShapFeature {
+  feature: string;
+  shap_value: number;
+}
+
+export interface ChatYieldHistoryPoint {
+  year: number;
+  yield_MT_per_Ha: number;
+}
+
+/** The context object the backend actually grounded its answer in — shown
+ * in the frontend's collapsible "based on this data" section. */
+export interface ChatContextUsed {
+  district: string;
+  season: string;
+  year: number;
+  predicted_yield_MT_per_Ha?: number;
+  confidence_lower?: number;
+  confidence_upper?: number;
+  confidence?: "High" | "Medium" | "Low";
+  interval_method?: string;
+  model_r2?: number | null;
+  top_shap_features?: ChatShapFeature[];
+  historical_baseline?: BaselineResponse | null;
+  recent_yield_history?: ChatYieldHistoryPoint[];
+  comparison?: {
+    district: string;
+    season: string;
+    baseline: BaselineResponse | null;
+    recent_yield_history: ChatYieldHistoryPoint[];
+  };
+  intent?: "comparison" | "explanation" | "uncertainty" | "general";
+  /** Set instead of the above fields when the prediction itself failed. */
+  error?: string;
+}
+
+export interface ChatResponse {
+  answer: string;
+  context_used: ChatContextUsed;
+}
+
+export const sendChatMessage = async (
+  request: ChatRequest
+): Promise<ChatResponse> => {
+  const response = await api.post("/api/chat", request);
+  return response.data;
+};
+
+// --- Recommendation tab --------------------------------------------------
+// LLM-generated, SHAP-grounded recommendation for the current
+// district/season/year, returned directly in the requested locale.
+
+export interface RecommendRequest {
+  district: string;
+  season: string;
+  year: number;
+  locale: string;
+}
+
+export interface RecommendResponse {
+  recommendation: string;
+  context_used: ChatContextUsed;
+}
+
+export const getRecommendation = async (
+  request: RecommendRequest
+): Promise<RecommendResponse> => {
+  const response = await api.post("/api/recommend", request);
+  return response.data;
+};
 
 export const getHealth = async () => {
   const response = await api.get("/health");
@@ -139,49 +230,76 @@ export const predictYield = async (
   return response.data;
 };
 
-// Helper to convert SHAP to simple language
+/**
+ * Map one raw model feature name onto the translation key it displays
+ * under. Order matters: soil_ph must be tested before the generic "soil"
+ * families, and interaction terms before their component names.
+ */
+const featureDisplayKey = (name: string): string => {
+  if (name === "temp_x_humidity") return "temp_x_humidity";
+  if (name === "rainfall_x_ndvi") return "rainfall_x_ndvi";
+  if (name === "ndvi_x_lst") return "ndvi_x_lst";
+  if (name === "soil_ph") return "soil_ph";
+  if (name.includes("organic_carbon")) return "organic_carbon";
+  if (name.includes("clay")) return "clay";
+  if (name.includes("sand")) return "sand";
+  if (name.includes("yield")) return "prev_yield";
+  if (name.includes("rainfall")) return "rainfall";
+  if (name.includes("drought")) return "drought";
+  if (name.includes("lst")) return "temperature";
+  if (name.includes("temp")) return "temperature";
+  if (name.includes("humidity")) return "humidity";
+  if (name.includes("evi")) return "evi";
+  if (name.includes("ndvi")) return "ndvi";
+  if (name.includes("solar")) return "solar_radiation";
+  return "other";
+};
+
+/**
+ * Single source of truth for turning a raw 32-feature SHAP vector into
+ * display-ready rows — used by both the Explain tab (list + "Key Insight"
+ * narrative, since that's built from this same array's top entry) and the
+ * Recommendation tab's risk/strategy rules.
+ *
+ * Several raw features share one display label (e.g. season_mean_ndvi,
+ * season_max_ndvi and season_min_ndvi are all "Greenness (NDVI)"). Grouping
+ * and summing by label BEFORE ranking — rather than ranking raw features
+ * and mapping labels after — is what keeps the same label from appearing
+ * as 2-3 duplicate rows with different numbers: previously the top-5 raw
+ * features were picked first, so 3 differently-named NDVI features could
+ * each independently make the cut and render as 3 "Greenness (NDVI)" rows.
+ */
 export const convertSHAPToExplanation = (
   shapValues: Record<string, number>
 ): ExplanationItem[] => {
-  const features = Object.entries(shapValues)
-    .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
+  const grouped = new Map<string, { total: number; rawFeatures: string[] }>();
+  for (const [rawName, value] of Object.entries(shapValues)) {
+    const key = featureDisplayKey(rawName);
+    const entry = grouped.get(key) ?? { total: 0, rawFeatures: [] };
+    entry.total += value;
+    entry.rawFeatures.push(rawName);
+    grouped.set(key, entry);
+  }
+
+  const combined = Array.from(grouped.entries())
+    .sort(([, a], [, b]) => Math.abs(b.total) - Math.abs(a.total))
     .slice(0, 5);
 
-  const maxAbs = Math.max(...features.map(([, v]) => Math.abs(v)), 1e-9);
+  const maxAbs = Math.max(
+    ...combined.map(([, { total }]) => Math.abs(total)),
+    1e-9
+  );
 
-  return features.map(([name, value]): ExplanationItem => {
-    const isPositive = value > 0;
-
-    // Map the raw model feature onto a translation key. Order matters:
-    // soil_ph must be tested before the generic "soil" families, and
-    // interaction terms before their component names.
-    let key: string;
-    if (name === "temp_x_humidity") key = "temp_x_humidity";
-    else if (name === "rainfall_x_ndvi") key = "rainfall_x_ndvi";
-    else if (name === "ndvi_x_lst") key = "ndvi_x_lst";
-    else if (name === "soil_ph") key = "soil_ph";
-    else if (name.includes("organic_carbon")) key = "organic_carbon";
-    else if (name.includes("clay")) key = "clay";
-    else if (name.includes("sand")) key = "sand";
-    else if (name.includes("yield")) key = "prev_yield";
-    else if (name.includes("rainfall")) key = "rainfall";
-    else if (name.includes("drought")) key = "drought";
-    else if (name.includes("lst")) key = "temperature";
-    else if (name.includes("temp")) key = "temperature";
-    else if (name.includes("humidity")) key = "humidity";
-    else if (name.includes("evi")) key = "evi";
-    else if (name.includes("ndvi")) key = "ndvi";
-    else if (name.includes("solar")) key = "solar_radiation";
-    else key = "other";
-
+  return combined.map(([key, { total, rawFeatures }]): ExplanationItem => {
+    const isPositive = total > 0;
     return {
       name: key,
-      feature: name,
+      feature: rawFeatures.join(", "),
       impact: isPositive ? "Positive" : "Negative",
       color: isPositive ? "text-emerald-600" : "text-red-600",
-      raw: value,
+      raw: total,
       /** 0–1, for rendering the influence bar */
-      magnitude: Math.abs(value) / maxAbs,
+      magnitude: Math.abs(total) / maxAbs,
     };
   });
 };
@@ -259,14 +377,17 @@ export const predictYieldsForAllDistricts = async (
   // from its per-district defaults. (This previously sent `rainfall`,
   // `temperature`, `soil_moisture` etc., which are UI names, not model feature
   // names, so the model silently ignored them.)
-  const requests = districts.map((district) =>
-    predictYield({ district, season, year, ...basePayload })
+  const requests = districts.map((district) => {
+    const payload = { district, season, year, ...basePayload };
+    // TEMP DEBUG — remove once district/year propagation is verified.
+    console.log("[predictYieldsForAllDistricts] payload:", payload);
+    return predictYield(payload)
       .then((res) => ({ ok: true as const, district, res }))
       .catch((err) => {
         console.warn(`Failed prediction for ${district}:`, err);
         return { ok: false as const, district, res: null };
-      })
-  );
+      });
+  });
 
   const settled = await Promise.all(requests);
   const succeeded = settled.filter((s) => s.ok);
