@@ -2,11 +2,11 @@
   "model_name": "LSTM",
   "metrics": {
     "Model": "LSTM",
-    "RMSE": 7.3132,
-    "MAE": 5.7093,
-    "R2": -2.1935,
-    "MAPE": 33.3,
-    "Train_Time_s": 23.31,
+    "RMSE": 10.7223,
+    "MAE": 8.4064,
+    "R2": -2.0812,
+    "MAPE": 47.87,
+    "Train_Time_s": 23.82,
     "Best_Params": {
       "epochs_per_fold": 50,
       "batch_size": 16,
@@ -19,197 +19,197 @@
       "Year": 2019,
       "Season": "Yala",
       "District": "Anuradhapura",
-      "actual": 18.95789909362793,
-      "predicted": 12.361729621887207
+      "actual": 24.617700576782227,
+      "predicted": 14.360833168029785
     },
     {
       "Year": 2020,
       "Season": "Yala",
       "District": "Anuradhapura",
-      "actual": 11.312883377075195,
-      "predicted": 12.780863761901855
+      "actual": 10.246649742126465,
+      "predicted": 13.12172794342041
     },
     {
       "Year": 2021,
       "Season": "Yala",
       "District": "Anuradhapura",
-      "actual": 16.250165939331055,
-      "predicted": 14.232882499694824
+      "actual": 25.56089973449707,
+      "predicted": 14.678889274597168
     },
     {
       "Year": 2022,
       "Season": "Yala",
       "District": "Anuradhapura",
-      "actual": 18.280433654785156,
-      "predicted": 13.888350486755371
+      "actual": 12.042224884033203,
+      "predicted": 13.016335487365723
     },
     {
       "Year": 2023,
       "Season": "Yala",
       "District": "Anuradhapura",
       "actual": 18.847749710083008,
-      "predicted": 4.875919818878174
+      "predicted": 2.5190415382385254
     },
     {
       "Year": 2024,
       "Season": "Yala",
       "District": "Anuradhapura",
       "actual": 19.772319793701172,
-      "predicted": 14.34674072265625
+      "predicted": 3.7900197505950928
     },
     {
       "Year": 2025,
       "Season": "Yala",
       "District": "Anuradhapura",
-      "actual": 23.326499938964844,
-      "predicted": 6.042860507965088
+      "actual": 21.07685089111328,
+      "predicted": 3.842737913131714
     },
     {
       "Year": 2019,
       "Season": "Yala",
       "District": "Kurunegala",
-      "actual": 17.857250213623047,
-      "predicted": 12.511104583740234
+      "actual": 14.897749900817871,
+      "predicted": 14.325287818908691
     },
     {
       "Year": 2020,
       "Season": "Yala",
       "District": "Kurunegala",
-      "actual": 10.059499740600586,
-      "predicted": 12.764347076416016
+      "actual": 12.155933380126953,
+      "predicted": 12.929348945617676
     },
     {
       "Year": 2021,
       "Season": "Yala",
       "District": "Kurunegala",
-      "actual": 15.151000022888184,
-      "predicted": 14.192631721496582
+      "actual": 15.343466758728027,
+      "predicted": 14.661059379577637
     },
     {
       "Year": 2022,
       "Season": "Yala",
       "District": "Kurunegala",
-      "actual": 13.753424644470215,
-      "predicted": 13.86523723602295
+      "actual": 7.85414981842041,
+      "predicted": 13.036595344543457
     },
     {
       "Year": 2023,
       "Season": "Yala",
       "District": "Kurunegala",
-      "actual": 12.203933715820312,
-      "predicted": 11.853822708129883
+      "actual": 15.78030014038086,
+      "predicted": 8.182466506958008
     },
     {
       "Year": 2024,
       "Season": "Yala",
       "District": "Kurunegala",
-      "actual": 18.05018424987793,
-      "predicted": 15.318319320678711
+      "actual": 28.961284637451172,
+      "predicted": 10.713139533996582
     },
     {
       "Year": 2025,
       "Season": "Yala",
       "District": "Kurunegala",
-      "actual": 15.841659545898438,
-      "predicted": 13.341509819030762
+      "actual": 12.82865047454834,
+      "predicted": 14.548667907714844
     },
     {
       "Year": 2019,
       "Season": "Yala",
       "District": "Matale",
-      "actual": 15.766559600830078,
-      "predicted": 12.504069328308105
+      "actual": 24.430200576782227,
+      "predicted": 13.792548179626465
     },
     {
       "Year": 2020,
       "Season": "Yala",
       "District": "Matale",
-      "actual": 13.913516998291016,
-      "predicted": 12.744999885559082
+      "actual": 13.32473373413086,
+      "predicted": 12.859662055969238
     },
     {
       "Year": 2021,
       "Season": "Yala",
       "District": "Matale",
-      "actual": 13.831725120544434,
-      "predicted": 14.154574394226074
+      "actual": 22.103050231933594,
+      "predicted": 14.650546073913574
     },
     {
       "Year": 2022,
       "Season": "Yala",
       "District": "Matale",
-      "actual": 9.015159606933594,
-      "predicted": 13.937804222106934
+      "actual": 4.312056064605713,
+      "predicted": 13.050005912780762
     },
     {
       "Year": 2023,
       "Season": "Yala",
       "District": "Matale",
-      "actual": 17.279199600219727,
-      "predicted": 11.891203880310059
+      "actual": 21.016450881958008,
+      "predicted": 8.182438850402832
     },
     {
       "Year": 2024,
       "Season": "Yala",
       "District": "Matale",
-      "actual": 23.216333389282227,
-      "predicted": 15.55742073059082
+      "actual": 25.267824172973633,
+      "predicted": 10.313233375549316
     },
     {
       "Year": 2025,
       "Season": "Yala",
       "District": "Matale",
-      "actual": 23.404949188232422,
-      "predicted": 13.18104362487793
+      "actual": 21.1335506439209,
+      "predicted": 14.531681060791016
     },
     {
       "Year": 2019,
       "Season": "Yala",
       "District": "Polonnaruwa",
-      "actual": 8.50192642211914,
-      "predicted": 12.481795310974121
+      "actual": 9.430399894714355,
+      "predicted": 14.689701080322266
     },
     {
       "Year": 2020,
       "Season": "Yala",
       "District": "Polonnaruwa",
       "actual": 15.660633087158203,
-      "predicted": 5.960367202758789
+      "predicted": 12.990370750427246
     },
     {
       "Year": 2021,
       "Season": "Yala",
       "District": "Polonnaruwa",
-      "actual": 16.763425827026367,
-      "predicted": 2.6822128295898438
+      "actual": 16.250150680541992,
+      "predicted": 14.63813591003418
     },
     {
       "Year": 2022,
       "Season": "Yala",
       "District": "Polonnaruwa",
-      "actual": 13.390299797058105,
-      "predicted": 6.304749965667725
+      "actual": 13.078300476074219,
+      "predicted": 12.824746131896973
     },
     {
       "Year": 2023,
       "Season": "Yala",
       "District": "Polonnaruwa",
       "actual": 17.330232620239258,
-      "predicted": 5.0450663566589355
+      "predicted": 3.768284320831299
     },
     {
       "Year": 2024,
       "Season": "Yala",
       "District": "Polonnaruwa",
-      "actual": 24.059175491333008,
-      "predicted": 13.964336395263672
+      "actual": 26.05900001525879,
+      "predicted": 3.9597055912017822
     },
     {
       "Year": 2025,
       "Season": "Yala",
       "District": "Polonnaruwa",
-      "actual": 17.04360008239746,
-      "predicted": 13.215989112854004
+      "actual": 22.846200942993164,
+      "predicted": 3.9172608852386475
     }
   ]
 }

@@ -1766,6 +1766,32 @@ CHAPTER_7 = [
      "compressing precisely the variance the models were being asked to "
      "predict."),
     ("p",
+     "The scale of the distortion can be measured directly. Holding the model "
+     "and features fixed and changing only the validation protocol, a random "
+     "five-fold split over the augmented file returns an R² of 0.552, while "
+     "leave-one-year-out over the genuine rows alone returns 0.044 — an "
+     "inflation of roughly twelve-fold, produced entirely by allowing fabricated "
+     "near-duplicates of a training row to appear in the test fold. Augmentation "
+     "was also tested in the correct manner, with test folds restricted to "
+     "genuine rows and only the training set augmented; every variant degraded "
+     "honest performance monotonically, from 0.044 with no augmentation to "
+     "−0.747 at a twenty-fold synthetic multiple. Synthetic rows copy the "
+     "information already present and add noise; they cannot create signal."),
+    ("p",
+     "The correction was initially applied only to the evaluation pipeline. An "
+     "audit of the serving layer found that the deployed dashboard was still "
+     "loading a model trained on the uncorrected panel, and further that it "
+     "reported the accuracy of a model it was not serving: the evaluator had "
+     "crowned a physics-residual variant with no loadable artefact, so the "
+     "application silently fell back to gradient boosting while continuing to "
+     "display the physics-residual R² of 0.0908 in place of gradient boosting's "
+     "own 0.012. Both faults are corrected in the submitted system. Filtering "
+     "the fabricated rows from the legacy pipeline moves twenty-four of the "
+     "twenty-eight targets, by 3.41 metric tons per hectare on average and by as "
+     "much as 11.98, and every model's score falls: the physics-residual "
+     "variant's headline 0.091 becomes −0.508, and no model retains a positive "
+     "R². The earlier figures were in part sustained by fabricated data."),
+    ("p",
      "Two parsing faults were found and corrected in the process, either of "
      "which silently corrupts the panel. Production values are written with "
      "thousands separators in two records, which parse to missing values unless "
@@ -2219,7 +2245,7 @@ CHAPTER_7 = [
             ["25 per cent", "+0.080 ± 0.115", "Yes"],
             ["100 per cent", "+0.354 ± 0.013", "Yes"],
         ],
-        "Table 7.11: Detection power at simulated weather-signal strengths",
+        "Table 7.10: Detection power at simulated weather-signal strengths",
     )),
     ("fig", (f"{REAL}/results/power_curve.png",
              "Figure 7.5: The weather signal PADR would have recovered, against what "
@@ -2242,7 +2268,7 @@ CHAPTER_7 = [
      "direction for a power claim."),
     ("p",
      "The same machinery answers a second question: which constants are "
-     "identifiable at this sample size. Table 7.12 fits PADR to data generated "
+     "identifiable at this sample size. Table 7.11 fits PADR to data generated "
      "from known values and reports the error as a share of each parameter's "
      "admissible range, taking under ten per cent as recovered."),
     ("table", (
@@ -2256,7 +2282,7 @@ CHAPTER_7 = [
             ["Yield response factor Ky", "0.966", "1.108", "12.8", "No"],
             ["Critical temperature", "35.58", "33.64", "16.2", "No"],
         ],
-        "Table 7.12: Parameter recovery at n = 28",
+        "Table 7.11: Parameter recovery at n = 28",
     )),
     ("p",
      "Five of the seven agronomic constants are recovered; the FAO-33 yield "
@@ -2298,7 +2324,7 @@ CHAPTER_7 = [
             ["XGBoost", "0.929", "16.42"],
             ["Random Forest", "0.929", "17.63"],
         ],
-        "Table 7.10: Year-blocked cross-conformal intervals at a nominal 90 per cent",
+        "Table 7.12: Year-blocked cross-conformal intervals at a nominal 90 per cent",
     )),
     ("p",
      "Mean coverage across models is 0.911 against a nominal 0.90, so the "
@@ -2310,7 +2336,140 @@ CHAPTER_7 = [
      "for that statement. A system that reported a point forecast without this "
      "interval would be misleading its user."),
 
-    ("h2", "7.12 Per-District Behaviour"),
+    ("h2", "7.12 Forecasting Under Unknown Weather"),
+    ("p",
+     "Every result reported so far, and most results in the yield-prediction "
+     "literature, are computed with the season's weather already in hand. No "
+     "forecaster is ever in that position. A forecast issued before the harvest "
+     "must be built only from quantities known at the moment it is issued, and "
+     "the weather of the season being predicted is not one of them."),
+    ("p",
+     "Of the thirty-two features, only nine can be known before the season "
+     "begins: five historical yield terms and four soil terms. The nine weather, "
+     "eleven satellite and three interaction features are unknowable until the "
+     "season has ended. Two of the nine knowable features are hardcoded "
+     "constants, so approximately five carry information at forecast time. The "
+     "eleven satellite features are the hardest case, because a vegetation index "
+     "depends on the crop that was actually planted and cannot be forecast at "
+     "all."),
+    ("p",
+     "The serving layer substituted the district-season historical mean for "
+     "every unknown feature and then treated that mean as a known quantity. Two "
+     "distinct errors follow. The first is bias: the models are nonlinear, so "
+     "the prediction at average weather is not the average prediction across "
+     "possible weathers. Evaluated against the seven observed years, the "
+     "discrepancy reaches 1.48 metric tons per hectare. The second is "
+     "understated uncertainty: a conformal band measures model error given the "
+     "features, and contains no allowance for not knowing the features at all. "
+     "Propagating the weather-driven spread widens the nominal ninety per cent "
+     "band from plus or minus 8.03 to approximately plus or minus 10.35 metric "
+     "tons per hectare, so the interval as displayed was about seventy-eight per "
+     "cent of the width it should have been."),
+    ("p",
+     "The remedy implemented here is Monte Carlo propagation. At a given issue "
+     "point the season is split: months already past take that year's measured "
+     "weather, and every remaining month is resampled two hundred times from a "
+     "forty-five-year NASA POWER analogue pool covering 1981 to 2025. Two design "
+     "choices determine whether this is correct. Complete analogue years are "
+     "resampled rather than individual features, because drawing rainfall from "
+     "one year and temperature from another manufactures weather that cannot "
+     "physically occur. And each sampled year contributes the shape of its "
+     "anomaly, which is then expressed in the evaluation panel's own mean and "
+     "standard deviation, so the sampled vectors remain on the distribution the "
+     "models were fitted to. The weather distribution is therefore estimated "
+     "from forty-five years while the yield relationship is estimated from "
+     "seven; each uses the largest record available to it."),
+    ("table", (
+        ["Forecast issued", "Months observed", "R²", "ρ", "Weather band (± MT/ha)"],
+        [
+            ["Pre-season", "0 of 6", "−0.273", "−0.247", "1.32"],
+            ["After June", "1 of 6", "−0.270", "−0.234", "1.25"],
+            ["After July", "2 of 6", "−0.267", "−0.221", "1.14"],
+            ["After August", "3 of 6", "−0.265", "−0.205", "0.94"],
+            ["After September", "4 of 6", "−0.258", "−0.200", "0.92"],
+            ["After October", "5 of 6", "−0.272", "−0.222", "0.66"],
+            ["After November (hindcast)", "6 of 6", "−0.237", "−0.191", "0.00"],
+            ["Climatology, using no features", "—", "−0.215", "—", "—"],
+        ],
+        "Table 7.13: Forecast skill against issue point, weather-only, "
+        "Leave-One-Year-Out with 200 weather samples per cell",
+    )),
+    ("fig", (f"{REAL}/results/forecast_leadtime.png",
+             "Figure 7.6: Skill against forecast issue point, and the weather "
+             "uncertainty that shrinks as the season is observed")),
+    ("p",
+     "The uncertainty machinery behaves exactly as it should: the weather band "
+     "contracts monotonically from plus or minus 1.32 metric tons per hectare "
+     "before the season to precisely zero once every month is observed. The "
+     "skill does not. At no issue point does the weather-informed forecast beat "
+     "climatology, and the correlation between forecast and outcome is negative "
+     "throughout. Observing the entire season leaves the forecaster no better "
+     "off than knowing nothing about it."),
+    ("p",
+     "A decomposition explains why. Holding all else at the district mean and "
+     "varying one group at a time, the weather features move the prediction by "
+     "0.35 to 0.76 metric tons per hectare, the satellite features by 0.54 to "
+     "1.35, and the two together with their interactions by 1.84 to 2.99. "
+     "Weather, the quantity the system exists to exploit, is the weakest of the "
+     "unknown inputs. The models are driven mainly by district-constant soil "
+     "terms and lagged yields, which is consistent with section 7.5: only 2.2 "
+     "per cent of the target's variance lies between districts, and the year "
+     "effect that dominates it is precisely what the protocol removes."),
+
+    ("h2", "7.13 Decision Value and the Break-Even Skill Frontier"),
+    ("p",
+     "Because accuracy on this panel is not recoverable, the more useful "
+     "question is what accuracy would have to be attained before a forecast is "
+     "worth acting on. That threshold can be derived without a good model, which "
+     "is why it survives the results above."),
+    ("p",
+     "For a perishable bulb crop the cost of being wrong is not exogenous to the "
+     "model. Curing-window humidity drives both the yield being predicted and "
+     "the fraction of the harvest that survives ambient storage; tropical onion "
+     "loses twenty to forty per cent under the ambient conditions in which it is "
+     "held. The cost of over-procuring is therefore a function of the model's "
+     "own covariates, and the newsvendor critical fractile moves with the "
+     "weather rather than being the constant that published crop-forecast-value "
+     "studies assume. Across curing-humidity and export-restriction states it "
+     "ranges from 0.649 to 0.960."),
+    ("p",
+     "Paddy cannot pose this question. Milled grain keeps at approximately "
+     "ninety-five per cent independently of growing-season weather, and the "
+     "Guaranteed Price Scheme truncates the downside, placing it near a fractile "
+     "of 0.5 where the coupling term is identically zero. The distinction is "
+     "mechanical rather than rhetorical, and it is the sense in which this "
+     "analysis is specific to onion rather than transferred from a cereal."),
+    ("p",
+     "From the coupled loss follows the break-even skill frontier: the minimum "
+     "forecast-outcome correlation at which acting on the forecast beats acting "
+     "on climatology. Calibrated in-fold, that threshold lies between 0.00 and "
+     "0.22; used raw it rises to between 0.39 and 0.48. The gap matters because "
+     "the fitted predictions are over-dispersed, their standard deviation being "
+     "0.407 of the target's against a correlation of 0.258, implying a shrink "
+     "slope of 0.634. The same forecast reduces expected decision loss by 3.9 "
+     "per cent when recalibrated and increases it by approximately fifty-three "
+     "per cent when used raw. The difference between a useful forecast and a "
+     "harmful one here is a one-line recalibration, not a different "
+     "architecture."),
+    ("fig", (f"{REAL}/results/decision_skill_scissors.png",
+             "Figure 7.7: Required forecast skill against attainable skill, and "
+             "the decision-loss consequence of leaving predictions uncalibrated")),
+    ("p",
+     "One hypothesis was tested and refuted. It was predicted that the required "
+     "skill would rise with the extremity of the critical fractile, so that "
+     "asymmetric-loss crops would need more accuracy before forecasting became "
+     "worthwhile. Simulation on this project's own residuals shows the threshold "
+     "mildly falling instead, from 0.145 at a fractile of 0.55 to 0.115 at 0.94. "
+     "The prediction is recorded here as refuted rather than omitted."),
+    ("p",
+     "Set against the attainable skill of section 7.12, where the correlation is "
+     "negative at every issue point, the two curves do not cross. On this data "
+     "design there is no forecast issue point at which acting on the model beats "
+     "acting on the district's climatological mean. That is a quantitative "
+     "conclusion rather than an absence of one, and it is the result this "
+     "chapter is able to defend."),
+
+    ("h2", "7.14 Per-District Behaviour"),
     ("p",
      "District-level differences are small and, given section 7.5, expected to "
      "be: only 2.2 per cent of the target's variance lies between districts. The "
@@ -2327,7 +2486,7 @@ CHAPTER_7 = [
      "observation quality rather than a property of the district's agronomy. The "
      "extent weighting introduced in section 7.3 down-weights it accordingly."),
 
-    ("h2", "7.13 Summary"),
+    ("h2", "7.15 Summary"),
     ("p",
      "The dataset used in the interim report carried a target that was "
      "approximately forty per cent fabricated. It has been rebuilt from "
@@ -2355,6 +2514,25 @@ CHAPTER_7 = [
      "stable across folds and agronomically plausible, and the comparison "
      "against their published values shows that FAO-33 materially overstates "
      "weather sensitivity for this crop and irrigation regime."),
+    ("p",
+     "Re-evaluating the system as a forecast rather than a retrospective fit "
+     "removes the last of its apparent skill. Only nine of the thirty-two "
+     "features can be known before a season begins, and propagating the unknown "
+     "weather through a forty-five-year analogue pool shows the forecast failing "
+     "to beat climatology at every issue point, with a negative correlation to "
+     "the outcome throughout. The weather channel moves the prediction less than "
+     "the satellite channel does, so the quantity the system exists to exploit "
+     "is the weakest input it has."),
+    ("p",
+     "The decision analysis converts that into a threshold rather than a "
+     "complaint. Because curing-window humidity drives both yield and storage "
+     "survival, the critical fractile is itself a function of the model's "
+     "covariates and ranges from 0.649 to 0.960 — a coupling a cereal cannot "
+     "exhibit. The skill required before acting on a forecast beats acting on "
+     "climatology lies between 0.00 and 0.22 when predictions are recalibrated "
+     "and between 0.39 and 0.48 when they are not. Attainable skill is negative. "
+     "The two curves do not cross, and that non-crossing is the chapter's "
+     "defensible conclusion."),
 ]
 
 

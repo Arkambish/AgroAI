@@ -205,7 +205,26 @@ def generate_final_comparison(ablation: pd.DataFrame | None = None) -> pd.DataFr
 
     rows = []
     for name, payload in payloads.items():
-        m = payload['metrics']
+        # Not every writer stores a metrics block — PADR's OOF carries only model_name and
+        # rows. Recomputing from its own out-of-fold predictions is exact (same y, same
+        # fold assignment), and keeps it in the table rather than dropping a model from the
+        # comparison because of a schema difference.
+        m = payload.get('metrics')
+        if m is None:
+            oof = payload.get('rows') or []
+            if not oof:
+                print(f'  ⚠ Skipping {name}: no metrics block and no rows to recompute from.')
+                continue
+            y_true = np.array([float(r['actual']) for r in oof])
+            y_pred = np.array([float(r['predicted']) for r in oof])
+            m = {
+                'Model': payload.get('model_name', name),
+                'RMSE': round(float(np.sqrt(mean_squared_error(y_true, y_pred))), 4),
+                'MAE': round(float(mean_absolute_error(y_true, y_pred)), 4),
+                'R2': round(float(r2_score(y_true, y_pred)), 4),
+                'MAPE': round(float(np.mean(np.abs((y_true - y_pred) / y_true)) * 100), 2),
+            }
+            print(f'  Recomputed metrics for {m["Model"]} from its out-of-fold rows.')
         rows.append({
             'Model': m['Model'], 'RMSE': m['RMSE'], 'MAE': m['MAE'],
             'R2': m['R2'], 'MAPE': m['MAPE'],

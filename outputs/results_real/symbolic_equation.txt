@@ -1,4 +1,4 @@
-Avg_Yield_MT_per_Ha ≈ sub(add(sqrt(sqrt(mul(temp_x_humidity, prev_year_yield))), 3.251), drought_index_spi)
+Avg_Yield_MT_per_Ha ≈ sqrt(mul(sand_pct, sqrt(add(sqrt(growing_degree_days), add(sqrt(add(sqrt(growing_degree_days), add(sub(sand_pct, time_to_peak_ndvi), sqrt(add(growing_degree_days, time_to_peak_ndvi))))), sub(sand_pct, time_to_peak_ndvi))))))
 
-Features: ['temp_x_humidity', 'season_mean_evi', 'drought_index_spi', 'rainfall_x_ndvi', 'prev_year_yield']
-RMSE=4.5823  R2=-0.2538  MAPE=27.19%
+Features: ['yield_3yr_avg', 'season_mean_evi', 'growing_degree_days', 'sand_pct', 'time_to_peak_ndvi']
+RMSE=6.7165  R2=-0.209  MAPE=43.98%

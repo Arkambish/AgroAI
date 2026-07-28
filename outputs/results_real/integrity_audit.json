@@ -1,0 +1,91 @@
+{
+  "source_file": "/Users/arqm7/Downloads/dataset_D_stat.csv",
+  "rows_in_file": 148,
+  "deduplication": {
+    "genuine_rows": 74,
+    "distinct_cells": 74,
+    "max_rows_per_cell": 1,
+    "cell_multiplicity_in_full_file": {
+      "1": 30,
+      "2": 26,
+      "3": 11,
+      "4": 4,
+      "5": 1,
+      "6": 2
+    },
+    "cross_check_vs_source_label": {
+      "matched": 74,
+      "identical_yields": 74
+    }
+  },
+  "leakage_cost": {
+    "random_5fold_on_all_148_rows": 0.552,
+    "honest_loyo_on_74_genuine_rows": 0.044,
+    "predict_training_mean": -0.176
+  },
+  "augmentation_trials": {
+    "none": {
+      "r2": 0.044,
+      "rmse": 8.13,
+      "n": 74
+    },
+    "gaussian_jitter_x1_sigma0.01": {
+      "r2": -0.053,
+      "rmse": 8.54,
+      "n": 74
+    },
+    "gaussian_jitter_x1_sigma0.05": {
+      "r2": -0.244,
+      "rmse": 9.28,
+      "n": 74
+    },
+    "gaussian_jitter_x5_sigma0.05": {
+      "r2": -0.422,
+      "rmse": 9.92,
+      "n": 74
+    },
+    "gaussian_jitter_x20_sigma0.05": {
+      "r2": -0.747,
+      "rmse": 10.99,
+      "n": 74
+    },
+    "smote_like_x1": {
+      "r2": -0.083,
+      "rmse": 8.66,
+      "n": 74
+    },
+    "smote_like_x5": {
+      "r2": -0.133,
+      "rmse": 8.85,
+      "n": 74
+    },
+    "smote_like_x20": {
+      "r2": -0.326,
+      "rmse": 9.58,
+      "n": 74
+    }
+  },
+  "ratio_structure": [
+    {
+      "max_denominator": 12,
+      "observed": 17,
+      "of": 74,
+      "expected_by_chance": 0.3,
+      "enrichment": 57.1
+    },
+    {
+      "max_denominator": 30,
+      "observed": 32,
+      "of": 74,
+      "expected_by_chance": 2.1,
+      "enrichment": 15.0
+    },
+    {
+      "max_denominator": 60,
+      "observed": 39,
+      "of": 74,
+      "expected_by_chance": 8.1,
+      "enrichment": 4.8
+    }
+  ]
+}

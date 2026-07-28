@@ -47,6 +47,11 @@ export interface PredictResponse {
   shap_values: Record<string, number>;
   model: string;
   model_r2: number | null;
+  /** What kind of statement this number is — see src/api.py run_prediction.
+   * `year` is not a model feature and the default cascade keys on
+   * (district, season) only, so a `climatological` result is identical for
+   * every year and must not be presented as a forecast of the year asked for. */
+  forecast_basis?: ForecastBasis;
   /** e.g. "conformal_90pct" | "gaussian_1.96rmse" | "heuristic_15pct" */
   interval_method?: string;
   interval_coverage?: number | null;
@@ -60,6 +65,15 @@ export interface PredictResponse {
   eri?: number;
   /** Per raw-feature ERI, 0-1, keyed the same way as shap_values. */
   per_feature_eri?: Record<string, number>;
+}
+
+/** Whether the prediction was conditioned on anything the user actually observed. */
+export interface ForecastBasis {
+  basis: "climatological" | "conditioned";
+  year_is_model_feature: boolean;
+  year_affects_prediction: boolean;
+  n_observed_inputs: number;
+  note: string;
 }
 
 /** One district as advertised by GET /districts (dataset-derived). */

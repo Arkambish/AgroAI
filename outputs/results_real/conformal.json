@@ -2,84 +2,91 @@
   "BiLSTM": {
     "alpha": 0.1,
     "coverage_target": 0.9,
-    "q": 10.951,
+    "q": 17.2128,
     "empirical_coverage": 1.0,
     "n": 28
   },
   "CNN": {
     "alpha": 0.1,
     "coverage_target": 0.9,
-    "q": 19.1141,
+    "q": 24.1978,
     "empirical_coverage": 1.0,
     "n": 28
   },
   "CNN_LSTM_Hybrid": {
     "alpha": 0.1,
     "coverage_target": 0.9,
-    "q": 21.8632,
+    "q": 24.5745,
     "empirical_coverage": 1.0,
     "n": 28
   },
   "LSTM": {
     "alpha": 0.1,
     "coverage_target": 0.9,
-    "q": 17.2836,
+    "q": 22.0993,
+    "empirical_coverage": 1.0,
+    "n": 28
+  },
+  "PADR": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 17.2368,
     "empirical_coverage": 1.0,
     "n": 28
   },
   "PhysResidual": {
     "alpha": 0.1,
     "coverage_target": 0.9,
-    "q": 6.8521,
+    "q": 16.4197,
     "empirical_coverage": 1.0,
     "n": 28
   },
   "RandomForest": {
     "alpha": 0.1,
     "coverage_target": 0.9,
-    "q": 7.4507,
+    "q": 17.5749,
     "empirical_coverage": 1.0,
     "n": 28
   },
   "StackConvex": {
     "alpha": 0.1,
     "coverage_target": 0.9,
-    "q": 7.7994,
+    "q": 18.7375,
     "empirical_coverage": 1.0,
     "n": 28
   },
   "StackInvRMSE": {
     "alpha": 0.1,
     "coverage_target": 0.9,
-    "q": 8.0765,
+    "q": 16.1226,
     "empirical_coverage": 1.0,
     "n": 28
   },
   "StackMean": {
     "alpha": 0.1,
     "coverage_target": 0.9,
-    "q": 9.4771,
+    "q": 16.935,
     "empirical_coverage": 1.0,
     "n": 28
   },
   "SVR": {
     "alpha": 0.1,
     "coverage_target": 0.9,
-    "q": 7.9667,
+    "q": 15.2337,
     "empirical_coverage": 1.0,
     "n": 28
   },
   "SymbolicRegression": {
     "alpha": 0.1,
     "coverage_target": 0.9,
-    "q": 8.7335,
+    "q": 19.1463,
     "empirical_coverage": 1.0,
     "n": 28
   },
   "XGBoost": {
     "alpha": 0.1,
     "coverage_target": 0.9,
-    "q": 8.0252,
+    "q": 17.7301,
     "empirical_coverage": 1.0,
     "n": 28
   }

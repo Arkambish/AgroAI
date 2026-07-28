@@ -3,8 +3,8 @@
   "description": "Two-stage: FAO-33/GDD mechanistic backbone + RandomForest on residual.",
   "mechanistic_formula": "Y = a + b \u00b7 (f_water \u00b7 f_heat \u00b7 f_gdd);  f_gdd = 1 \u2212 exp(\u2212GDD/1500);  f_water = clip(1 \u2212 1.1\u00b7clip(\u2212SPI/2, 0, 1), 0, 1);  f_heat = clip(1 \u2212 0.03\u00b7heat_stress_days, 0, 1)",
   "calibration": {
-    "a": 18.98280143737793,
-    "b": -4.3576250076293945
+    "a": 19.54258918762207,
+    "b": -4.3878865242004395
   },
   "constants": {
     "Ky_water": 1.1,
@@ -14,11 +14,11 @@
   },
   "hybrid_metrics": {
     "Model": "PhysResidual",
-    "RMSE": 3.9021,
-    "MAE": 3.3497,
-    "R2": 0.0908,
-    "MAPE": 23.32,
-    "Train_Time_s": 1.01,
+    "RMSE": 7.5011,
+    "MAE": 6.3443,
+    "R2": -0.508,
+    "MAPE": 49.46,
+    "Train_Time_s": 0.98,
     "Best_Params": {
       "Ky_water": 1.1,
       "GDD_scale": 1500.0,
@@ -28,15 +28,15 @@
   },
   "backbone_only_metrics": {
     "Model": "PhysBackboneOnly",
-    "RMSE": 4.5241,
-    "MAE": 3.6576,
-    "R2": -0.2221,
-    "MAPE": 25.13,
-    "Train_Time_s": 1.01,
+    "RMSE": 6.8487,
+    "MAE": 5.8309,
+    "R2": -0.2571,
+    "MAPE": 45.38,
+    "Train_Time_s": 0.98,
     "Best_Params": {},
     "Parameters": null
   },
-  "plain_randomforest_R2": 0.0203,
+  "plain_randomforest_R2": -0.5423,
   "backbone_contribution_note": "heat_stress_days is 0 across the real Yala data, so f_heat is inert; the backbone signal here comes from GDD (thermal time) and SPI (water). Compare hybrid R2 vs plain RandomForest R2 for the with/without-backbone ablation.",
   "references": [
     "FAO-33 Doorenbos & Kassam 1979 (Ky_onion\u22481.1)",

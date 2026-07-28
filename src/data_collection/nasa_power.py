@@ -19,6 +19,7 @@ coordinates are recorded per district in the output so this is checkable, not as
 import os
 import time
 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -69,7 +70,11 @@ def fetch_district(district, lat, lon, start=START, end=END):
 
     df = pd.DataFrame({p: pd.Series(block[p]) for p in PARAMETERS})
     df.index = pd.to_datetime(df.index, format='%Y%m%d')
-    df = df.replace(_FILL, pd.NA).astype(float)
+    # np.nan, not pd.NA: pd.NA has no float representation, so .astype(float) raises
+    # TypeError as soon as a request actually contains a -999 fill. That never fired for
+    # the shipped 2000-2025 window but does for earlier years, where ALLSKY_SFC_SW_DWN
+    # predates the satellite record.
+    df = df.replace(_FILL, np.nan).astype(float)
 
     df.insert(0, 'district', district)
     df['grid_lat'] = grid_lat

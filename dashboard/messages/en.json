@@ -141,6 +141,9 @@
     "intervalGaussian": "Range estimated as ±1.96 × the model's error (RMSE). Approximate, not calibrated.",
     "intervalHeuristic": "Rough ±15% estimate only — this model has no calibrated interval yet.",
 
+    "basisAllYears": "all years",
+    "basisClimatological": "You did not enter any measured conditions, so this is the historical average for this district and season — not a forecast for {year}. The model returns this same number for every year. To get a year-specific estimate, enter the rainfall, temperature and other conditions actually observed this season.",
+
     "modelLabel": "Model: {model}",
     "modelReliability": "Model reliability",
     "r2Value": "R² = {value}",

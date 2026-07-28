@@ -1,12 +1,12 @@
 BIG ONION YIELD PREDICTION — RESEARCH FINDINGS
 ============================================================
 
-1. Best performing model: PhysResidual with R²=0.091, RMSE=3.902 MT/Ha
+1. Best performing model: SymbolicRegression with R²=-0.209, RMSE=6.716 MT/Ha
 2. Does DL outperform ML? NO (Wilcoxon p=0.0000)
 3. Does CNN-LSTM hybrid beat standalone CNN/LSTM? NO
-4. Top 3 most important features: temp_x_humidity, season_mean_evi, drought_index_spi
-5. Ablation Δ R² (Weather → Weather+Satellite): ?
-6. RMSE Yala=3.902, Maha=?
-7. Easiest district to predict: Anuradhapura (R²=0.361)
-8. Hardest district to predict: Kurunegala (R²=-1.183)
+4. Top 3 most important features: yield_3yr_avg, season_mean_evi, growing_degree_days
+5. Ablation Δ R² (Weather → Weather+Satellite): -16.57 percentage points
+6. RMSE Yala=6.717, Maha=?
+7. Easiest district to predict: Anuradhapura (R²=0.077)
+8. Hardest district to predict: Matale (R²=-0.457)
 9. Reaches target R² > 0.75? NO

@@ -1,7 +1,7 @@
 {
-  "Model": "PhysResidual",
-  "RMSE": 3.9021,
-  "MAE": 3.3497,
-  "R2": 0.0908,
-  "MAPE": 23.32
+  "Model": "SymbolicRegression",
+  "RMSE": 6.7165,
+  "MAE": 4.9724,
+  "R2": -0.209,
+  "MAPE": 43.98
 }

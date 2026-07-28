@@ -283,50 +283,96 @@ def _resolve_features(data: dict):
     return values, sources
 
 
+def _metrics_for(model_name: str) -> dict:
+    """The served model's OWN row from model_comparison.csv.
+
+    best_model_metrics.json names whichever model the evaluator crowned, which is
+    frequently one with no servable .pkl (e.g. PhysResidual). The old code fell through
+    to a different artefact but kept the crowned model's metrics, so /predict reported
+    XGBoost alongside PhysResidual's R2 of 0.0908 — XGBoost's real R2 is 0.012. Metrics
+    must describe the model that actually produced the number.
+    """
+    path = os.path.join(RESULTS_DIR, 'model_comparison.csv')
+    if not os.path.exists(path):
+        return {}
+    try:
+        table = pd.read_csv(path)
+    except Exception as exc:  # noqa: BLE001 - a broken CSV must not take the API down
+        print(f'[api] Could not read model_comparison.csv: {exc}')
+        return {}
+    row = table[table['Model'] == model_name]
+    if row.empty:
+        return {}
+    record = row.iloc[0].to_dict()
+    return {
+        'Model': model_name,
+        **{k: float(record[k]) for k in ('RMSE', 'MAE', 'R2', 'MAPE')
+           if k in record and pd.notna(record[k])},
+    }
+
+
 def _load_state() -> None:
     """Load best tabular model. Prefer whichever the evaluator crowned;
     fall back to XGBoost."""
     metrics_path = os.path.join(RESULTS_DIR, 'best_model_metrics.json')
-    metrics = {}
+    crowned = {}
     if os.path.exists(metrics_path):
         with open(metrics_path) as f:
-            metrics = json.load(f)
+            crowned = json.load(f)
 
     candidates = {
         'XGBoost': ('xgb_best.pkl', None),
         'RandomForest': ('rf_best.pkl', None),
         'SVR': ('svr_best.pkl', 'svr_scaler.pkl'),
     }
-    name = metrics.get('Model') if metrics.get('Model') in candidates else None
+    name = crowned.get('Model') if crowned.get('Model') in candidates else None
+    served_is_crowned = name is not None
     if name is None:
-        for n in candidates:
-            if os.path.exists(os.path.join(MODELS_DIR, candidates[n][0])):
-                name = n
-                break
+        # Fall back to the BEST servable model, not the first one that happens to exist.
+        # `candidates` is a dict literal, so iterating it picked whichever name was typed
+        # first — XGBoost — regardless of merit. On the corrected panel that was the worst
+        # of the three (R2 -0.711 against SVR's -0.307), so the application was serving its
+        # weakest available model purely because of source-code ordering.
+        available = [n for n in candidates
+                     if os.path.exists(os.path.join(MODELS_DIR, candidates[n][0]))]
+        scored = [(n, _metrics_for(n).get('R2')) for n in available]
+        ranked = sorted([s for s in scored if s[1] is not None],
+                        key=lambda s: s[1], reverse=True)
+        if ranked:
+            name = ranked[0][0]
+            ladder = ', '.join(f'{n} {r:+.4f}' for n, r in ranked)
+            print(f'[api] Crowned model not servable. Best servable by R2: {ladder}')
+        elif available:
+            name = available[0]  # no scores on disk — order is all we have
 
     if name is None:
         raise FileNotFoundError(
             'No tabular model artefact found. Run `python main.py` first.'
         )
 
-    if name is not None:
-        artefact, scaler_file = candidates[name]
-        _state['model'] = joblib.load(os.path.join(MODELS_DIR, artefact))
-        _state['model_name'] = name
-        _state['metrics'] = metrics
-        _state['scaler'] = (
-            joblib.load(os.path.join(MODELS_DIR, scaler_file)) if scaler_file else None
-        )
-        
-        # Initialize SHAP explainer for tree-based models
-        if name in ['RandomForest', 'XGBoost']:
-            try:
-                _state['explainer'] = shap.TreeExplainer(_state['model'])
-                print(f'[api] Initialized SHAP TreeExplainer for {name}')
-            except Exception as e:
-                print(f'[api] Failed to initialize SHAP: {e}')
-        
-        print(f'[api] Loaded {name} (metrics={metrics or "n/a"})')
+    # Never attribute the crowned model's scores to a different artefact.
+    metrics = crowned if served_is_crowned else _metrics_for(name)
+
+    artefact, scaler_file = candidates[name]
+    _state['model'] = joblib.load(os.path.join(MODELS_DIR, artefact))
+    _state['model_name'] = name
+    _state['metrics'] = metrics
+    _state['scaler'] = (
+        joblib.load(os.path.join(MODELS_DIR, scaler_file)) if scaler_file else None
+    )
+
+    # Initialize SHAP explainer for tree-based models
+    if name in ['RandomForest', 'XGBoost']:
+        try:
+            _state['explainer'] = shap.TreeExplainer(_state['model'])
+            print(f'[api] Initialized SHAP TreeExplainer for {name}')
+        except Exception as e:
+            print(f'[api] Failed to initialize SHAP: {e}')
+
+    if not served_is_crowned and crowned.get('Model'):
+        print(f'[api] NOTE: evaluator crowned {crowned["Model"]}, which has no servable '
+              f'artefact. Serving {name} and reporting {name}\'s own metrics.')
+    print(f'[api] Loaded {name} (metrics={metrics or "n/a"})')
 
     # Cache the processed dataset. It backs /context, the default cascade that
     # /predict uses instead of zero-filling, /baseline and /districts.
@@ -429,10 +475,35 @@ def run_prediction(data: dict):
     # `python -m src.xai.run_xai` hasn't been run yet for this DATA_VARIANT.
     eri_result = compute_eri(shap_dict)
 
+    # What kind of statement is this number, really?
+    #
+    # 'Year' is not in ALL_FEATURES, and _resolve_features keys its default cascade on
+    # (district, season) only. So with no user-supplied observations the vector — and
+    # therefore the prediction — is byte-identical for 2019 and 2040. Saying so here is
+    # the difference between a forecast and a district lookup presented as one.
+    year_is_feature = 'Year' in ALL_FEATURES or 'year' in ALL_FEATURES
+    conditioned = n_user > 0
+    forecast_basis = {
+        'basis': 'conditioned' if conditioned else 'climatological',
+        'year_is_model_feature': year_is_feature,
+        'year_affects_prediction': bool(conditioned or year_is_feature),
+        'n_observed_inputs': n_user,
+        'note': (
+            'Conditioned on {n} value(s) you supplied. The remaining features are the '
+            '(district, season) historical mean.'.format(n=n_user)
+            if conditioned else
+            'No observed values were supplied, so every feature came from the '
+            '(district, season) historical mean. This is the climatological expectation '
+            'for this district and season — it is the same number for every year, and '
+            'is not a forecast of the year requested.'
+        ),
+    }
+
     response = {
         'district': data.get('district'),
         'season': data.get('season'),
         'year': data.get('year'),
+        'forecast_basis': forecast_basis,
         'predicted_yield_MT_per_Ha': round(prediction, 2),
         'confidence_lower': round(max(0.0, prediction - margin), 2),
         'confidence_upper': round(prediction + margin, 2),

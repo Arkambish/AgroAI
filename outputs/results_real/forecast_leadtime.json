@@ -1,0 +1,66 @@
+{
+  "pre-season": {
+    "n_months_observed": 0,
+    "n": 28,
+    "r2": -0.273,
+    "rmse": 6.89,
+    "rho": -0.247,
+    "mean_weather_band_90pct": 2.64
+  },
+  "after Jun": {
+    "n_months_observed": 1,
+    "n": 28,
+    "r2": -0.27,
+    "rmse": 6.88,
+    "rho": -0.234,
+    "mean_weather_band_90pct": 2.5
+  },
+  "after Jul": {
+    "n_months_observed": 2,
+    "n": 28,
+    "r2": -0.267,
+    "rmse": 6.88,
+    "rho": -0.221,
+    "mean_weather_band_90pct": 2.28
+  },
+  "after Aug": {
+    "n_months_observed": 3,
+    "n": 28,
+    "r2": -0.265,
+    "rmse": 6.87,
+    "rho": -0.205,
+    "mean_weather_band_90pct": 1.87
+  },
+  "after Sep": {
+    "n_months_observed": 4,
+    "n": 28,
+    "r2": -0.258,
+    "rmse": 6.85,
+    "rho": -0.2,
+    "mean_weather_band_90pct": 1.83
+  },
+  "after Oct": {
+    "n_months_observed": 5,
+    "n": 28,
+    "r2": -0.272,
+    "rmse": 6.89,
+    "rho": -0.222,
+    "mean_weather_band_90pct": 1.32
+  },
+  "after Nov (hindcast)": {
+    "n_months_observed": 6,
+    "n": 28,
+    "r2": -0.237,
+    "rmse": 6.79,
+    "rho": -0.191,
+    "mean_weather_band_90pct": 0.0
+  },
+  "climatology (no features)": {
+    "n_months_observed": null,
+    "n": 28,
+    "r2": -0.215,
+    "rmse": 6.73,
+    "rho": 0.0,
+    "mean_weather_band_90pct": null
+  }
+}

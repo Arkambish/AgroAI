@@ -50,19 +50,41 @@ def _load_base_oof() -> tuple[list, dict, np.ndarray, np.ndarray]:
     if not payloads:
         return [], {}, np.array([]), np.array([])
 
-    # Common row order taken from the first payload; key = (Year, Season, District).
+    # Common row order taken from a payload that carries Season; key = (Year, Season, District).
     def key(r):
         return (int(r['Year']), str(r['Season']), str(r['District']))
 
-    first = next(iter(payloads.values()))
-    keys = [key(r) for r in first['rows']]
-    y = np.array([float(r['actual']) for r in first['rows']], dtype=float)
+    def short_key(r):
+        return (int(r['Year']), str(r['District']))
+
+    # Not every writer emits Season — PADR's OOF omits it because the corrected panel is
+    # single-season. Dropping it for that would exclude a base model on a schema accident
+    # rather than on merit, so fall back to (Year, District), but ONLY when that is unique
+    # on the reference rows. If it is not, the fallback would silently mis-align rows.
+    reference = next((p for p in payloads.values()
+                      if p['rows'] and 'Season' in p['rows'][0]), None)
+    if reference is None:
+        return [], {}, np.array([]), np.array([])
+
+    keys = [key(r) for r in reference['rows']]
+    short_keys = [short_key(r) for r in reference['rows']]
+    short_is_unique = len(set(short_keys)) == len(short_keys)
+    y = np.array([float(r['actual']) for r in reference['rows']], dtype=float)
     years = np.array([k[0] for k in keys])
 
     included, excluded = {}, []
     for name, p in payloads.items():
-        lut = {key(r): r['predicted'] for r in p['rows']}
-        preds = np.array([lut.get(k, np.nan) for k in keys], dtype=float)
+        rows = p['rows']
+        has_season = bool(rows) and 'Season' in rows[0]
+        if not has_season and not short_is_unique:
+            excluded.append(f'{name} (no Season, and Year+District is not unique)')
+            continue
+        if has_season:
+            lut = {key(r): r['predicted'] for r in rows}
+            preds = np.array([lut.get(k, np.nan) for k in keys], dtype=float)
+        else:
+            lut = {short_key(r): r['predicted'] for r in rows}
+            preds = np.array([lut.get(k, np.nan) for k in short_keys], dtype=float)
         if len(lut) < len(keys) or np.isnan(preds).any():
             excluded.append(name)
         else:

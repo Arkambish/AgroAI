@@ -1,27 +1,27 @@
 {
-  "equation": "sub(add(sqrt(sqrt(mul(temp_x_humidity, prev_year_yield))), 3.251), drought_index_spi)",
-  "raw_program": "sub(add(sqrt(sqrt(mul(X0, X4))), 3.251), X2)",
+  "equation": "sqrt(mul(sand_pct, sqrt(add(sqrt(growing_degree_days), add(sqrt(add(sqrt(growing_degree_days), add(sub(sand_pct, time_to_peak_ndvi), sqrt(add(growing_degree_days, time_to_peak_ndvi))))), sub(sand_pct, time_to_peak_ndvi))))))",
+  "raw_program": "sqrt(mul(X3, sqrt(add(sqrt(X2), add(sqrt(add(sqrt(X2), add(sub(X3, X4), sqrt(add(X2, X4))))), sub(X3, X4))))))",
   "features": [
-    "temp_x_humidity",
+    "yield_3yr_avg",
     "season_mean_evi",
-    "drought_index_spi",
-    "rainfall_x_ndvi",
-    "prev_year_yield"
+    "growing_degree_days",
+    "sand_pct",
+    "time_to_peak_ndvi"
   ],
   "metrics": {
     "Model": "SymbolicRegression",
-    "RMSE": 4.5823,
-    "MAE": 3.9126,
-    "R2": -0.2538,
-    "MAPE": 27.19,
-    "Train_Time_s": 35.66,
+    "RMSE": 6.7165,
+    "MAE": 4.9724,
+    "R2": -0.209,
+    "MAPE": 43.98,
+    "Train_Time_s": 38.19,
     "Best_Params": {
       "features": [
-        "temp_x_humidity",
+        "yield_3yr_avg",
         "season_mean_evi",
-        "drought_index_spi",
-        "rainfall_x_ndvi",
-        "prev_year_yield"
+        "growing_degree_days",
+        "sand_pct",
+        "time_to_peak_ndvi"
       ]
     },
     "Parameters": null

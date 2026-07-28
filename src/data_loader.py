@@ -176,6 +176,16 @@ def load_collected_data():
     raw = raw.sort_values(['district', 'season', 'year', 'month_num'])
     if 'source' in raw.columns:
         print(f'  rows: {len(raw)} (source mix: {raw["source"].value_counts().to_dict()})')
+        # Drop the synthetic month-rows. They were previously aggregated into the seasonal
+        # target alongside the real ones, so the panel this pipeline trained on was ~40%
+        # fabricated: 26 of 28 district-year targets matched the all-rows aggregation and
+        # only 4 matched the real-only one. Filtering moves 24 of 28 targets, by 3.41 MT/ha
+        # on average and up to 11.98 — i.e. the model was fitting a materially different
+        # variable. Expect the corrected metrics to be WORSE; the old ones were partly
+        # propped up by fabricated data.
+        before = len(raw)
+        raw = raw[raw['source'] == 'real'].copy()
+        print(f'  dropped {before - len(raw)} synthetic rows -> {len(raw)} real rows retained')
 
     rows = []
     for (year, district, season), g in raw.groupby(['year', 'district', 'season']):

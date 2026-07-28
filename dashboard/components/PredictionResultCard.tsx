@@ -48,6 +48,13 @@ export default function PredictionResultCard({
   const point = result.predicted_yield_MT_per_Ha;
   const completeness = result.data_completeness;
 
+  // `year` is not a model feature, and with no observed inputs every feature comes
+  // from the (district, season) mean — so the identical number is returned for 2019
+  // and 2040. Stamping the requested year onto it would advertise a forecast that
+  // never happened, which is the one thing this card must not do.
+  const basis = result.forecast_basis;
+  const isClimatological = basis?.basis === "climatological";
+
   // Describe how the interval was actually produced — a calibrated conformal
   // band and a crude ±15% heuristic used to render identically.
   const intervalNote = (() => {
@@ -107,9 +114,17 @@ export default function PredictionResultCard({
           </p>
         )}
 
+        {isClimatological && (
+          <p className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <span>{t("basisClimatological", { year: result.year })}</span>
+          </p>
+        )}
+
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-emerald-900">
           <span>
-            {districtName} · {seasonName} {result.year}
+            {districtName} · {seasonName}
+            {isClimatological ? ` · ${t("basisAllYears")}` : ` ${result.year}`}
           </span>
           <span>{t("modelLabel", { model: result.model })}</span>
         </div>
