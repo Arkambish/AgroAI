@@ -1,7 +1,7 @@
 {
-  "Model": "RandomForest",
-  "RMSE": 2.0677,
-  "MAE": 1.6824,
-  "R2": 0.8421,
-  "MAPE": 24.68
+  "Model": "StackConvex",
+  "RMSE": 2.0301,
+  "MAE": 1.6353,
+  "R2": 0.8478,
+  "MAPE": 23.76
 }

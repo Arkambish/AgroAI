@@ -27,10 +27,38 @@
     "empirical_coverage": 0.919,
     "n": 136
   },
+  "PhysResidual": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 3.8613,
+    "empirical_coverage": 0.919,
+    "n": 136
+  },
   "RandomForest": {
     "alpha": 0.1,
     "coverage_target": 0.9,
     "q": 3.3984,
+    "empirical_coverage": 0.919,
+    "n": 136
+  },
+  "StackConvex": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 3.4982,
+    "empirical_coverage": 0.919,
+    "n": 136
+  },
+  "StackInvRMSE": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 4.1826,
+    "empirical_coverage": 0.919,
+    "n": 136
+  },
+  "StackMean": {
+    "alpha": 0.1,
+    "coverage_target": 0.9,
+    "q": 4.8081,
     "empirical_coverage": 0.919,
     "n": 136
   },

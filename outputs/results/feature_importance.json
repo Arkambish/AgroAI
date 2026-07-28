@@ -2,32 +2,32 @@
   {
     "rank": 1,
     "name": "ndvi_x_lst",
-    "mean_abs_shap": 2.1851749788120225
+    "mean_abs_shap": 2.185349105969214
   },
   {
     "rank": 2,
     "name": "season_min_ndvi",
-    "mean_abs_shap": 0.677312998729078
+    "mean_abs_shap": 0.6790511389188779
   },
   {
     "rank": 3,
     "name": "season_mean_ndvi",
-    "mean_abs_shap": 0.5774106910331838
+    "mean_abs_shap": 0.575991725573408
   },
   {
     "rank": 4,
     "name": "season_max_ndvi",
-    "mean_abs_shap": 0.39061304898459764
+    "mean_abs_shap": 0.3903526139014332
   },
   {
     "rank": 5,
     "name": "yield_3yr_avg",
-    "mean_abs_shap": 0.3277733814070192
+    "mean_abs_shap": 0.3273512418134267
   },
   {
     "rank": 6,
     "name": "season_mean_evi",
-    "mean_abs_shap": 0.21760668354447543
+    "mean_abs_shap": 0.21762518195874378
   },
   {
     "rank": 7,
@@ -37,41 +37,41 @@
   {
     "rank": 8,
     "name": "ndvi_anomaly",
-    "mean_abs_shap": 0.1364403159924512
+    "mean_abs_shap": 0.13665569692810942
   },
   {
     "rank": 9,
     "name": "season_mean_lst_night",
-    "mean_abs_shap": 0.10011100761891198
+    "mean_abs_shap": 0.10000924882950053
   },
   {
     "rank": 10,
     "name": "soil_ph",
-    "mean_abs_shap": 0.06939691805088166
+    "mean_abs_shap": 0.06932477885274746
   },
   {
     "rank": 11,
     "name": "organic_carbon",
-    "mean_abs_shap": 0.04030774587561712
+    "mean_abs_shap": 0.04055747894433234
   },
   {
     "rank": 12,
     "name": "ndvi_std",
-    "mean_abs_shap": 0.03575321971886135
+    "mean_abs_shap": 0.03585711040771916
   },
   {
     "rank": 13,
     "name": "season_avg_solar_rad",
-    "mean_abs_shap": 0.03531827588080046
+    "mean_abs_shap": 0.03561784353043961
   },
   {
     "rank": 14,
     "name": "prev_year_yield",
-    "mean_abs_shap": 0.03405611627043926
+    "mean_abs_shap": 0.03452098743125173
   },
   {
     "rank": 15,
     "name": "extent_prev_season",
-    "mean_abs_shap": 0.033870594182117617
+    "mean_abs_shap": 0.03382731091772491
   }
 ]

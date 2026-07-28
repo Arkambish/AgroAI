@@ -103,3 +103,23 @@ def test_nasa_power_fill_values_become_nan_not_pdNA():
     cleaned = frame.replace(nasa_power._FILL, np.nan).astype(float)
     assert cleaned['T2M'].isna().sum() == 1
     assert cleaned['T2M'].dtype == float
+
+
+def test_invalid_data_variant_fails_loudly(monkeypatch):
+    """A typo in DATA_VARIANT must raise, not produce a half-running server.
+
+    `DATA_VARIANT=test` used to resolve every path to outputs/*_test, which does not exist.
+    The API still started, answered /districts from its hardcoded fallback, and returned 503
+    from everything else — while the startup warning blamed a missing model.
+    """
+    import importlib
+    import config as config_module
+
+    monkeypatch.setenv('DATA_VARIANT', 'test')
+    with pytest.raises(ValueError, match='not valid'):
+        importlib.reload(config_module)
+
+    # Leave the module in the state the rest of the session expects.
+    monkeypatch.setenv('DATA_VARIANT', 'real')
+    importlib.reload(config_module)
+    assert config_module.DATA_VARIANT == 'real'

@@ -9,7 +9,22 @@ RANDOM_STATE = 42
 # env var (set automatically by `python main.py --real`). It only changes WHERE
 # artifacts are read/written so the synthetic demo stays untouched as a fallback.
 # ---------------------------------------------------------------------------
+VALID_DATA_VARIANTS = ('synthetic', 'real')
 DATA_VARIANT = os.environ.get('DATA_VARIANT', 'synthetic')
+
+# Fail loudly on a typo. The suffix below turns ANY string into a directory name, so
+# `DATA_VARIANT=test` used to resolve to outputs/models_test — a directory that does not
+# exist — and the API would still start, serve /districts from its hardcoded fallback, and
+# then return 503 from every endpoint that needs a model or the panel. The startup warning
+# said "run main.py first", which sends you off to retrain something that was never the
+# problem. A typo must not be able to produce a half-running server.
+if DATA_VARIANT not in VALID_DATA_VARIANTS:
+    raise ValueError(
+        f'DATA_VARIANT={DATA_VARIANT!r} is not valid. '
+        f'Use one of {", ".join(VALID_DATA_VARIANTS)} — for example:\n'
+        f'    DATA_VARIANT=real PORT=5050 python src/api.py'
+    )
+
 _VARIANT_SUFFIX = '' if DATA_VARIANT == 'synthetic' else f'_{DATA_VARIANT}'
 
 MODELS_DIR = f'outputs/models{_VARIANT_SUFFIX}'

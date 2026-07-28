@@ -1,156 +1,199 @@
 # Big Onion Yield Prediction — Agro AI
 
-End-to-end system for predicting big onion (Allium cepa) harvest yield across four Sri Lankan districts (Matale, Anuradhapura, Polonnaruwa, Kurunegala) for the Yala and Maha seasons.
+End-to-end system for predicting big onion (*Allium cepa*) harvest yield across four Sri Lankan
+districts (Matale, Anuradhapura, Polonnaruwa, Kurunegala).
 
 University of Moratuwa, Faculty of Information Technology, FYP 2026.
 
 | Member | Index | Component |
 |---|---|---|
-| Arkam B.H.M. | 214019K | ML/DL modelling pipeline + Flask API |
+| Arkam B.H.M. | 214019K | ML/DL modelling pipeline, evaluation, Flask API |
 | Sharuja B. | 214192G | Data engineering + feature engineering |
-| Shathurya P. | 214193K | Dashboard + visualisation + decision-support |
+| Shathurya P. | 214193K | Dashboard, visualisation, explainability UX |
 
-## What's in this repo
+---
 
-```
-src/             Python ML/DL pipeline + Flask serving API   (Arkam)
-frontend/        Next.js 16 dashboard                         (Shathurya)
-data/            raw CSVs (when collected) + synthetic + processed
-outputs/         trained models, plots, result CSVs
-docs/            8 explainer markdowns + interim report + proposal + figures
-main.py          run the whole ML/DL pipeline
-requirements.txt Python deps
-```
+## Read this before quoting any number
 
-The ML/DL pipeline trains 7 models — RF, XGBoost, SVR, LSTM, BiLSTM, 1D-CNN, and a novel **Hybrid CNN-LSTM** with season indicator — on multi-source agricultural data (DCS yield, NASA POWER weather, MODIS NDVI/EVI, Sentinel-2, CHIRPS rainfall, MODIS LST, SoilGrids), and serves the best one over a Flask REST API. The dashboard consumes that API and presents predictions via an interactive choropleth, smart prediction form, SHAP explainability, and a model-comparison admin panel.
+This project reports a **negative result**, and that is the finding rather than a failure.
 
-## Quick start (fresh clone)
+On the real data — 28 district-year rows, Yala only, 2019–2025 — **no model beats predicting the
+training-year average.** The honest leave-one-year-out (LOYO) scoreboard:
 
-You need **Python 3.12** (TensorFlow 2.16–2.17 doesn't support 3.13/3.14 yet) and **Node ≥ 20** (Next.js 16 requirement).
+| Model | R² | RMSE |
+|---|---|---|
+| *climatology (no features at all)* | *−0.215* | *6.73* |
+| SymbolicRegression (best model) | −0.209 | 6.72 |
+| SVR (served by the API) | −0.307 | 6.98 |
+| PADR | −0.374 | 7.33 |
+| RandomForest | −0.542 | 7.59 |
+| XGBoost | −0.711 | 7.99 |
+| CNN-LSTM hybrid | −3.635 | 13.15 |
+
+This is explained, not hidden. 63.6% of the target's variance lies between years, and LOYO removes
+exactly that; measurement error accounts for over half of what remains within a year. The attainable
+R² ceiling on this panel is **+0.162**, so the proposal-stage target of 0.75 was never reachable.
+
+**There are two data variants and they must never be confused.**
+
+| | `DATA_VARIANT=real` | `DATA_VARIANT=synthetic` (default) |
+|---|---|---|
+| Rows | 28 (4 districts × 7 years, Yala) | 136 (incl. Jaffna, both seasons) |
+| Best R² | **−0.209** | +0.848 |
+| Outputs | `outputs/*_real/` | `outputs/*/` |
+| Use it for | **every number in the report** | software demos, UI screenshots, tests |
+
+The synthetic variant exists to demonstrate that the system works end to end. Its R² of 0.85 is
+**not a result** and must never appear in the report or a viva without the variant named in the same
+breath.
+
+---
+
+## Quick start
+
+Requires **Python 3.12** (TensorFlow does not yet support 3.13+) and **Node ≥ 20**.
 
 ```bash
-git clone https://github.com/Arkambish/AgroAI.git
-cd AgroAI
-```
-
-### 1 — Run the ML/DL pipeline (Arkam's component)
-
-```bash
-# Python venv + install
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -U pip
-pip install -r requirements.txt
-
-# Full pipeline (uses synthetic data when raw CSVs are missing). ~6 min on CPU.
-python main.py
-
-# Faster iterations during development:
-python main.py --skip-shap            # skip SHAP
-python main.py --skip-dl --skip-shap  # ML only (~1 min)
-python main.py --skip-eda             # skip EDA plots
-
-# Generate the architecture figures used in the interim report:
-python src/generate_figures.py
+pip install -U pip && pip install -r requirements.txt
 ```
 
-After this, `outputs/` contains the trained models, all plots, the model comparison CSV, and the SHAP feature-importance JSON.
-
-### 2 — Start the Flask API
-
-macOS port 5000 is taken by AirPlay Receiver, so use 5050:
+### 1 — Train
 
 ```bash
-PORT=5050 python src/api.py
-# → http://localhost:5050
+DATA_VARIANT=real python main.py --real     # honest pipeline,  ~3 min
+python main.py                              # synthetic demo,   ~1 min
 ```
 
-API endpoints (all consumed by the dashboard):
+Useful flags: `--skip-eda`, `--skip-dl`, `--skip-symbolic`, `--skip-ablation`, `--skip-stacking`.
 
-| Endpoint | Method | Purpose |
-|---|---|---|
-| `/health` | GET | Health check |
-| `/predict` | POST | Predict yield from a feature payload |
-| `/models/compare` | GET | Model-comparison metrics |
-| `/feature-importance` | GET | Top-15 SHAP features |
-| `/context` | GET | Prefill values for the predict form (`?district=&season=&year=`) |
-| `/districts` | GET | Districts/seasons/years for dropdowns |
+### 2 — Serve
 
-### 3 — Run the dashboard (Shathurya's component)
-
-In a second terminal, with the API still running:
+macOS reserves port 5000 for AirPlay Receiver, so the API runs on **5050** — the dashboard's
+`.env.local` already points there.
 
 ```bash
-cd frontend
-npm install
-cp .env.local.example .env.local   # only needed if backend isn't on :5050
-npm run dev
-# → http://localhost:3000
+DATA_VARIANT=real PORT=5050 python src/api.py
 ```
 
-The dashboard has four pages:
+An invalid `DATA_VARIANT` now fails immediately with the valid values rather than starting a
+half-working server that returns 503 from every endpoint.
 
-| Route | What it does |
+### 3 — Dashboard
+
+```bash
+cd dashboard && npm install && npm run dev     # → http://localhost:3000
+```
+
+| Route | Purpose |
 |---|---|
-| `/` | KPI cards, choropleth map, Yala-vs-Maha comparison chart |
-| `/predict` | Smart prediction form with auto-prefilled features |
-| `/explainability` | Top-15 SHAP feature attributions |
-| `/admin` | Sortable model performance table + RMSE/R² chart |
+| `/[locale]` | KPI cards, district choropleth, seasonal comparison |
+| `/[locale]/predict` | Prediction form with auto-filled context |
+| `/[locale]/explain` | SHAP attributions + explanation-reliability index |
+| `/[locale]/recommend` | LLM-generated agronomic advice |
 
-Production build + start:
+Trilingual: English, Sinhala (`si`), Tamil (`ta`).
+
+### 4 — Tests
 
 ```bash
-cd frontend
-npm run build
-npm run start
+python -m pytest                # 37 backend tests
+cd dashboard && npm test        # 30 frontend tests (vitest)
 ```
 
-> Trained models, generated plots, and `node_modules/` are **not** version-controlled (see `.gitignore`). Run `python main.py` and `npm install` once after cloning to regenerate them.
+The backend suite is written as tripwires on defects this project has actually had: synthetic rows
+reaching the trained panel, augmentation improving honest scores, the API reporting one model's
+accuracy while serving another, and a climatological average being presented as a year-specific
+forecast. `tests/test_frontend_backend_contract.py` also enforces that `dashboard/lib/features.ts`
+mirrors `config.ALL_FEATURES` and that every locale defines every `en.json` key.
+
+---
 
 ## What the pipeline does
 
-1. Loads multi-source data (DCS yield, NASA POWER weather, MODIS NDVI/EVI, Sentinel-2, CHIRPS rainfall, MODIS LST, SoilGrids). Falls back to a calibrated synthetic generator if any raw CSV is missing.
-2. Preprocesses + engineers features (weather aggregates, vegetation indices, historical yield, soil, interaction terms).
-3. Runs EDA — distribution / time-series / correlation / seasonal / district plots.
-4. Trains 3 ML models (Random Forest, XGBoost, SVR) and 4 DL models (LSTM, BiLSTM, 1D-CNN, hybrid CNN-LSTM with season indicator) using **Leave-One-Year-Out CV** for honest temporal evaluation.
-5. Runs a 6-experiment ablation study to quantify each data source's contribution.
-6. Computes SHAP values on the best model.
-7. Saves all artefacts under `outputs/` and exposes them via the Flask API and the Next.js dashboard.
+1. **Load** the monthly DCS panel and aggregate to 28 district-year rows. Rows marked
+   `source=synthetic` are filtered out — they previously reached the target and made ~40% of it
+   fabricated.
+2. **Engineer** 32 features in five groups: 9 weather, 11 satellite, 5 historical, 4 soil,
+   3 interaction.
+3. **Train 13 models** under leave-one-year-out CV: RandomForest, XGBoost, SVR, LSTM, BiLSTM, 1D-CNN,
+   hybrid CNN-LSTM, SymbolicRegression, PhysResidual, PADR, and three stacking combiners.
+4. **Calibrate** conformal prediction intervals, compute SHAP, run ablations.
+5. **Serve** one model over Flask; the dashboard consumes it.
+
+### Analyses beyond the model comparison
+
+| Script | What it establishes |
+|---|---|
+| `src/integrity_audit.py` | Random 5-fold reports R² 0.552 where honest LOYO gives 0.044 — a 12× inflation. Also shows augmentation degrades honest scores monotonically. |
+| `src/weather_forecast.py` | Monte Carlo over unknown future weather, resampling whole analogue years from a 45-year (1981–2025) NASA POWER pool. |
+| `src/forecast_leadtime.py` | Skill against forecast issue date. Never beats climatology at any lead. |
+| `src/decision_loss.py` | Storage-coupled decision loss and the break-even skill frontier. |
+| `src/figures_decision.py` | Figures 7.6 and 7.7 of the final report. |
+
+---
 
 ## Layout
 
 ```
-data/raw/             drop real CSVs here when collected
-data/synthetic/       regenerated deterministically from seed=42
-data/processed/       cleaned + feature-engineered training data
-outputs/models/       *.pkl (sklearn) + *.keras (TF)
-outputs/plots/        eda/, training/, results/, figures/
-outputs/results/      comparison CSVs, JSON metrics, final_summary.txt
-src/                  Python pipeline (see config.py for all knobs)
-src/api.py            Flask REST API
-frontend/             Next.js 16 dashboard (App Router, TypeScript, Tailwind 4)
-docs/                 8 explainer markdowns + interim report + proposal
-main.py               run the whole pipeline
+src/                Python pipeline + Flask API   (see config.py for all knobs)
+dashboard/          Next.js dashboard, App Router, TypeScript, Tailwind 4
+tests/              pytest suite
+data/collected/     source CSVs (only 4 of 10 files are actually read)
+data/processed_real/  the 28-row panel the models train on
+outputs/results_real/ honest metrics, JSON + CSV
+outputs/models_real/  trained artefacts
+docs/               explainers, findings, reports
+main.py             run the whole pipeline
 ```
+
+Trained models, plots and `node_modules/` are not version-controlled. Run the pipeline and
+`npm install` once after cloning.
+
+---
 
 ## Documentation
 
-If you're new to the project, read the explainers in `docs/` in order:
+Start with **[docs/START_HERE.md](docs/START_HERE.md)** — a from-zero guide that also flags which of
+the older explainers are stale.
 
-1. [docs/00_OVERVIEW.md](docs/00_OVERVIEW.md) — project at a glance
-2. [docs/01_PROBLEM_AND_DATA.md](docs/01_PROBLEM_AND_DATA.md) — agricultural problem and data sources
-3. [docs/02_ML_DL_FUNDAMENTALS.md](docs/02_ML_DL_FUNDAMENTALS.md) — ML/DL crash course
-4. [docs/03_PIPELINE_WALKTHROUGH.md](docs/03_PIPELINE_WALKTHROUGH.md) — every Python file explained
-5. [docs/04_MODELS_EXPLAINED.md](docs/04_MODELS_EXPLAINED.md) — all 7 models in plain English
-6. [docs/05_NOVELTY_AND_RESEARCH.md](docs/05_NOVELTY_AND_RESEARCH.md) — research contribution
-7. [docs/06_RESULTS_AND_INTERPRETATION.md](docs/06_RESULTS_AND_INTERPRETATION.md) — what the numbers mean
-8. [docs/07_HOW_TO_RUN.md](docs/07_HOW_TO_RUN.md) — command-by-command runbook
+| Doc | Contents |
+|---|---|
+| [PADR_FINDINGS.md](docs/PADR_FINDINGS.md) | Authoritative results for the corrected pipeline |
+| [09_SYSTEM_AUDIT.md](docs/09_SYSTEM_AUDIT.md) | Known defects and inconsistencies |
+| [05_NOVELTY_AND_RESEARCH.md](docs/05_NOVELTY_AND_RESEARCH.md) | Research contribution |
+| [00–07_*.md](docs/) | Original explainer series (partly superseded) |
 
-The interim report itself is at [docs/Interim_Report_AgroAI.md](docs/Interim_Report_AgroAI.md), and the original proposal at [docs/Proposal FYP.md](docs/Proposal%20FYP.md).
+Final report: `outputs/Final_Report_AgroAI.docx`, generated by
+`DATA_VARIANT=real python src/generate_final_docx.py`.
+
+---
+
+## Known issues
+
+Recorded here rather than in a private list, because they affect how results should be read.
+
+- **Two leaks remain in the panel.** `prev_year_yield` is literally the previous year's target
+  (verified in 22 of 24 district-year pairs), and `ndvi_anomaly` / `drought_index_spi` are
+  standardised against all 2019–2025 data ([`data_loader.py:244`](src/data_loader.py#L244)). Both
+  inflate every model's score and must be fixed before submission.
+- **Sequence models are fed manufactured input.** `feature_engineer.py:20` expands four seasonal
+  averages into a 5-step "monthly" series with a fixed sine curve and fixed weights. Its own
+  docstring says *"Synthetic-only"*. The LSTM/CNN-LSTM results therefore cannot support a claim
+  about temporal modelling.
+- **Six of the 32 features are constants** (`season_avg_solar_rad = 18.0`,
+  `extent_prev_season = 400.0`, `organic_carbon = 1.8`, `heat_stress_days = 0`, …).
+- **Kurunegala and Matale share a NASA POWER grid cell** — byte-identical daily weather on 100% of
+  days, so the panel has three independent weather series, not four.
+- **`data/raw/` is empty**; the `REQUIRED_FILES` path in `data_loader.py` is dead scaffolding.
+- **Five files in `data/collected/` are unused**, two of which (`Sentinal.csv`,
+  `Geospatial data.csv`) contain no measurement columns at all — the Earth Engine export ran without
+  a band reduction.
 
 ## Notes
 
-- DL models use **50 epochs/fold** by default in synthetic-mode (`SYNTHETIC_MODE_DL_EPOCHS` in `src/config.py`). Bump to 200 for real data.
-- TensorFlow saves models in the modern `.keras` format (replaces legacy `.h5`).
-- All randomness is seeded (`RANDOM_STATE=42`) — the synthetic dataset and all training runs are reproducible.
-- The dashboard is hand-written shadcn-style components on Radix UI + Tailwind 4 (no shadcn CLI because its templates currently target Tailwind 3).
+- All randomness is seeded (`RANDOM_STATE=42`); runs are reproducible.
+- DL epochs per fold are set by `SYNTHETIC_MODE_DL_EPOCHS` in `src/config.py`.
+- `src/data_collection/gee_ndvi_export.js` re-exports MODIS NDVI over district polygons including
+  Kurunegala. It has never been run, and doing so is the highest-value data action available.
