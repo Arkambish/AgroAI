@@ -17,3 +17,6 @@ python-dotenv>=1.0.0
 statsmodels>=0.14.0
 tqdm>=4.65.0
 python-docx>=1.2.0
+
+# Testing — run with `python -m pytest` from the repo root.
+pytest>=8.0.0

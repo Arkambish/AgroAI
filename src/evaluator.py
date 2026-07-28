@@ -241,7 +241,8 @@ def generate_final_comparison(ablation: pd.DataFrame | None = None) -> pd.DataFr
 
     # Save best model metadata for the API.
     best = comparison.iloc[0]
-    best_payload = payloads[best['Model']]
+    # (No payload lookup here: it was assigned and never read, and it raised KeyError
+    # whenever a model's display name differed from the key `_load_oof_payloads` stored.)
     best_meta = {
         'Model': best['Model'], 'RMSE': float(best['RMSE']),
         'MAE': float(best['MAE']), 'R2': float(best['R2']),
