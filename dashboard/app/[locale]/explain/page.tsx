@@ -47,9 +47,12 @@ function effectTier(magnitude: number): "high" | "medium" | "low" {
   return "low";
 }
 
-/** Same 4-tier scheme as requested for the per-card reliability readout —
- * distinct from (and more granular than) the 3-tier badge shown next to the
- * page title, which keeps its own existing thresholds/labels. */
+/** 4-tier scheme for the per-card "Confidence" readout — distinct from (and
+ * more granular than) the 3-tier scheme used once, up top, for the overall
+ * prediction-level reliability. Keeping two different words ("Confidence"
+ * per card vs. "Explanation reliability" once at the top) for two genuinely
+ * different numbers (per-feature ERI vs. the prediction-level aggregate) is
+ * what stops the page from reading as the same phrase repeated everywhere. */
 function reliabilityTier(eri: number | undefined): {
   emoji: string;
   key: "cardHigh" | "cardGood" | "cardModerate" | "cardLow" | "cardUnknown";
@@ -60,6 +63,28 @@ function reliabilityTier(eri: number | undefined): {
   if (pct >= 70) return { emoji: "🟡", key: "cardGood" };
   if (pct >= 50) return { emoji: "🟠", key: "cardModerate" };
   return { emoji: "🔴", key: "cardLow" };
+}
+
+/** Same 3-tier thresholds as the old top-of-page badge (0.4 / 0.7), just
+ * resolved into the pieces the new summary card actually renders: an emoji,
+ * a "{level} confidence" phrase, and a one-line plain-language note. */
+function summaryReliability(
+  eriLevel: "levelHigh" | "levelMedium" | "levelLow" | undefined
+): {
+  emoji: string;
+  confidenceKey: "confidenceHigh" | "confidenceMedium" | "confidenceLow" | "confidenceUnknown";
+  noteKey: "levelHigh" | "levelMedium" | "levelLow" | "unknown";
+} {
+  if (eriLevel === "levelHigh") {
+    return { emoji: "🟢", confidenceKey: "confidenceHigh", noteKey: "levelHigh" };
+  }
+  if (eriLevel === "levelMedium") {
+    return { emoji: "🟡", confidenceKey: "confidenceMedium", noteKey: "levelMedium" };
+  }
+  if (eriLevel === "levelLow") {
+    return { emoji: "🔴", confidenceKey: "confidenceLow", noteKey: "levelLow" };
+  }
+  return { emoji: "⚪", confidenceKey: "confidenceUnknown", noteKey: "unknown" };
 }
 
 export default function ExplainPage() {
@@ -86,11 +111,11 @@ export default function ExplainPage() {
     [prediction]
   );
 
-  // Same top-5 selection as the bars above, with a per-row ERI attached: each
-  // displayed factor can fold in several raw model features (e.g. NDVI's 3
-  // variants), so its reliability is the |SHAP|-weighted average of
-  // per_feature_eri across just those raw features — the same weighting the
-  // backend uses to roll per-feature ERI up into one prediction-level score.
+  // Per-row ERI: each displayed factor can fold in several raw model
+  // features (e.g. NDVI's 3 variants), so its reliability is the
+  // |SHAP|-weighted average of per_feature_eri across just those raw
+  // features — the same weighting the backend uses to roll per-feature ERI
+  // up into one prediction-level score.
   const reliabilityItems = useMemo<ReliabilityBarDatum[]>(() => {
     if (!prediction?.shap_values) return [];
     const shapValues = prediction.shap_values;
@@ -119,7 +144,7 @@ export default function ExplainPage() {
   }, [explanations, prediction, t]);
 
   // Per-card reliability lookup — same values as reliabilityItems, keyed by
-  // name for O(1) access while rendering the simple-view cards below.
+  // name for O(1) access while rendering the cards below.
   const eriByName = useMemo(
     () => new Map(reliabilityItems.map((r) => [r.name, r.eri])),
     [reliabilityItems]
@@ -151,6 +176,7 @@ export default function ExplainPage() {
         : eriScore < 0.7
           ? "levelMedium"
           : "levelHigh";
+  const summary = summaryReliability(eriLevel);
 
   if (!prediction) {
     return (
@@ -175,252 +201,236 @@ export default function ExplainPage() {
     );
   }
 
-  // The strongest factor drives the key insight — previously the box rendered
-  // its heading with no body text at all.
+  // The strongest factor drives the key insight — the one thing a farmer
+  // takes away, rather than a restatement of every factor already shown as
+  // its own card above.
   const top = explanations[0];
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-        <div className="flex flex-col space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            {t("title")}
-          </h1>
+    <div className="space-y-8">
+      {/* 1. Prediction summary card — expected yield + the ONE place overall
+          explanation reliability is shown on this page. Everything below
+          this uses the word "Confidence" instead, so the same phrase isn't
+          repeated card after card. */}
+      <div className="overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/60 p-6 shadow-lg sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <Brain className="text-emerald-700" size={24} />
+            <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+              {t("title")}
+            </h1>
+          </div>
 
-          <p className="text-slate-500">
-            {t("subtitle")} — {prediction.predicted_yield_MT_per_Ha} MT/Ha
-          </p>
-
-          {/* Overall Explanation Reliability Index for this prediction — see
-              src/xai/eri.py. Shown regardless of which view (below) is active. */}
-          <span
-            className={clsx(
-              "inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-semibold",
-              eriLevel === "levelHigh" && "bg-emerald-100 text-emerald-700",
-              eriLevel === "levelMedium" && "bg-amber-100 text-amber-700",
-              eriLevel === "levelLow" && "bg-red-100 text-red-700",
-              eriLevel === undefined && "bg-slate-100 text-slate-500"
-            )}
+          <button
+            type="button"
+            onClick={handleNewPrediction}
+            className="flex shrink-0 items-center justify-center space-x-2 rounded-2xl border-2 border-white/80 bg-white/70 px-4 py-2.5 text-sm font-bold text-slate-600 backdrop-blur transition-colors hover:border-slate-200 hover:bg-white"
           >
-            {eriScore !== undefined && eriLevel
-              ? t("reliability.badge", {
-                  value: Math.round(eriScore * 100),
-                  level: t(`reliability.${eriLevel}`),
-                })
-              : t("reliability.badgeUnknown")}
-          </span>
+            <RotateCcw size={16} />
+            <span>{tButton("newPrediction")}</span>
+          </button>
         </div>
 
-        <button
-          type="button"
-          onClick={handleNewPrediction}
-          className="flex shrink-0 items-center justify-center space-x-2 rounded-2xl border-2 border-slate-200 bg-white px-5 py-3 font-bold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50"
-        >
-          <RotateCcw size={18} />
-          <span>{tButton("newPrediction")}</span>
-        </button>
+        <p className="mt-3 text-lg font-semibold text-emerald-950">
+          {t("summaryYield", { value: prediction.predicted_yield_MT_per_Ha })}
+        </p>
+
+        <div className="mt-5 rounded-2xl border border-emerald-100 bg-white/70 p-4">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">
+            <Brain size={13} />
+            <span>{t("reliability.summaryLabel")}</span>
+          </p>
+          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="flex items-center gap-2 text-lg font-bold text-slate-900">
+              <span aria-hidden="true">{summary.emoji}</span>
+              <span>{t(`reliability.${summary.confidenceKey}`)}</span>
+            </span>
+            {eriScore !== undefined && (
+              <span className="text-sm font-semibold text-slate-500">
+                {Math.round(eriScore * 100)}%
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-slate-600">
+            {t(`reliability.summaryNote.${summary.noteKey}`)}
+          </p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <section className="space-y-6">
-          <h2 className="text-xl font-bold text-slate-800">
-            {t("keyFactors")}
-          </h2>
+      {/* 2. Main factors — one compact, farmer-friendly card per factor.
+          This is the single place impact/effect/confidence per factor is
+          shown; nothing above or below restates it. */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold text-slate-800">
+          {t("keyFactors")}
+        </h2>
 
-          <div className="grid gap-4">
-            {explanations.map((item) => {
-              // SHAP contribution is in the model's own units (MT/Ha), so it
-              // converts directly to kg/Ha for a number a farmer can picture
-              // — used only inside the technical details drawer now.
-              const kgPerHa = Math.round(Math.abs(item.raw) * 1000);
-              const isPositive = item.impact === "Positive";
-              const tier = effectTier(item.magnitude);
-              const eri = eriByName.get(item.name);
-              const reliability = reliabilityTier(eri);
-              const isExpanded = expandedTechnical.has(item.name);
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {explanations.map((item) => {
+            // SHAP contribution is in the model's own units (MT/Ha), so it
+            // converts directly to kg/Ha for a number a farmer can picture
+            // — used only inside the technical details drawer.
+            const kgPerHa = Math.round(Math.abs(item.raw) * 1000);
+            const isPositive = item.impact === "Positive";
+            const tier = effectTier(item.magnitude);
+            const eri = eriByName.get(item.name);
+            const reliability = reliabilityTier(eri);
+            const isExpanded = expandedTechnical.has(item.name);
 
-              return (
-                <div
-                  key={item.name}
-                  className="rounded-xl border bg-white p-4 shadow-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl" aria-hidden="true">
-                      {FEATURE_EMOJI[item.name] ?? FEATURE_EMOJI.other}
-                    </span>
-                    <p className="font-bold text-slate-900">
-                      {t(`features.${item.name}`)}
+            return (
+              <div
+                key={item.name}
+                className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl" aria-hidden="true">
+                    {FEATURE_EMOJI[item.name] ?? FEATURE_EMOJI.other}
+                  </span>
+                  <p className="text-base font-bold text-slate-900">
+                    {t(`features.${item.name}`)}
+                  </p>
+                </div>
+
+                {/* Stacked label/value rows — a card a farmer can read top
+                    to bottom, not a technical grid of columns. No raw SHAP
+                    numbers here; those only appear once expanded below. */}
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      {t("impactLabel")}
+                    </p>
+                    <p
+                      className={clsx(
+                        "mt-0.5 text-sm font-bold",
+                        isPositive ? "text-emerald-600" : "text-red-600"
+                      )}
+                    >
+                      {isPositive
+                        ? t("impactPositive")
+                        : t("impactNegative")}
                     </p>
                   </div>
 
-                  {/* Farmer-facing summary: what happened, how much, how much
-                      to trust it — no raw SHAP numbers here (see requirement
-                      to move those into "Technical details" below). */}
-                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                        {t("impactLabel")}
-                      </p>
-                      <p
-                        className={clsx(
-                          "mt-0.5 text-sm font-bold",
-                          isPositive ? "text-emerald-600" : "text-red-600"
-                        )}
-                      >
-                        {isPositive
-                          ? t("impactPositive")
-                          : t("impactNegative")}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                        {t("effectLabel")}
-                      </p>
-                      <p className="mt-0.5 text-sm font-bold text-slate-800">
-                        {t(`effect.${tier}`)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                        {t("reliability.cardLabel")}
-                      </p>
-                      <p className="mt-0.5 flex items-center gap-1.5 text-sm font-bold text-slate-800">
-                        <span aria-hidden="true">{reliability.emoji}</span>
-                        <span>{t(`reliability.${reliability.key}`)}</span>
-                      </p>
-                      {eri !== undefined && (
-                        <p className="text-xs font-semibold text-slate-500">
-                          {Math.round(eri * 100)}%
-                        </p>
-                      )}
-                    </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      {t("effectLabel")}
+                    </p>
+                    <p className="mt-0.5 text-sm font-bold text-slate-800">
+                      {t(`effect.${tier}`)}
+                    </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => toggleTechnical(item.name)}
-                    aria-expanded={isExpanded}
-                    className="mt-3 flex items-center gap-1 border-t border-dashed border-slate-100 pt-3 text-[11px] font-semibold text-slate-400 transition-colors hover:text-slate-600"
-                  >
-                    <ChevronDown
-                      size={12}
-                      className={clsx(
-                        "transition-transform",
-                        isExpanded && "rotate-180"
-                      )}
-                    />
-                    <span>{t("technicalDetails")}</span>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="mt-2 space-y-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
-                      <p>
-                        {isPositive
-                          ? t("perFactorPositive", {
-                              feature: t(`features.${item.name}`),
-                              amount: kgPerHa,
-                            })
-                          : t("perFactorNegative", {
-                              feature: t(`features.${item.name}`),
-                              amount: kgPerHa,
-                            })}
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      {t("reliability.cardLabel")}
+                    </p>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-sm font-bold text-slate-800">
+                      <span aria-hidden="true">{reliability.emoji}</span>
+                      <span>{t(`reliability.${reliability.key}`)}</span>
+                    </p>
+                    {eri !== undefined && (
+                      <p className="text-xs font-semibold text-slate-500">
+                        {Math.round(eri * 100)}%
                       </p>
+                    )}
+                  </div>
+                </div>
 
-                      {/* Diverging bar: extends right (emerald) from center
-                          for a positive contribution, left (red) for
-                          negative — the exact SHAP value + visualization
-                          this card used to show up-front. */}
-                      <div>
-                        <div className="flex items-center justify-between text-[11px] text-slate-400">
-                          <span>{t("relative")}</span>
-                          <span className="font-mono tabular-nums">
-                            {item.raw > 0 ? "+" : ""}
-                            {item.raw.toFixed(3)}
-                          </span>
-                        </div>
-                        <div className="relative mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                          <div className="absolute inset-y-0 left-1/2 w-px bg-slate-300" />
-                          {isPositive ? (
-                            <div
-                              className="absolute inset-y-0 left-1/2 rounded-r-full bg-emerald-500"
-                              style={{
-                                width: `${Math.max(2, item.magnitude * 50).toFixed(1)}%`,
-                              }}
-                            />
-                          ) : (
-                            <div
-                              className="absolute inset-y-0 right-1/2 rounded-l-full bg-red-500"
-                              style={{
-                                width: `${Math.max(2, item.magnitude * 50).toFixed(1)}%`,
-                              }}
-                            />
-                          )}
-                        </div>
+                <button
+                  type="button"
+                  onClick={() => toggleTechnical(item.name)}
+                  aria-expanded={isExpanded}
+                  className="flex items-center gap-1 border-t border-dashed border-slate-100 pt-3 text-[11px] font-semibold text-slate-400 transition-colors hover:text-slate-600"
+                >
+                  <ChevronDown
+                    size={12}
+                    className={clsx(
+                      "transition-transform",
+                      isExpanded && "rotate-180"
+                    )}
+                  />
+                  <span>{t("technicalDetails")}</span>
+                </button>
+
+                {isExpanded && (
+                  <div className="space-y-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+                    <p>
+                      {isPositive
+                        ? t("perFactorPositive", {
+                            feature: t(`features.${item.name}`),
+                            amount: kgPerHa,
+                          })
+                        : t("perFactorNegative", {
+                            feature: t(`features.${item.name}`),
+                            amount: kgPerHa,
+                          })}
+                    </p>
+
+                    {/* Diverging bar: extends right (emerald) from center
+                        for a positive contribution, left (red) for
+                        negative — the raw SHAP value this card keeps
+                        hidden until expanded. */}
+                    <div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400">
+                        <span>{t("relative")}</span>
+                        <span className="font-mono tabular-nums">
+                          {item.raw > 0 ? "+" : ""}
+                          {item.raw.toFixed(3)}
+                        </span>
                       </div>
-
-                      {eri !== undefined && (
-                        <div className="flex items-center justify-between">
-                          <span>{t("reliability.cardLabel")}</span>
-                          <span className="font-mono tabular-nums">
-                            {(eri * 100).toFixed(1)}%
-                          </span>
-                        </div>
-                      )}
-
-                      <div>
-                        <span className="font-semibold text-slate-500">
-                          {t("technicalFeatures")}:
-                        </span>{" "}
-                        <span className="font-mono">{item.feature}</span>
+                      <div className="relative mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                        <div className="absolute inset-y-0 left-1/2 w-px bg-slate-300" />
+                        {isPositive ? (
+                          <div
+                            className="absolute inset-y-0 left-1/2 rounded-r-full bg-emerald-500"
+                            style={{
+                              width: `${Math.max(2, item.magnitude * 50).toFixed(1)}%`,
+                            }}
+                          />
+                        ) : (
+                          <div
+                            className="absolute inset-y-0 right-1/2 rounded-l-full bg-red-500"
+                            style={{
+                              width: `${Math.max(2, item.magnitude * 50).toFixed(1)}%`,
+                            }}
+                          />
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </section>
 
-        <section className="space-y-6">
-          <h2 className="text-xl font-bold text-slate-800">{t("summary")}</h2>
-
-          <div className="rounded-xl border bg-white p-6 shadow-sm">
-            <p className="text-slate-700">
-              {t("basedOn")} <b>{prediction.district}</b> {t("expected")}{" "}
-              <b>{prediction.predicted_yield_MT_per_Ha} MT/Ha</b>
-            </p>
-
-            <ul className="mt-4 list-disc space-y-1.5 pl-6 text-slate-700">
-              {explanations.map((item) => (
-                <li key={item.name}>
-                  <b>{t(`features.${item.name}`)}</b>{" "}
-                  {item.impact === "Positive" ? t("positive") : t("negative")}
-                </li>
-              ))}
-            </ul>
-
-            {top && (
-              <div className="mt-6 rounded-xl bg-amber-50 p-4">
-                <AlertTriangle className="text-amber-500" size={20} />
-                <p className="mt-2 font-bold text-amber-900">
-                  {t("keyInsight")}
-                </p>
-                <p className="mt-1 text-sm leading-relaxed text-amber-800">
-                  {top.impact === "Positive"
-                    ? t("insightPositive", {
-                        feature: t(`features.${top.name}`),
-                      })
-                    : t("insightNegative", {
-                        feature: t(`features.${top.name}`),
-                      })}
-                </p>
+                    <div>
+                      <span className="font-semibold text-slate-500">
+                        {t("technicalFeatures")}:
+                      </span>{" "}
+                      <span className="font-mono">{item.feature}</span>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 3. Key Insight — one simple conclusion, not another list of every
+          factor already shown as its own card above. */}
+      {top && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="text-amber-500" size={20} />
+            <p className="font-bold text-amber-900">{t("keyInsight")}</p>
           </div>
-        </section>
-      </div>
+          <p className="mt-2 text-sm leading-relaxed text-amber-800">
+            {top.impact === "Positive"
+              ? t("insightPositive", {
+                  feature: t(`features.${top.name}`),
+                })
+              : t("insightNegative", {
+                  feature: t(`features.${top.name}`),
+                })}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

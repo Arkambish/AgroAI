@@ -15,9 +15,7 @@ import {
   type BaselineResponse,
   type DistrictInfo,
 } from "@/lib/api";
-import { FEATURE_META_BY_NAME } from "@/lib/features";
 import {
-  useLocalFlag,
   useLocalJSONState,
   resetPrediction,
   PREDICTION_KEY,
@@ -25,20 +23,13 @@ import {
 } from "@/lib/use-local-flag";
 import FieldInputCard, { type FarmerInputs } from "@/components/FieldInputCard";
 import KnownDataPanel from "@/components/KnownDataPanel";
-import AdvancedOverrides, {
-  validateOverride,
-} from "@/components/AdvancedOverrides";
 import PredictionResultCard from "@/components/PredictionResultCard";
 import ChatAssistant from "@/components/ChatAssistant";
-
-const ADVANCED_KEY = "agrisense_advanced_mode";
 
 const DEFAULT_FARMER_INPUTS: FarmerInputs = {
   district: "",
   season: "",
   year: new Date().getFullYear(),
-  extentHa: "",
-  lastSeasonYield: "",
 };
 
 export default function PredictPage() {
@@ -71,14 +62,6 @@ export default function PredictPage() {
   const [contextLoading, setContextLoading] = useState(false);
   const [contextError, setContextError] = useState<string | null>(null);
   const [baseline, setBaseline] = useState<BaselineResponse | null>(null);
-
-  // Tier C — expert overrides, kept in their own bucket. The officer-mode
-  // preference persists across sessions.
-  const [advanced, handleAdvancedToggle] = useLocalFlag(ADVANCED_KEY);
-  const [overrides, setOverrides] = useState<Record<string, number>>({});
-  const [overrideErrors, setOverrideErrors] = useState<Record<string, string>>(
-    {}
-  );
 
   // Read via a ref rather than a dependency: the seed effect below should
   // only re-seed when it actually needs to, not every time the persisted
@@ -231,49 +214,9 @@ export default function PredictPage() {
     [districts, farmerInputs, setFarmerInputs, setResult]
   );
 
-  const handleOverrideChange = useCallback((name: string, raw: string) => {
-    const meta = FEATURE_META_BY_NAME[name];
-    if (!meta) return;
-
-    setOverrides((prev) => {
-      const next = { ...prev };
-      if (raw === "") {
-        delete next[name];
-      } else {
-        next[name] = Number(raw);
-      }
-      return next;
-    });
-
-    setOverrideErrors((prev) => {
-      const next = { ...prev };
-      if (raw === "") {
-        delete next[name];
-        return next;
-      }
-      const problem = validateOverride(meta, Number(raw));
-      if (problem) {
-        next[name] = tForm(problem.key, {
-          min: problem.min,
-          max: problem.max,
-        });
-      } else {
-        delete next[name];
-      }
-      return next;
-    });
-  }, [tForm]);
-
-  const handleReset = useCallback(() => {
-    setOverrides({});
-    setOverrideErrors({});
-  }, []);
-
-  const hasErrors = Object.keys(overrideErrors).length > 0;
-
   const isValid = useMemo(
-    () => Boolean(district && season && !hasErrors),
-    [district, season, hasErrors]
+    () => Boolean(district && season),
+    [district, season]
   );
 
   const handlePredict = async () => {
@@ -282,27 +225,15 @@ export default function PredictPage() {
     setPredictError(null);
 
     try {
-      // Send only what we actually know. The backend resolves the remaining
-      // features from its per-district defaults and recomputes the interaction
-      // terms, so nothing here can be silently zero-filled.
+      // Send only what the farmer actually chose. The backend resolves every
+      // other feature (rainfall, temperature, NDVI, soil, prior yield, ...)
+      // from its per-district defaults and recomputes the interaction terms,
+      // so nothing here can be silently zero-filled or farmer-edited.
       const payload: Record<string, unknown> = {
         district,
         season,
         year,
-        ...overrides,
       };
-
-      const extent = Number(farmerInputs.extentHa);
-      if (farmerInputs.extentHa !== "" && Number.isFinite(extent)) {
-        payload.extent_prev_season = extent;
-      }
-
-      const lastYield = Number(farmerInputs.lastSeasonYield);
-      if (farmerInputs.lastSeasonYield !== "" && Number.isFinite(lastYield)) {
-        // The farmer's own recall of last harvest — the strongest signal they own.
-        payload.prev_season_yield = lastYield;
-        payload.prev_year_yield = lastYield;
-      }
 
       // TEMP DEBUG — remove once district/year propagation is verified.
       console.log("[Predict] request payload:", payload);
@@ -333,8 +264,6 @@ export default function PredictPage() {
   const handleNewPrediction = useCallback(() => {
     resetPrediction();
     setPredictError(null);
-    setOverrides({});
-    setOverrideErrors({});
     setContext(null);
     setContextError(null);
     setBaseline(null);
@@ -364,21 +293,9 @@ export default function PredictPage() {
 
           <KnownDataPanel
             context={context}
-            featureSources={result?.feature_sources}
             resolved={result?.resolved_features}
-            overrides={overrides}
             loading={contextLoading}
             error={contextError}
-          />
-
-          <AdvancedOverrides
-            enabled={advanced}
-            onToggle={handleAdvancedToggle}
-            context={context}
-            overrides={overrides}
-            errors={overrideErrors}
-            onOverrideChange={handleOverrideChange}
-            onReset={handleReset}
           />
 
           <div className="flex gap-3">
@@ -417,12 +334,6 @@ export default function PredictPage() {
               </button>
             )}
           </div>
-
-          {hasErrors && (
-            <p className="text-center text-sm font-medium text-red-600">
-              {tForm("fixErrors")}
-            </p>
-          )}
         </section>
 
         <section className="space-y-6 lg:col-span-5">

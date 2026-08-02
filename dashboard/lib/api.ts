@@ -67,9 +67,16 @@ export interface PredictResponse {
   per_feature_eri?: Record<string, number>;
 }
 
-/** Whether the prediction was conditioned on anything the user actually observed. */
+/** What kind of statement the prediction actually is:
+ *  - "conditioned": grounded in values the farmer/officer supplied themselves.
+ *  - "historical_record": the requested year has a real recorded row in the
+ *    dataset (see src/api.py _exact_year_row) — a genuine past result, not
+ *    an average or a guess.
+ *  - "climatological": no observations and no record for that year (typically
+ *    a future year), so every feature is the (district, season) mean — the
+ *    same number for every such year. */
 export interface ForecastBasis {
-  basis: "climatological" | "conditioned";
+  basis: "climatological" | "conditioned" | "historical_record";
   year_is_model_feature: boolean;
   year_affects_prediction: boolean;
   n_observed_inputs: number;

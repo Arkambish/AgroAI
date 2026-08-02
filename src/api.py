@@ -62,7 +62,18 @@ RESULTS_DIR = os.path.join(ROOT, 'outputs', f'results{_SUFFIX}')
 PROCESSED_DIR = os.path.join(ROOT, 'data', f'processed{_SUFFIX}')
 
 app = Flask(__name__)
-CORS(app)
+# Explicit origin/method/header allowlist for the dashboard dev server.
+# CORS(app) with no arguments reflects *any* request Origin back verbatim
+# (flask-cors' default resource is {"origins": "*"}, and it echoes the
+# specific Origin header rather than sending a literal "*" whenever one is
+# present) — every site on the internet could call this API from a browser.
+# Restricting `origins` here is what actually scopes it to the dashboard.
+CORS(
+    app,
+    resources={r"/*": {"origins": "http://localhost:3000"}},
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
 
 # Set in the environment (or .env) before starting the server, e.g.
 #   OPENROUTER_API_KEY=sk-or-... python src/api.py
@@ -235,19 +246,52 @@ def _build_catalog(df: pd.DataFrame) -> list:
     return sorted(catalog, key=lambda d: d['name'])
 
 
+def _exact_year_row(district: str, season: str, year) -> dict:
+    """The real recorded feature row for (district, season, year), if the
+    dataset actually has one — same lookup /context uses to decide
+    source="exact" vs "historical_mean". Returns {} when there's no such
+    row (e.g. a future year, or a district/season pair not in the data).
+    """
+    df = _state.get('context_df')
+    if df is None or district is None or season is None or year is None:
+        return {}
+    try:
+        year_int = int(year)
+    except (TypeError, ValueError):
+        return {}
+
+    match = df[
+        (df['District'] == district)
+        & (df['Season'] == season)
+        & (df['Year'] == year_int)
+    ]
+    if match.empty:
+        return {}
+    row = match.iloc[0]
+    return {f: float(row[f]) for f in ALL_FEATURES if f in row.index and _finite(row[f])}
+
+
 def _resolve_features(data: dict):
     """Build the 32-feature vector, recording where every value came from.
 
-    Resolution order per feature: request value → (district, season) mean →
-    district mean → season mean → global mean → 0.0. The three interaction
+    Resolution order per feature: request value → exact (district, season,
+    year) record → (district, season) mean → district mean → season mean →
+    global mean → 0.0. The exact-year tier is what lets a request for a year
+    the dataset actually recorded (e.g. 2019) be grounded in what really
+    happened that season, rather than always falling back to a multi-year
+    average regardless of which year was asked for. The three interaction
     terms are always recomputed from the resolved inputs so they can never
     disagree with the features the model actually sees.
     """
     defaults = _state.get('defaults') or {}
     district = data.get('district')
     season = data.get('season')
+    year = data.get('year')
+
+    exact_year = _exact_year_row(district, season, year)
 
     tiers = [
+        ('exact_year_record', exact_year),
         ('district_season_mean', (defaults.get('district_season') or {}).get((district, season), {})),
         ('district_mean', (defaults.get('district') or {}).get(district, {})),
         ('season_mean', (defaults.get('season') or {}).get(season, {})),
@@ -311,6 +355,62 @@ def _metrics_for(model_name: str) -> dict:
     }
 
 
+def _init_explainer(name: str) -> None:
+    """Build a SHAP explainer for whichever model got loaded into `_state`.
+
+    TreeExplainer only understands tree ensembles (RandomForest/XGBoost) — it
+    inspects the model's internal split structure, which an SVR simply doesn't
+    have. Previously this branch was the *only* one, so `_state['explainer']`
+    stayed None for SVR and every /predict response silently returned
+    `shap_values: {}`. Anything that isn't a tree ensemble now falls through
+    to shap.KernelExplainer, a model-agnostic method that only needs a
+    predict function and a background sample — it works identically for SVR,
+    or any other model swapped in later.
+    """
+    model = _state['model']
+    scaler = _state['scaler']
+
+    if name in ('RandomForest', 'XGBoost'):
+        try:
+            _state['explainer'] = shap.TreeExplainer(model)
+            print(f'[api] Initialized SHAP TreeExplainer for {name}')
+        except Exception as e:
+            print(f'[api] Failed to initialize SHAP TreeExplainer for {name}: {e}')
+        return
+
+    # Model-agnostic path. Explains in the same *raw*, unscaled feature space
+    # as ALL_FEATURES/resolved_features — the wrapper below applies the
+    # scaler internally — so SHAP attributions line up with the human-facing
+    # feature values the rest of the API already returns, and the background
+    # sample can be drawn directly from the historical dataset.
+    def predict_fn(X: np.ndarray) -> np.ndarray:
+        X = np.asarray(X, dtype=np.float32)
+        if scaler is not None:
+            X = scaler.transform(X)
+        return model.predict(X)
+
+    df = _state.get('context_df')
+    if df is None or not all(f in df.columns for f in ALL_FEATURES):
+        print(f'[api] No context dataset available — skipping SHAP explainer for {name}')
+        return
+    background_raw = df[list(ALL_FEATURES)].dropna().to_numpy(dtype=np.float32)
+    if len(background_raw) == 0:
+        print(f'[api] Context dataset has no complete rows — skipping SHAP explainer for {name}')
+        return
+
+    # Summarise to a handful of representative rows. KernelExplainer's cost
+    # scales with background size, so handing it the raw (likely 100+ row)
+    # dataset would make every /predict call take seconds; a k-means summary
+    # keeps per-request latency reasonable without changing what a feature's
+    # "typical" value looks like.
+    background = shap.kmeans(background_raw, min(25, len(background_raw)))
+    try:
+        _state['explainer'] = shap.KernelExplainer(predict_fn, background)
+        print(f'[api] Initialized SHAP KernelExplainer for {name} (model-agnostic)')
+    except Exception as e:
+        print(f'[api] Failed to initialize SHAP KernelExplainer for {name}: {e}')
+
+
 def _load_state() -> None:
     """Load best tabular model. Prefer whichever the evaluator crowned;
     fall back to XGBoost."""
@@ -361,14 +461,6 @@ def _load_state() -> None:
         joblib.load(os.path.join(MODELS_DIR, scaler_file)) if scaler_file else None
     )
 
-    # Initialize SHAP explainer for tree-based models
-    if name in ['RandomForest', 'XGBoost']:
-        try:
-            _state['explainer'] = shap.TreeExplainer(_state['model'])
-            print(f'[api] Initialized SHAP TreeExplainer for {name}')
-        except Exception as e:
-            print(f'[api] Failed to initialize SHAP: {e}')
-
     if not served_is_crowned and crowned.get('Model'):
         print(f'[api] NOTE: evaluator crowned {crowned["Model"]}, which has no servable '
               f'artefact. Serving {name} and reporting {name}\'s own metrics.')
@@ -390,6 +482,10 @@ def _load_state() -> None:
     else:
         print('[api] integrated_dataset.csv not found — /context will return 503 '
               'and /predict will fall back to zero-fill.')
+
+    # SHAP explainer — needs context_df (for the KernelExplainer background
+    # sample), so this must run after the dataset load above.
+    _init_explainer(name)
 
     # Optional: conformal (calibrated) interval half-widths per model.
     conf_path = os.path.join(RESULTS_DIR, 'conformal.json')
@@ -422,11 +518,16 @@ def run_prediction(data: dict):
         return {'error': 'Model not loaded'}, 503
 
     resolved, feature_sources = _resolve_features(data)
-    feature_vec = np.array([[resolved[f] for f in ALL_FEATURES]],
+    # Raw, unscaled — the same space as ALL_FEATURES/resolved_features and
+    # the KernelExplainer background built in _init_explainer. Kept separate
+    # from the scaled model input below so SHAP (computed further down) can
+    # reuse it rather than trying to invert the scaler.
+    feature_row = np.array([[resolved[f] for f in ALL_FEATURES]],
                            dtype=np.float32)
+    model_input = feature_row
     if _state['scaler'] is not None:
-        feature_vec = _state['scaler'].transform(feature_vec)
-    prediction = float(_state['model'].predict(feature_vec)[0])
+        model_input = _state['scaler'].transform(model_input)
+    prediction = float(_state['model'].predict(model_input)[0])
 
     # Prefer conformal (calibrated) interval half-width; fall back to Gaussian ±1.96·RMSE.
     conf = (_state.get('conformal') or {}).get(_state.get('model_name'))
@@ -441,16 +542,46 @@ def run_prediction(data: dict):
         margin = prediction * 0.15
         interval_method = 'heuristic_15pct'
 
-    # Calculate SHAP values for this prediction
+    # Calculate SHAP values for this prediction.
     shap_dict = {}
-    if _state['explainer'] is not None:
+    explainer = _state['explainer']
+    if explainer is not None:
         try:
-            # TreeExplainer expects a 2D array or similar. feature_vec is already (1, N)
-            sv = _state['explainer'].shap_values(feature_vec)
-            # For XGBoost/RF regression, sv is usually (1, N) or (N,)
-            if isinstance(sv, list): sv = sv[0]
-            if len(sv.shape) == 2: sv = sv[0]
-            shap_dict = {f: float(sv[i]) for i, f in enumerate(ALL_FEATURES)}
+            if isinstance(explainer, shap.TreeExplainer):
+                # Fit directly on the model, so it expects the same (scaled,
+                # if a scaler is present) space the model itself predicts on.
+                sv = explainer.shap_values(model_input)
+            else:
+                # KernelExplainer wraps a predict_fn that scales internally
+                # (see _init_explainer), so it expects the raw, unscaled
+                # feature row — the same space its background sample was
+                # built from. nsamples bounds worst-case latency; without it
+                # shap's 'auto' heuristic can run into the thousands for 32
+                # features, turning one /predict call into several seconds.
+                # l1_reg=0 disables KernelExplainer's default
+                # l1_reg="num_features(10)" LASSO feature selection, which
+                # otherwise silently zeroes out all but 10 of the 32
+                # features — a sparsity artefact of the regression, not a
+                # real "no effect" signal, and it's the reason shap_values
+                # came back mostly empty even once the explainer itself was
+                # wired up correctly.
+                sv = explainer.shap_values(
+                    feature_row, nsamples=100, l1_reg=0, silent=True
+                )
+
+            # For XGBoost/RF regression, sv is usually (1, N) or (N,).
+            if isinstance(sv, list):
+                sv = sv[0]
+            sv = np.asarray(sv)
+            if sv.ndim == 2:
+                sv = sv[0]
+
+            # NaN/Inf can leak in from a degenerate background sample or a
+            # KernelExplainer coalition that hit a model edge case — drop
+            # rather than ship a non-JSON-serializable or misleading value.
+            shap_dict = {
+                f: float(v) for f, v in zip(ALL_FEATURES, sv) if np.isfinite(v)
+            }
         except Exception as e:
             print(f'[api] SHAP error: {e}')
 
@@ -463,9 +594,10 @@ def run_prediction(data: dict):
 
     # How much of the vector is grounded in a real record vs a wider fallback.
     n_user = sum(1 for s in feature_sources.values() if s == 'user')
+    n_exact_year = sum(1 for s in feature_sources.values() if s == 'exact_year_record')
     n_grounded = sum(
         1 for s in feature_sources.values()
-        if s in ('user', 'district_season_mean', 'district_mean', 'derived')
+        if s in ('user', 'exact_year_record', 'district_season_mean', 'district_mean', 'derived')
     )
     n_zero = sum(1 for s in feature_sources.values() if s == 'zero_fallback')
 
@@ -477,25 +609,47 @@ def run_prediction(data: dict):
 
     # What kind of statement is this number, really?
     #
-    # 'Year' is not in ALL_FEATURES, and _resolve_features keys its default cascade on
-    # (district, season) only. So with no user-supplied observations the vector — and
-    # therefore the prediction — is byte-identical for 2019 and 2040. Saying so here is
-    # the difference between a forecast and a district lookup presented as one.
+    # 'Year' is not in ALL_FEATURES, so it never influences the model directly — the
+    # requested year only matters through which tier _resolve_features pulled from:
+    #   - the farmer/officer supplied real values themselves               -> conditioned
+    #   - the requested year has an actual recorded row in the dataset     -> historical_record
+    #   - neither (typically a future year, e.g. the current year default) -> climatological,
+    #     identical for every such year, since nothing distinguishes 2024 from 2040 here.
+    # Collapsing the last two into one "climatological" label (the old behaviour) told a
+    # farmer asking about a real recorded past season the exact same "not a forecast, same
+    # number every year" story as one asking about an unrecorded future season — even
+    # though the former really did use that season's own weather/soil/NDVI data.
     year_is_feature = 'Year' in ALL_FEATURES or 'year' in ALL_FEATURES
     conditioned = n_user > 0
+    year_has_exact_record = n_exact_year > 0
+    if conditioned:
+        basis = 'conditioned'
+    elif year_has_exact_record:
+        basis = 'historical_record'
+    else:
+        basis = 'climatological'
+
     forecast_basis = {
-        'basis': 'conditioned' if conditioned else 'climatological',
+        'basis': basis,
         'year_is_model_feature': year_is_feature,
-        'year_affects_prediction': bool(conditioned or year_is_feature),
+        'year_affects_prediction': bool(conditioned or year_has_exact_record or year_is_feature),
         'n_observed_inputs': n_user,
         'note': (
             'Conditioned on {n} value(s) you supplied. The remaining features are the '
             '(district, season) historical mean.'.format(n=n_user)
             if conditioned else
-            'No observed values were supplied, so every feature came from the '
-            '(district, season) historical mean. This is the climatological expectation '
-            'for this district and season — it is the same number for every year, and '
-            'is not a forecast of the year requested.'
+            'These are the actual recorded weather, satellite and soil conditions for '
+            '{district} in {season} {year} — not an average across years. This is a real '
+            'historical result, not a forecast.'.format(
+                district=data.get('district'), season=data.get('season'), year=data.get('year'),
+            )
+            if year_has_exact_record else
+            'No observed values were supplied and {year} has no recorded data yet, so every '
+            'feature came from the (district, season) historical mean. This is the '
+            'climatological expectation for this district and season — it is the same '
+            'number for every such year, and is not a forecast of {year} specifically.'.format(
+                year=data.get('year'),
+            )
         ),
     }
 

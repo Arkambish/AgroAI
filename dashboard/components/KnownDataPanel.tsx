@@ -1,41 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Database, Satellite } from "lucide-react";
+import { ChevronDown, Lock, Satellite } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { clsx } from "clsx";
-import {
-  FEATURE_GROUPS,
-  SOURCE_STYLES,
-  formatFeatureValue,
-  type FeatureSource,
-} from "@/lib/features";
+import { FEATURE_GROUPS, formatFeatureValue } from "@/lib/features";
 import type { ContextResponse } from "@/lib/api";
 
 interface Props {
   context: ContextResponse | null;
-  /** Populated after a prediction — where each value actually came from */
-  featureSources?: Record<string, FeatureSource>;
   /** Populated after a prediction — the values actually fed to the model */
   resolved?: Record<string, number>;
-  /** Advanced-mode overrides, shown as user-supplied */
-  overrides: Record<string, number>;
   loading: boolean;
   error: string | null;
 }
 
 /**
- * Tier B — the ~28 features the system supplies.
- *
- * Read-only by design: these are NASA POWER, MODIS and SoilGrids products that
- * no farmer can measure. Displaying them with their provenance makes the
- * multi-source pipeline visible, which a form of blank number boxes never did.
+ * Everything the model needs beyond district/season/year — weather,
+ * satellite, soil and historical-harvest figures a farmer cannot measure
+ * themselves. Shown read-only, with no provenance/source detail: the farmer
+ * only needs to know these were filled in automatically and cannot be
+ * changed here, not which averaging tier each one came from.
  */
 export default function KnownDataPanel({
   context,
-  featureSources,
   resolved,
-  overrides,
   loading,
   error,
 }: Props) {
@@ -48,21 +37,9 @@ export default function KnownDataPanel({
   // default.
   const [open, setOpen] = useState<string | null>(null);
   // The whole technical breakdown is hidden by default. Non-technical
-  // farmers only need the one-line "17-year average for X (Y)" summary;
-  // the per-source feature groups are an opt-in "View details" drawer.
+  // farmers only need to know these values were filled in automatically;
+  // the per-group feature list is an opt-in "View details" drawer.
   const [detailsOpen, setDetailsOpen] = useState(false);
-
-  const provenance = (() => {
-    if (!context) return null;
-    if (context.source === "exact") {
-      return t("provenanceExact", { year: context.year });
-    }
-    return t("provenanceAverage", {
-      years: context.n_years ?? 0,
-      district: context.district,
-      season: context.season,
-    });
-  })();
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
@@ -73,11 +50,10 @@ export default function KnownDataPanel({
             {t("knownSectionTitle")}
           </h3>
         </div>
-        {provenance && (
-          <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-800">
-            {provenance}
-          </span>
-        )}
+        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">
+          <Lock size={11} />
+          {t("autoFilled")}
+        </span>
       </div>
 
       <p className="text-sm text-slate-500">{t("knownSectionHelp")}</p>
@@ -127,15 +103,9 @@ export default function KnownDataPanel({
                   onClick={() => setOpen(isOpen ? null : group.key)}
                   className="flex w-full items-center justify-between bg-slate-50 px-4 py-3 text-left transition-colors hover:bg-slate-100"
                 >
-                  <div className="flex items-center space-x-2.5">
-                    <Database size={15} className="text-slate-400" />
-                    <span className="text-sm font-bold text-slate-800">
-                      {tg(group.labelKey)}
-                    </span>
-                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 ring-1 ring-slate-200">
-                      {group.sourceBadge}
-                    </span>
-                  </div>
+                  <span className="text-sm font-bold text-slate-800">
+                    {tg(group.labelKey)}
+                  </span>
                   <div className="flex items-center space-x-2">
                     <span className="text-xs text-slate-400">
                       {group.features.length}
@@ -153,24 +123,11 @@ export default function KnownDataPanel({
                 {isOpen && (
                   <dl className="divide-y divide-slate-100">
                     {group.features.map((meta) => {
-                      const overridden = overrides[meta.name] !== undefined;
-                      const source: FeatureSource | undefined = overridden
-                        ? "user"
-                        : featureSources?.[meta.name];
-
-                      // Show what the model actually used, in priority order:
-                      // an unsent override → the last prediction's resolved value
-                      // → the area's context value. Otherwise a "You" badge can
-                      // sit next to a value the farmer never entered.
-                      let value: number | undefined;
-                      if (overridden) {
-                        value = overrides[meta.name];
-                      } else if (resolved?.[meta.name] !== undefined) {
-                        value = resolved[meta.name];
-                      } else {
-                        value = context?.[meta.name] as number | undefined;
-                      }
-                      const isUserValue = overridden || source === "user";
+                      // What the model actually used, if a prediction has
+                      // already run — otherwise the area's context value.
+                      const value =
+                        resolved?.[meta.name] ??
+                        (context?.[meta.name] as number | undefined);
 
                       return (
                         <div
@@ -180,29 +137,10 @@ export default function KnownDataPanel({
                           <dt className="text-xs text-slate-600">
                             {tf(meta.labelKey)}
                           </dt>
-                          <dd className="flex items-center gap-2">
-                            {source && (
-                              <span
-                                className={clsx(
-                                  "rounded px-1.5 py-0.5 text-[10px] font-semibold",
-                                  SOURCE_STYLES[source],
-                                )}
-                              >
-                                {t(`source.${source}`)}
-                              </span>
-                            )}
-                            <span
-                              className={clsx(
-                                "font-mono text-xs font-semibold tabular-nums",
-                                isUserValue
-                                  ? "text-emerald-700"
-                                  : "text-slate-800",
-                              )}
-                            >
-                              {loading && !context
-                                ? "…"
-                                : formatFeatureValue(value, meta)}
-                            </span>
+                          <dd className="font-mono text-xs font-semibold tabular-nums text-slate-800">
+                            {loading && !context
+                              ? "…"
+                              : formatFeatureValue(value, meta)}
                           </dd>
                         </div>
                       );

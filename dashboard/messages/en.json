@@ -18,46 +18,17 @@
     "district": "District",
     "season": "Season",
     "year": "Year",
-    "optional": "(optional)",
-    "on": "On",
-    "off": "Off",
 
     "fieldSectionTitle": "Select your farm details",
     "fieldSectionHelp": "We collect weather, satellite and soil information automatically for your area.",
     "loadingArea": "Loading your area…",
 
-    "extentLabel": "Farm size (optional)",
-    "extentHelp": "Leave blank to use the area average.",
-    "lastYieldLabel": "Previous harvest (optional)",
-    "lastYieldHelp": "Helps improve prediction accuracy.",
-    "useDistrictAverage": "Use district average",
-
     "knownSectionTitle": "What we already know about your area",
-    "knownSectionHelp": "We automatically collect weather, satellite, soil and historical harvest information for your area.",
+    "knownSectionHelp": "We automatically collect weather, satellite, soil and historical harvest information for your area. These values are filled in for you and cannot be edited.",
+    "autoFilled": "Auto-filled",
     "viewDetails": "View details",
     "hideDetails": "Hide details",
-    "contextUnavailable": "No records found for this area yet. The prediction will use wider district and seasonal averages.",
-
-    "provenanceExact": "Exact {year} record",
-    "provenanceAverage": "{years}-year average for {district} ({season})",
-
-    "advancedTitle": "Advanced / Officer mode",
-    "advancedHelp": "For agriculture officers with a soil test or fresh field reading.",
-    "overrideCount": "{count, plural, one {# value overridden} other {# values overridden}}",
-    "noOverrides": "Using recorded values for your area.",
-    "resetDefaults": "Reset to district defaults",
-    "outOfRange": "Enter a value between {min} and {max}.",
-    "fixErrors": "Please correct the highlighted values before predicting.",
-
-    "source": {
-      "user": "You",
-      "district_season_mean": "District record",
-      "district_mean": "District avg",
-      "season_mean": "Season avg",
-      "global_mean": "Overall avg",
-      "derived": "Calculated",
-      "zero_fallback": "Missing"
-    }
+    "contextUnavailable": "No records found for this area yet. The prediction will use wider district and seasonal averages."
   },
 
   "featureGroups": {
@@ -141,9 +112,6 @@
     "intervalGaussian": "Range estimated as ±1.96 × the model's error (RMSE). Approximate, not calibrated.",
     "intervalHeuristic": "Rough ±15% estimate only — this model has no calibrated interval yet.",
 
-    "basisAllYears": "all years",
-    "basisClimatological": "You did not enter any measured conditions, so this is the historical average for this district and season — not a forecast for {year}. The model returns this same number for every year. To get a year-specific estimate, enter the rainfall, temperature and other conditions actually observed this season.",
-
     "modelLabel": "Model: {model}",
     "modelReliability": "Model reliability",
     "r2Value": "R² = {value}",
@@ -160,9 +128,6 @@
     "change": "Compared to average",
     "vsDistrictAverage": "vs district average",
     "previousSeason": "Previous Season",
-
-    "dataSourcesTitle": "Data used for prediction",
-    "dataSourcesBody": "This prediction uses weather, satellite, soil and historical harvest information from your selected area.",
 
     "success": "Prediction Completed",
     "successDescription": "AI has successfully generated yield prediction",
@@ -248,24 +213,18 @@
   },
 
   "explain": {
-    "title": "Why This Prediction?",
-    "subtitle": "Understand what factors influenced your yield prediction",
+    "title": "Why this prediction?",
+    "summaryYield": "Your expected yield: {value} MT/Ha",
 
     "noPrediction": "No Prediction Found",
     "noDescription": "Please make a prediction first to see explanation.",
     "goPredict": "Go to Prediction",
 
-    "keyFactors": "Key Factors",
-    "summary": "Summary for Farmers",
+    "keyFactors": "Main factors affecting your yield",
     "reasoning": "AI Explanation",
-
-    "basedOn": "Based on the conditions recorded for",
-    "expected": "we expect a yield of",
 
     "relative": "Relative Influence",
 
-    "positive": "helped increase",
-    "negative": "reduced",
     "impactLabel": "Impact",
     "impactPositive": "↑ Increased yield",
     "impactNegative": "↓ Reduced yield",
@@ -277,7 +236,7 @@
       "low": "Low"
     },
 
-    "technicalDetails": "Technical details",
+    "technicalDetails": "View technical details",
     "technicalFeatures": "Underlying model features",
 
     "keyInsight": "Key Insight",
@@ -292,31 +251,33 @@
     "district": "District",
     "yield": "Yield",
     "reliability": {
-      "badge": "Explanation reliability: {value}% — {level}",
-      "badgeUnknown": "Explanation reliability isn't available for this prediction",
-      "levelHigh": "high",
-      "levelMedium": "medium",
-      "levelLow": "low, interpret with caution",
-      "viewSimple": "Simple view",
-      "viewReliability": "Reliability view",
-      "legend": "Faded / hatched bars = less reliable explanation",
-      "unknown": "N/A",
-      "cardLabel": "Explanation reliability",
+      "cardLabel": "Confidence",
       "cardHigh": "High reliability",
       "cardGood": "Good reliability",
       "cardModerate": "Moderate reliability",
       "cardLow": "Low reliability",
-      "cardUnknown": "Not available"
+      "cardUnknown": "Not available",
+      "summaryLabel": "Explanation reliability",
+      "confidenceHigh": "High confidence",
+      "confidenceMedium": "Medium confidence",
+      "confidenceLow": "Low confidence",
+      "confidenceUnknown": "Confidence unknown",
+      "summaryNote": {
+        "levelHigh": "This explanation is well grounded — you can trust these factors.",
+        "levelMedium": "This explanation is reasonably grounded — treat it as a helpful guide alongside your own judgement.",
+        "levelLow": "This explanation has limited grounding — treat these factors as a rough guide only.",
+        "unknown": "We don't have a reliability score for this explanation yet."
+      }
     },
     "features": {
-      "rainfall": "Rainfall",
-      "temperature": "Temperature",
+      "rainfall": "Rainfall availability",
+      "temperature": "Temperature conditions",
       "humidity": "Humidity",
-      "soil_ph": "Soil pH",
+      "soil_ph": "Soil condition",
       "soil_moisture": "Soil Moisture",
       "ndvi": "Greenness (NDVI)",
       "solar_radiation": "Solar Radiation",
-      "evi": "Vegetation (EVI)",
+      "evi": "Vegetation health (EVI)",
       "clay": "Clay",
       "sand": "Sand",
       "organic_carbon": "Organic Carbon",

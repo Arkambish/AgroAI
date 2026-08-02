@@ -6,8 +6,6 @@ import {
   History,
   TrendingUp,
   TrendingDown,
-  AlertTriangle,
-  Database,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { clsx } from "clsx";
@@ -46,14 +44,6 @@ export default function PredictionResultCard({
     : result.season;
 
   const point = result.predicted_yield_MT_per_Ha;
-  const completeness = result.data_completeness;
-
-  // `year` is not a model feature, and with no observed inputs every feature comes
-  // from the (district, season) mean — so the identical number is returned for 2019
-  // and 2040. Stamping the requested year onto it would advertise a forecast that
-  // never happened, which is the one thing this card must not do.
-  const basis = result.forecast_basis;
-  const isClimatological = basis?.basis === "climatological";
 
   // Describe how the interval was actually produced — a calibrated conformal
   // band and a crude ±15% heuristic used to render identically.
@@ -114,17 +104,9 @@ export default function PredictionResultCard({
           </p>
         )}
 
-        {isClimatological && (
-          <p className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
-            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-            <span>{t("basisClimatological", { year: result.year })}</span>
-          </p>
-        )}
-
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-emerald-900">
           <span>
-            {districtName} · {seasonName}
-            {isClimatological ? ` · ${t("basisAllYears")}` : ` ${result.year}`}
+            {districtName} · {seasonName} {result.year}
           </span>
           <span>{t("modelLabel", { model: result.model })}</span>
         </div>
@@ -202,28 +184,6 @@ export default function PredictionResultCard({
         </div>
       )}
 
-      {/* Data sources used for prediction */}
-      {/* {completeness && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center space-x-2">
-            <Database size={16} className="text-emerald-600" />
-            <p className="text-xs font-bold text-slate-700">
-              {t("dataSourcesTitle")}
-            </p>
-          </div>
-
-          <p className="mt-2 text-xs leading-relaxed text-slate-600">
-            {t("dataSourcesBody")}
-          </p>
-
-          <div className="mt-3 space-y-1.5 text-xs text-slate-600">
-            <p>✓ Weather information</p>
-            <p>✓ Satellite vegetation data</p>
-            <p>✓ Soil characteristics</p>
-            <p>✓ Historical harvest records</p>
-          </div>
-        </div>
-      )} */}
       <div className="space-y-3 rounded-2xl bg-slate-900 p-6 text-white shadow-xl">
         <h4 className="flex items-center space-x-2 font-bold text-emerald-400">
           <CheckCircle2 size={20} />

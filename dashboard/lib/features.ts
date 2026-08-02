@@ -126,6 +126,7 @@ export const FEATURE_META_BY_NAME: Record<string, FeatureMeta> =
  */
 export type FeatureSource =
   | "user"
+  | "exact_year_record"
   | "district_season_mean"
   | "district_mean"
   | "season_mean"
@@ -136,6 +137,7 @@ export type FeatureSource =
 /** Tailwind classes per provenance tier — greener means better grounded. */
 export const SOURCE_STYLES: Record<FeatureSource, string> = {
   user: "bg-emerald-100 text-emerald-800",
+  exact_year_record: "bg-teal-100 text-teal-800",
   district_season_mean: "bg-sky-100 text-sky-800",
   district_mean: "bg-sky-100 text-sky-800",
   season_mean: "bg-amber-100 text-amber-800",

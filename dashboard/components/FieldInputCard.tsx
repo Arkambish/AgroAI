@@ -8,10 +8,6 @@ export interface FarmerInputs {
   district: string;
   season: string;
   year: number;
-  /** Optional — hectares planted last season */
-  extentHa: string;
-  /** Optional — MT/Ha harvested last season */
-  lastSeasonYield: string;
 }
 
 interface Props {
@@ -25,11 +21,10 @@ const selectClass =
   "w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none";
 
 /**
- * Tier A — the only things a farmer actually knows.
- *
- * District, season and year are required; extent and last season's yield are
- * optional and fall back to district records. Everything else the model needs
- * is filled server-side, so nothing here asks for a satellite index.
+ * The only three things a farmer actually provides: district, season and
+ * year. Every other model input (rainfall, temperature, NDVI, soil, prior
+ * yield, ...) is resolved server-side and shown read-only in
+ * KnownDataPanel — nothing here asks for a satellite index.
  */
 export default function FieldInputCard({
   value,
@@ -158,57 +153,6 @@ export default function FieldInputCard({
               </option>
             ))}
           </select>
-        </div>
-      </div>
-
-      {/* The only two model features a farmer genuinely owns. Both optional
-          — set off by a dashed divider and a lighter label weight so the
-          three required fields above stay the primary focus. */}
-      <div className="space-y-3 border-t border-dashed border-slate-100 pt-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <label
-              htmlFor="extentHa"
-              className="text-xs font-semibold text-slate-500"
-            >
-              {t("extentLabel")}
-            </label>
-            <input
-              id="extentHa"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step={0.1}
-              placeholder={t("useDistrictAverage")}
-              value={value.extentHa}
-              onChange={(e) => onChange({ extentHa: e.target.value })}
-              className={selectClass}
-              suppressHydrationWarning
-            />
-            <p className="text-[11px] text-slate-400">{t("extentHelp")}</p>
-          </div>
-
-          <div className="space-y-1.5">
-            <label
-              htmlFor="lastSeasonYield"
-              className="text-xs font-semibold text-slate-500"
-            >
-              {t("lastYieldLabel")}
-            </label>
-            <input
-              id="lastSeasonYield"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step={0.1}
-              placeholder={t("useDistrictAverage")}
-              value={value.lastSeasonYield}
-              onChange={(e) => onChange({ lastSeasonYield: e.target.value })}
-              className={selectClass}
-              suppressHydrationWarning
-            />
-            <p className="text-[11px] text-slate-400">{t("lastYieldHelp")}</p>
-          </div>
         </div>
       </div>
     </div>
