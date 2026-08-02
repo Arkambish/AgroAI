@@ -141,7 +141,18 @@ def stress_vs_yield(stress_by_cell=None):
 
     arms = ablation.sort_values('stress_cv_pct')
     target_cv = float(ablation['target_cv_pct'].iloc[0])
-    bars = ax2.barh(arms['arm'], arms['stress_cv_pct'], color=SERIES[0],
+    # Raw config identifiers are fine in the CSV; a report figure needs prose.
+    ARM_LABELS = {
+        'full': 'full model',
+        'no_shrinkage': 'no shrinkage',
+        'strong_shrinkage': 'strong shrinkage',
+        'fixed_physics': 'published coefficients, not estimated',
+        'flat_beta': 'uniform β(τ) — no phenology',
+        'calendar_time': 'calendar time, not thermal time',
+        'no_waterlogging': 'no waterlogging term',
+    }
+    labels = [ARM_LABELS.get(a, a.replace('_', ' ')) for a in arms['arm']]
+    bars = ax2.barh(labels, arms['stress_cv_pct'], color=SERIES[0],
                     height=0.6, zorder=3)
     for bar, value in zip(bars, arms['stress_cv_pct']):
         ax2.text(value + 0.4, bar.get_y() + bar.get_height() / 2, f'{value:.1f}%',
@@ -247,6 +258,10 @@ def scoreboard():
                 va='center', ha='left' if value >= 0 else 'right',
                 color=INK, fontsize=9)
     ax.axvline(0, color=BASELINE, lw=1.2, zorder=2)
+    # Headroom on the left, or the most negative bar's label (Persistence, -1.085)
+    # collides with its own tick label.
+    span = table['R2'].max() - table['R2'].min()
+    ax.set_xlim(table['R2'].min() - 0.14 * span, table['R2'].max() + 0.10 * span)
 
     if summary is not None:
         ceiling = summary['implied_loyo_r2_ceiling']
