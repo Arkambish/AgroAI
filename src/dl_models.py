@@ -151,6 +151,29 @@ def _save_oof(model_name: str, oof: np.ndarray, y: np.ndarray, df: pd.DataFrame,
         json.dump(payload, f, indent=2)
 
 
+def _save_history(model_name: str, history: dict | None) -> None:
+    """Persist the per-epoch loss trace behind the learning-curve figures.
+
+    Figure 6.1 of the report plots this, so it belongs on disk as an artefact
+    rather than existing only inside a PNG. Note what it is: the trace from the
+    LAST leave-one-year-out fold, with the validation split carved from that
+    fold's training partition.
+    """
+    if not history:
+        return
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    slug = model_name.lower().replace(' ', '_').replace('-', '_')
+    payload = {
+        'model_name': model_name,
+        'fold': 'last leave-one-year-out fold',
+        'validation_split': 0.15,
+        'loss': [float(v) for v in history.get('loss', [])],
+        'val_loss': [float(v) for v in history.get('val_loss', [])],
+    }
+    with open(os.path.join(RESULTS_DIR, f'dl_history_{slug}.json'), 'w') as f:
+        json.dump(payload, f, indent=2)
+
+
 def _metrics(y_true, y_pred, name: str, train_time: float, n_params: int) -> dict:
     from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
     rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
@@ -294,6 +317,7 @@ def train_all_dl_models(seq_payload: dict, df: pd.DataFrame) -> list:
           f'params={m["Parameters"]:,} ({elapsed:.1f}s)')
     actual_vs_predicted(y, oof, 'LSTM', os.path.join(PLOTS_DIR, 'actual_vs_pred_lstm.png'),
                          districts=districts)
+    _save_history('LSTM', hist)
     learning_curve_plot(hist, 'LSTM', os.path.join(TRAIN_PLOTS_DIR, 'lstm_learning_curve.png'))
     metrics_all.append(m)
 
@@ -312,6 +336,7 @@ def train_all_dl_models(seq_payload: dict, df: pd.DataFrame) -> list:
           f'params={m["Parameters"]:,} ({elapsed:.1f}s)')
     actual_vs_predicted(y, oof, 'BiLSTM', os.path.join(PLOTS_DIR, 'actual_vs_pred_bilstm.png'),
                          districts=districts)
+    _save_history('BiLSTM', hist)
     learning_curve_plot(hist, 'BiLSTM', os.path.join(TRAIN_PLOTS_DIR, 'bilstm_learning_curve.png'))
     metrics_all.append(m)
 
@@ -334,6 +359,7 @@ def train_all_dl_models(seq_payload: dict, df: pd.DataFrame) -> list:
           f'params={m["Parameters"]:,} ({elapsed:.1f}s)')
     actual_vs_predicted(y, oof, 'CNN', os.path.join(PLOTS_DIR, 'actual_vs_pred_cnn.png'),
                          districts=districts)
+    _save_history('CNN', hist)
     learning_curve_plot(hist, 'CNN', os.path.join(TRAIN_PLOTS_DIR, 'cnn_learning_curve.png'))
     metrics_all.append(m)
 
@@ -359,6 +385,7 @@ def train_all_dl_models(seq_payload: dict, df: pd.DataFrame) -> list:
     actual_vs_predicted(y, oof, 'Hybrid CNN-LSTM',
                          os.path.join(PLOTS_DIR, 'actual_vs_pred_cnn_lstm.png'),
                          districts=districts)
+    _save_history('Hybrid CNN-LSTM', hist)
     learning_curve_plot(hist, 'Hybrid CNN-LSTM',
                          os.path.join(TRAIN_PLOTS_DIR, 'cnn_lstm_learning_curve.png'))
     metrics_all.append(m)

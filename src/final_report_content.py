@@ -16,7 +16,11 @@ from docx.shared import Inches, Pt
 
 REAL = "outputs/plots_real"
 SYNTH = "outputs/plots"
-FIGDIR = f"{SYNTH}/figures"
+# Corrected schematics from src/generate_final_figures.py. The old
+# {SYNTH}/figures/ set belongs to the interim report and had drifted from both
+# the text and the code (three modules vs four, five stages vs nine, a
+# PostgreSQL store that was never built, "7 models" vs nine base learners).
+FIGDIR = f"{SYNTH}/figures_final"
 
 
 # ============================================================================
@@ -1371,8 +1375,8 @@ CHAPTER_5 = [
      "out-of-fold prediction records share that key and add a model dimension; "
      "the comparison, calibration and attribution artefacts are keyed on model "
      "alone."),
-    ("fig", (f"{FIGDIR}/figure_5_3_database_schema.png",
-             "Figure 5.3: Logical data schema of the processed store")),
+    ("fig", (f"{FIGDIR}/figure_5_3_artefact_schema.png",
+             "Figure 5.3: Logical schema of the persisted artefact store")),
     ("p",
      "The dashboard is organised around the four user groups of Table 4.1. The "
      "overview presents national and district key figures with a choropleth "
@@ -1559,13 +1563,29 @@ CHAPTER_6 = [
      "partition of two dozen records the networks reach their early-stopping "
      "criterion long before the nominal maximum."),
     ("p",
-     "Figure 6.1 shows the training curve of the hybrid on the collected data. "
-     "The behaviour it displays is itself a finding: the validation loss "
-     "separates from the training loss early and does not recover, which is the "
-     "signature of a model with more capacity than the sample can constrain. "
-     "This is consistent with the quantitative outcome reported in section 7.4."),
-    ("fig", (f"{REAL}/training/cnn_lstm_learning_curve.png",
-             "Figure 6.1: Training curve of the hybrid CNN-LSTM on the collected data")),
+     "Figure 6.1 shows the loss trace of the hybrid on the final "
+     "leave-one-year-out fold of the collected data. Two features of it are "
+     "themselves findings. The first is the persistent gap: validation loss "
+     "settles near three times training loss and stays there, which is the "
+     "signature of a model with more capacity than the sample can constrain, "
+     "and is consistent with the quantitative outcome in section 7.4. The "
+     "second is that the run terminated on the fifty-epoch cap rather than on "
+     "the early-stopping criterion, with validation loss still descending. The "
+     "cap is the synthetic-mode setting, which the real-data run inherits; the "
+     "networks were therefore not trained to convergence, and the deep-model "
+     "figures in chapter 7 should be read as a lower bound on what these "
+     "architectures would reach with an uncapped budget. Given the "
+     "leave-one-year-out ceiling established in section 7.1 this would not "
+     "change the ranking, but it is a limitation of the run rather than of the "
+     "architecture."),
+    ("p",
+     "The trace should be read for shape only, not as an estimate of "
+     "generalisation. It comes from one fold, and its validation split is "
+     "fifteen per cent of roughly twenty-four training records, which is three "
+     "or four points."),
+    ("fig", (f"{FIGDIR}/figure_6_1_hybrid_learning_curve.png",
+             "Figure 6.1: Loss trace of the hybrid CNN-LSTM on the final "
+             "leave-one-year-out fold of the collected data")),
 
     ("h2", "6.7 Symbolic Regression Implementation"),
     ("p",
@@ -3511,7 +3531,7 @@ APPENDIX_C = [
     ("h2", "C.3 Full SHAP attribution ranking"),
     ("p",
      "Table C.3 gives the complete top-fifteen mean absolute SHAP attribution "
-     "ranking summarised in section 7.11 and plotted in Figure 7.5."),
+     "ranking summarised in section 7.11."),
     ("table", (
         ["Rank", "Predictor", "Group", "Mean |SHAP|"],
         [
