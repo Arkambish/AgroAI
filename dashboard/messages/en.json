@@ -158,58 +158,74 @@
   },
 
   "recommend": {
-    "title": "Actionable Advice",
-    "subtitle": "Steps you can take to improve your yield based on AI analysis",
-    "aiTitle": "AI Recommendation",
-    "aiLoading": "Working out the best next step for your field…",
-    "aiError": "We couldn't reach the recommendation service. Please try again.",
-    "aiRetry": "Try again",
+    "title": "Recommended Actions",
+    "subtitle": "Based on your predicted yield and crop conditions",
 
     "noTitle": "No Recommendations Yet",
     "noDescription": "Please make a prediction first to see personalized agricultural advice.",
     "start": "Start Now",
 
-    "strategyTitle": "Strategies for Improvement",
-    "learnHow": "Learn how",
+    "impactLabel": "Impact",
+    "impactReduced": "Reduced expected yield",
+    "reasonLabel": "Why this matters",
+    "actionLabel": "Recommended action",
+    "reliabilityLabel": "Reliability",
 
-    "whatIfTitle": "If conditions improve...",
-    "whatIfText": "Your predicted yield is {current} MT/Ha. The best recorded season in your district reached {best} MT/Ha — the gap shows what better conditions could deliver.",
+    "whyToggle": "Why am I seeing this?",
+    "whyFeature": "Feature",
+    "whyShap": "SHAP contribution",
+    "whyShapNegative": "Negative impact",
+    "whyCurrentValue": "Current value",
+    "whyRecommendedRange": "Recommended range",
+    "whySource": "Source",
 
-    "riskTitle": "Risk Prevention",
+    "ifYouActTitle": "If you take these actions",
+    "ifYouActText": "Improving these conditions may help reduce yield loss in future cultivation.",
 
-    "heatRisk": "Heat Wave Alert",
-    "soilRisk": "Soil Erosion",
-    "pestRisk": "Pest Infestation",
+    "allGoodTitle": "Conditions look good",
+    "allGoodDesc": "Your predicted conditions are within the recommended range for big onion cultivation. Keep up your current practices.",
 
-    "heatAction": "Increase irrigation",
-    "soilAction": "Monitor drainage",
-    "pestAction": "Early spray recommended",
+    "risksTitle": "Watch for Possible Risks",
+    "riskLevelLabel": "Level",
+    "riskReasonLabel": "Reason",
+    "riskActionLabel": "Action",
 
-    "riskModerate": "Moderate",
-    "riskLow": "Low",
-    "riskHigh": "High",
-    "riskBasis": "Risk levels are derived from the factors that lowered your prediction.",
+    "level": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
 
-    "action": "Action",
+    "expertTitle": "Need more help?",
+    "expertDesc": "Contact your local agriculture officer for field-specific guidance.",
 
-    "expertTitle": "Expert Support",
-    "expertDesc": "Need more specific advice? Connect with a local agriculture officer.",
-    "findOfficer": "Find Officer",
-
-    "irrigationTitle": "Optimize Irrigation",
-    "irrigationDesc": "Increase water supply during dry periods to stabilize yield.",
-
-    "heatTitle": "Heat Management",
-    "heatDesc": "Use mulching or shade techniques to reduce heat stress.",
-
-    "phTitle": "Adjust Soil pH",
-    "phDesc": "Balance soil pH using lime or sulfur for optimal growth.",
-
-    "nutrientTitle": "Nutrient Boost",
-    "nutrientDesc": "Apply balanced NPK fertilizer for better bulb development.",
-
-    "pestTitle": "Pest Monitoring",
-    "pestDesc": "Monitor and control pests during critical growth stages."
+    "rules": {
+      "soil_ph_low": {
+        "title": "Soil condition",
+        "reason": "Soil pH ({current}) is below the recommended range for big onion growth ({min}–{max}).",
+        "action": "Improve soil condition before the next cultivation stage — apply agricultural lime to raise soil pH."
+      },
+      "soil_ph_high": {
+        "title": "Soil condition",
+        "reason": "Soil pH ({current}) is above the recommended range for big onion growth ({min}–{max}).",
+        "action": "Apply sulfur or organic matter to gradually lower soil pH before the next cultivation stage."
+      },
+      "water_deficit": {
+        "title": "Water management",
+        "reason": "Rainfall this season ({current} mm) was below what big onion typically needs ({min}+ mm), which may have affected crop growth.",
+        "action": "Maintain proper irrigation during dry periods, especially during bulb development."
+      },
+      "heat_stress": {
+        "title": "Heat stress risk",
+        "reason": "High temperature conditions ({current} heat-stress days this season) reduced your expected yield.",
+        "action": "Monitor soil moisture and maintain irrigation during hot spells."
+      },
+      "humidity_disease_risk": {
+        "title": "Disease-prone conditions",
+        "reason": "High humidity ({current}%) during the season increases the risk of fungal disease such as purple blotch.",
+        "action": "Ensure good field drainage and airflow, and watch crops for early signs of disease."
+      }
+    }
   },
 
   "explain": {

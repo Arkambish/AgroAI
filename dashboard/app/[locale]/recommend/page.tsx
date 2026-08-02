@@ -1,31 +1,55 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Lightbulb,
-  CheckCircle2,
-  ShieldAlert,
-  Zap,
+  Sprout,
   Droplets,
-  Sparkles,
-  RotateCw,
+  Flame,
+  CloudRain,
+  CheckCircle2,
+  ChevronDown,
   RotateCcw,
+  Phone,
 } from "lucide-react";
-
-import { useTranslations, useLocale } from "next-intl";
-import {
-  convertSHAPToExplanation,
-  getBaseline,
-  getRecommendation,
-  type BaselineResponse,
-  type ExplanationItem,
-  type PredictResponse,
-} from "@/lib/api";
-import { useLocalJSON, resetPrediction, PREDICTION_KEY } from "@/lib/use-local-flag";
 import { clsx } from "clsx";
 
-type RiskLevel = "High" | "Moderate" | "Low";
+import { useTranslations, useLocale } from "next-intl";
+import { type PredictResponse } from "@/lib/api";
+import {
+  evaluateAgronomicRules,
+  type AgronomicRecommendation,
+  type AgronomicRisk,
+  type RecommendationCategory,
+} from "@/lib/agronomy";
+import { useLocalJSON, resetPrediction, PREDICTION_KEY } from "@/lib/use-local-flag";
+
+const CATEGORY_ICON: Record<RecommendationCategory, typeof Sprout> = {
+  soil: Sprout,
+  water: Droplets,
+  heat: Flame,
+  humidity: CloudRain,
+};
+
+const LEVEL_BADGE_CLASS: Record<"high" | "medium" | "low", string> = {
+  high: "bg-red-100 text-red-600",
+  medium: "bg-amber-100 text-amber-600",
+  low: "bg-emerald-100 text-emerald-600",
+};
+
+const RELIABILITY_EMOJI: Record<string, string> = {
+  cardHigh: "🟢",
+  cardGood: "🟡",
+  cardModerate: "🟠",
+  cardLow: "🔴",
+  cardUnknown: "⚪",
+};
+
+function formatValue(unit: string, value: number): string {
+  if (unit === "pH") return value.toFixed(1);
+  return Math.round(value).toString();
+}
 
 export default function RecommendationPage() {
   const t = useTranslations();
@@ -35,79 +59,32 @@ export default function RecommendationPage() {
   const prediction = useLocalJSON<PredictResponse>(PREDICTION_KEY);
 
   // Same centralized reset used on Predict/Explain — clears the shared
-  // prediction/SHAP/recommendation state and sends the farmer back to the
-  // form to start over.
+  // prediction/SHAP state and sends the farmer back to the form to start
+  // over.
   const handleNewPrediction = () => {
     resetPrediction();
     router.push(`/${locale}/predict`);
   };
-  const explanations = useMemo<ExplanationItem[]>(
-    () => convertSHAPToExplanation(prediction?.shap_values ?? {}),
+
+  const { recommendations, risks } = useMemo(
+    () =>
+      prediction
+        ? evaluateAgronomicRules(prediction)
+        : { recommendations: [], risks: [] },
     [prediction]
   );
-  const [baseline, setBaseline] = useState<BaselineResponse | null>(null);
 
-  const [aiRecommendation, setAiRecommendation] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState(false);
-  // Bumped by the retry button to re-run the fetch effect without changing
-  // any of district/season/year/locale.
-  const [aiRetryToken, setAiRetryToken] = useState(0);
-
-  const predDistrict = prediction?.district;
-  const predSeason = prediction?.season;
-  const predYear = prediction?.year;
-
-  useEffect(() => {
-    if (!predDistrict || !predSeason) return;
-    let active = true;
-
-    getBaseline(predDistrict, predSeason)
-      .then((data) => {
-        if (active) setBaseline(data);
-      })
-      .catch(() => {
-        if (active) setBaseline(null);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [predDistrict, predSeason]);
-
-  // Re-fetches whenever the underlying prediction or the UI language
-  // changes — a language switch needs a fresh call anyway, since the
-  // recommendation text itself is generated in that language, not
-  // translated client-side.
-  useEffect(() => {
-    if (!predDistrict || !predSeason || predYear === undefined) return;
-    let active = true;
-
-    setAiLoading(true);
-    setAiError(false);
-
-    getRecommendation({
-      district: predDistrict,
-      season: predSeason,
-      year: predYear,
-      locale,
-    })
-      .then((data) => {
-        if (!active) return;
-        setAiRecommendation(data.recommendation);
-      })
-      .catch((err) => {
-        console.error("Recommendation request failed:", err);
-        if (active) setAiError(true);
-      })
-      .finally(() => {
-        if (active) setAiLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [predDistrict, predSeason, predYear, locale, aiRetryToken]);
+  // Independent per-card "Why am I seeing this?" disclosure state, closed
+  // by default so the simple view stays uncluttered.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   if (!prediction) {
     return (
@@ -134,104 +111,7 @@ export default function RecommendationPage() {
     );
   }
 
-  // Factors that pulled the prediction down, strongest first.
-  const negatives = explanations.filter((e) => e.impact === "Negative");
-  // `name` is the translation key emitted by convertSHAPToExplanation, so these
-  // match exactly. (This previously tested "soil ph" with a space against a
-  // value of "soil_ph", so the pH strategy could never fire.)
-  const hasNegative = (...keys: string[]) =>
-    negatives.some((e) => keys.includes(e.name));
-  // Severity follows the strongest related negative factor. A risk with no
-  // related factor pulling the prediction down stays Low.
-  const severityOf = (...keys: string[]): RiskLevel => {
-    const worst = Math.max(
-      0,
-      ...negatives.filter((e) => keys.includes(e.name)).map((e) => e.magnitude)
-    );
-    if (worst >= 0.6) return "High";
-    if (worst >= 0.25) return "Moderate";
-    return "Low";
-  };
-
-  const getStrategies = () => {
-    const strategies = [];
-
-    if (hasNegative("rainfall", "drought", "rainfall_x_ndvi")) {
-      strategies.push({
-        key: "irrigation",
-        title: t("recommend.irrigationTitle"),
-        description: t("recommend.irrigationDesc"),
-        icon: Droplets,
-      });
-    }
-
-    if (hasNegative("temperature", "temp_x_humidity")) {
-      strategies.push({
-        key: "heat",
-        title: t("recommend.heatTitle"),
-        description: t("recommend.heatDesc"),
-        icon: ShieldAlert,
-      });
-    }
-
-    if (hasNegative("soil_ph")) {
-      strategies.push({
-        key: "ph",
-        title: t("recommend.phTitle"),
-        description: t("recommend.phDesc"),
-        icon: Zap,
-      });
-    }
-
-    if (strategies.length < 3) {
-      strategies.push(
-        {
-          key: "nutrient",
-          title: t("recommend.nutrientTitle"),
-          description: t("recommend.nutrientDesc"),
-          icon: CheckCircle2,
-        },
-        {
-          key: "pest",
-          title: t("recommend.pestTitle"),
-          description: t("recommend.pestDesc"),
-          icon: ShieldAlert,
-        }
-      );
-    }
-
-    return strategies;
-  };
-
-  // Risk levels now follow the SHAP factors instead of being literals.
-  const risks: { key: string; title: string; risk: RiskLevel; action: string }[] =
-    [
-      {
-        key: "heat",
-        title: t("recommend.heatRisk"),
-        risk: severityOf("temperature", "temp_x_humidity"),
-        action: t("recommend.heatAction"),
-      },
-      {
-        key: "soil",
-        title: t("recommend.soilRisk"),
-        risk: severityOf("rainfall", "drought", "rainfall_x_ndvi"),
-        action: t("recommend.soilAction"),
-      },
-      {
-        key: "pest",
-        title: t("recommend.pestRisk"),
-        risk: severityOf("humidity", "ndvi", "evi"),
-        action: t("recommend.pestAction"),
-      },
-    ];
-
-  const riskLabel = (risk: RiskLevel) =>
-    ({
-      High: t("recommend.riskHigh"),
-      Moderate: t("recommend.riskModerate"),
-      Low: t("recommend.riskLow"),
-    })[risk];
+  const hasFindings = recommendations.length > 0 || risks.length > 0;
 
   return (
     <div className="space-y-10">
@@ -254,128 +134,234 @@ export default function RecommendationPage() {
         </button>
       </div>
 
-      <div className="rounded-3xl bg-linear-to-br from-emerald-600 to-lime-600 p-8 text-white shadow-xl">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-wide">
-          <Sparkles size={14} />
-          <span>{t("recommend.aiTitle")}</span>
-        </div>
-
-        {aiLoading && (
-          <div className="flex items-center gap-3 text-emerald-50">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-            <span>{t("recommend.aiLoading")}</span>
-          </div>
-        )}
-
-        {!aiLoading && aiError && (
-          <div className="flex flex-wrap items-center gap-4">
-            <p className="text-emerald-50">{t("recommend.aiError")}</p>
-            <button
-              type="button"
-              onClick={() => setAiRetryToken((n) => n + 1)}
-              className="flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 text-sm font-bold transition-colors hover:bg-white/25"
-            >
-              <RotateCw size={14} />
-              {t("recommend.aiRetry")}
-            </button>
-          </div>
-        )}
-
-        {!aiLoading && !aiError && aiRecommendation && (
-          <p className="text-lg leading-relaxed text-emerald-50">
-            {aiRecommendation}
-          </p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <h2 className="text-xl font-bold text-slate-800">
-            {t("recommend.strategyTitle")}
-          </h2>
-
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            {getStrategies().map((strategy) => (
-              <div
-                key={strategy.key}
-                className="rounded-3xl border bg-white p-6 shadow-md"
-              >
-                <div className="mb-4 inline-flex rounded-2xl bg-lime-100 p-4 text-lime-600">
-                  <strategy.icon size={28} />
-                </div>
-
-                <h3 className="text-xl font-bold text-slate-900">
-                  {strategy.title}
-                </h3>
-
-                <p className="mt-2 text-slate-600">{strategy.description}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Compared against the district's best recorded season rather than
-              an invented +15% "simulation". */}
-          {baseline && (
-            <div className="rounded-3xl bg-linear-to-br from-emerald-600 to-lime-600 p-8 text-white shadow-xl">
-              <h3 className="text-2xl font-bold">
-                {t("recommend.whatIfTitle")}
-              </h3>
-
-              <p className="mt-2 text-emerald-50 opacity-90">
-                {t("recommend.whatIfText", {
-                  current: prediction.predicted_yield_MT_per_Ha,
-                  best: baseline.max.toFixed(1),
-                })}
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-6">
-          <h2 className="text-xl font-bold text-slate-800">
-            {t("recommend.riskTitle")}
-          </h2>
-
-          {risks.map((risk) => (
-            <div
-              key={risk.key}
-              className="rounded-2xl border bg-white p-5 shadow-sm"
-            >
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-slate-900">{risk.title}</h4>
-
-                <span
-                  className={clsx(
-                    "rounded-full px-2 py-1 text-[10px] font-bold uppercase",
-                    risk.risk === "High" && "bg-red-100 text-red-600",
-                    risk.risk === "Moderate" && "bg-amber-100 text-amber-600",
-                    risk.risk === "Low" && "bg-emerald-100 text-emerald-600"
-                  )}
-                >
-                  {riskLabel(risk.risk)}
-                </span>
-              </div>
-
-              <p className="mt-2 text-sm text-slate-500">
-                <span className="font-bold">{t("recommend.action")}:</span>{" "}
-                {risk.action}
-              </p>
-            </div>
-          ))}
-
-          <p className="text-[11px] leading-relaxed text-slate-400">
-            {t("recommend.riskBasis")}
-          </p>
-
-          <div className="rounded-2xl bg-slate-900 p-6 text-white">
-            <h4 className="font-bold">{t("recommend.expertTitle")}</h4>
-
-            <p className="mt-2 text-sm text-slate-400">
-              {t("recommend.expertDesc")}
+      {!hasFindings && (
+        <div className="flex items-start gap-4 rounded-3xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
+          <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-600" size={28} />
+          <div>
+            <h3 className="text-lg font-bold text-emerald-900">
+              {t("recommend.allGoodTitle")}
+            </h3>
+            <p className="mt-1 text-sm text-emerald-800">
+              {t("recommend.allGoodDesc")}
             </p>
           </div>
         </div>
+      )}
+
+      {recommendations.length > 0 && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {recommendations.map((rec) => (
+            <RecommendationCard
+              key={rec.id}
+              rec={rec}
+              t={t}
+              isExpanded={expanded.has(rec.id)}
+              onToggle={() => toggleExpanded(rec.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {recommendations.length > 0 && (
+        <div className="rounded-3xl bg-linear-to-br from-emerald-600 to-lime-600 p-8 text-white shadow-xl">
+          <h3 className="text-xl font-bold">{t("recommend.ifYouActTitle")}</h3>
+          <p className="mt-2 text-emerald-50 opacity-90">
+            {t("recommend.ifYouActText")}
+          </p>
+        </div>
+      )}
+
+      {risks.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-slate-800">
+            {t("recommend.risksTitle")}
+          </h2>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {risks.map((risk) => (
+              <RiskCard key={risk.id} risk={risk} t={t} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-2xl bg-slate-900 p-6 text-white">
+        <div className="flex items-center gap-2">
+          <Phone size={18} className="text-slate-300" />
+          <h4 className="font-bold">{t("recommend.expertTitle")}</h4>
+        </div>
+        <p className="mt-2 text-sm text-slate-400">
+          {t("recommend.expertDesc")}
+        </p>
       </div>
+    </div>
+  );
+}
+
+function RecommendationCard({
+  rec,
+  t,
+  isExpanded,
+  onToggle,
+}: {
+  rec: AgronomicRecommendation;
+  t: ReturnType<typeof useTranslations>;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const Icon = CATEGORY_ICON[rec.category];
+  const current = formatValue(rec.unit, rec.currentValue);
+  const [min, max] = rec.recommendedRange;
+
+  return (
+    <div className="space-y-4 rounded-3xl border bg-white p-6 shadow-md">
+      <div className="flex items-center gap-3">
+        <div className="inline-flex rounded-2xl bg-lime-100 p-3 text-lime-600">
+          <Icon size={24} />
+        </div>
+        <h3 className="text-lg font-bold text-slate-900">
+          {t(`recommend.rules.${rec.id}.title`)}
+        </h3>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          {t("recommend.impactLabel")}
+        </p>
+        <p className="mt-0.5 text-sm font-bold text-red-600">
+          {t("recommend.impactReduced")}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          {t("recommend.reasonLabel")}
+        </p>
+        <p className="mt-0.5 text-sm text-slate-700">
+          {t(`recommend.rules.${rec.id}.reason`, {
+            current,
+            min: formatValue(rec.unit, min),
+            max: formatValue(rec.unit, max),
+          })}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          {t("recommend.actionLabel")}
+        </p>
+        <p className="mt-0.5 text-sm font-bold text-slate-900">
+          {t(`recommend.rules.${rec.id}.action`)}
+        </p>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          {t("recommend.reliabilityLabel")}
+        </p>
+        <p className="mt-0.5 flex items-center gap-1.5 text-sm font-bold text-slate-800">
+          <span aria-hidden="true">{RELIABILITY_EMOJI[rec.reliabilityTier]}</span>
+          <span>{t(`explain.reliability.${rec.reliabilityTier}`)}</span>
+          {rec.reliability !== undefined && (
+            <span className="font-semibold text-slate-500">
+              {Math.round(rec.reliability * 100)}%
+            </span>
+          )}
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isExpanded}
+        className="flex items-center gap-1 border-t border-dashed border-slate-100 pt-3 text-[11px] font-semibold text-slate-400 transition-colors hover:text-slate-600"
+      >
+        <ChevronDown
+          size={12}
+          className={clsx("transition-transform", isExpanded && "rotate-180")}
+        />
+        <span>{t("recommend.whyToggle")}</span>
+      </button>
+
+      {isExpanded && (
+        <div className="space-y-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+          <div>
+            <span className="font-semibold text-slate-500">
+              {t("recommend.whyFeature")}:
+            </span>{" "}
+            {t(`features.${rec.valueFeature}`)}
+          </div>
+          <div>
+            <span className="font-semibold text-slate-500">
+              {t("recommend.whyShap")}:
+            </span>{" "}
+            {t("recommend.whyShapNegative")}
+          </div>
+          <div>
+            <span className="font-semibold text-slate-500">
+              {t("recommend.whyCurrentValue")}:
+            </span>{" "}
+            {current} {rec.unit}
+          </div>
+          <div>
+            <span className="font-semibold text-slate-500">
+              {t("recommend.whyRecommendedRange")}:
+            </span>{" "}
+            {formatValue(rec.unit, min)} – {formatValue(rec.unit, max)} {rec.unit}
+          </div>
+          <div>
+            <span className="font-semibold text-slate-500">
+              {t("recommend.whySource")}:
+            </span>{" "}
+            {rec.source}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RiskCard({
+  risk,
+  t,
+}: {
+  risk: AgronomicRisk;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const Icon = CATEGORY_ICON[risk.category];
+
+  return (
+    <div className="space-y-3 rounded-2xl border bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <Icon size={20} className="text-amber-500" />
+          <h4 className="font-bold text-slate-900">
+            {t(`recommend.rules.${risk.id}.title`)}
+          </h4>
+        </div>
+
+        <span
+          className={clsx(
+            "rounded-full px-2 py-1 text-[10px] font-bold uppercase",
+            LEVEL_BADGE_CLASS[risk.level]
+          )}
+        >
+          {t(`recommend.level.${risk.level}`)}
+        </span>
+      </div>
+
+      <p className="text-sm text-slate-600">
+        {t(`recommend.rules.${risk.id}.reason`, {
+          current: formatValue(risk.unit, risk.currentValue),
+        })}
+      </p>
+
+      <p className="text-sm text-slate-500">
+        <span className="font-bold text-slate-700">
+          {t("recommend.riskActionLabel")}:
+        </span>{" "}
+        {t(`recommend.rules.${risk.id}.action`)}
+      </p>
     </div>
   );
 }
