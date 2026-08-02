@@ -53,7 +53,11 @@ export default function FieldInputCard({
   };
 
   const selected = districts.find((d) => d.name === value.district);
-  const availableSeasons = selected?.seasons ?? [];
+  // Only Yala is offered — Maha season has been retired from this dashboard,
+  // so it's filtered out here even if the backend catalog still reports it.
+  const availableSeasons = (selected?.seasons ?? []).filter(
+    (s) => s.toLowerCase() === "yala"
+  );
   // Offer the dataset's years plus projection years beyond the last, always
   // reaching at least two years past *today* (not just past the dataset) —
   // otherwise a district whose data ends in the past (e.g. the synthetic

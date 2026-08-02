@@ -146,7 +146,9 @@ export default function PredictPage() {
     const seeded = {
       ...current,
       district: first.name,
-      season: first.seasons[0] ?? "Yala",
+      // Yala is the only season this dashboard offers (Maha was retired) —
+      // never seed from first.seasons[0], which could still be "Maha".
+      season: "Yala",
       year: new Date().getFullYear(),
     };
     // TEMP DEBUG — remove once district/year propagation is verified.
@@ -206,9 +208,10 @@ export default function PredictPage() {
         console.log("[Predict] district selected:", patch.district);
         const info = districts.find((d) => d.name === patch.district);
         if (info) {
-          if (!info.seasons.includes(next.season)) {
-            next.season = info.seasons[0] ?? next.season;
-          }
+          // Yala is the only season this dashboard offers (Maha was
+          // retired), so every district reconciles to it rather than
+          // falling back to whatever info.seasons[0] happens to be.
+          next.season = "Yala";
           const maxYear = info.years[info.years.length - 1];
           // Never clamp below the current year — a target district backed
           // only by dataset-wide averages (e.g. Kurunegala under the

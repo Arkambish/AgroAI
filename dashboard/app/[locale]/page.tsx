@@ -17,7 +17,6 @@ import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import {
   predictYieldsForAllDistricts,
-  getDistricts,
   TARGET_DISTRICTS,
   type BatchPredictionResult,
   getYieldCategory,
@@ -59,19 +58,9 @@ export default function Home() {
       setError(null);
 
       try {
-        // Ask the API which seasons it actually has data for, rather than
-        // assuming "Yala" unconditionally. NOTE: districts deliberately do
-        // NOT come from this catalog — the backend's district list is
-        // DATA_VARIANT-dependent (synthetic data has Jaffna, no Kurunegala;
-        // real data has Kurunegala, no Jaffna, see src/data_loader.py), but
-        // this dashboard's map/cards are hardcoded to the 4 TARGET_DISTRICTS.
-        // Using the catalog's districts here silently substituted Jaffna for
-        // Kurunegala under the default synthetic variant, so selecting
-        // Kurunegala on the map never had a matching prediction.
-        const catalog = await getDistricts();
-        const season = catalog.seasons.includes("Yala")
-          ? "Yala"
-          : (catalog.seasons[0] ?? "Yala");
+        // Yala is the only season this dashboard offers (Maha was retired),
+        // so it's hardcoded rather than read from the districts catalog.
+        const season = "Yala";
         // Always the current year unless the user explicitly picks another
         // (there's no year selector on this page yet) — NOT the dataset's
         // last year, which for the synthetic variant is 2023.
@@ -167,8 +156,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* Top Section: Intro Left, Map Right */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+      {/* Top Section: Intro Left, Map Right. Grid rows stretch to the
+          tallest column by default, so the map (styled h-full in
+          DistrictMap.tsx) fills exactly the left column's height with no
+          leftover gap beneath it — see DistrictMap.tsx for the mobile-only
+          min-height floor used when there's no row to stretch against. */}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-stretch">
         {/* Intro & Target District Overview - Left */}
         <div className="space-y-6 flex flex-col justify-between">
           <section className="relative overflow-hidden rounded-3xl bg-white p-8 text-emerald-950 shadow-xl border border-emerald-50">
@@ -265,7 +258,7 @@ export default function Home() {
         </div>
 
         {/* District Map Section - Right */}
-        <div>
+        <div className="h-full">
           <DistrictMap
             predictions={districtPredictions}
             selectedDistrict={selectedDistrict}

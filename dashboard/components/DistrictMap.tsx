@@ -24,7 +24,16 @@ const GeoJSON = dynamic(
   { ssr: false }
 );
 
+const MapResizeHandler = dynamic(() => import("./MapResizeHandler"), {
+  ssr: false,
+});
+
 const GEOJSON_URL = "/sri-lanka-target-districts-only.geojson";
+
+// Floor so the map stays usable when it isn't being stretched to match a
+// taller sibling (e.g. stacked single-column mobile layout, where there's no
+// row to stretch against).
+const MIN_MAP_HEIGHT = "min-h-[420px]";
 
 const ALLOWED_TARGET_KEYS = [
   "matale",
@@ -35,6 +44,9 @@ const ALLOWED_TARGET_KEYS = [
 
 interface Props {
   predictions?: Record<string, number>;
+  /** Defaults to filling the parent's height (see MIN_MAP_HEIGHT for the
+   * floor used when there's no stretched row to fill, e.g. mobile). Pass a
+   * fixed number/string only when the caller actually wants that instead. */
   height?: number | string;
   onSelectDistrict?: (districtName: string) => void;
   selectedDistrict?: string | null;
@@ -60,7 +72,7 @@ function getFeatureDistrictName(feature?: Feature<Geometry, any>) {
 
 export default function DistrictMap({
   predictions = {},
-  height = 440,
+  height,
   onSelectDistrict,
   selectedDistrict,
 }: Props) {
@@ -188,7 +200,9 @@ export default function DistrictMap({
 
   if (error) {
     return (
-      <div className="h-[440px] grid place-items-center rounded-2xl border border-red-200 bg-red-50 text-sm text-red-600">
+      <div
+        className={`h-full ${MIN_MAP_HEIGHT} grid place-items-center rounded-2xl border border-red-200 bg-red-50 text-sm text-red-600`}
+      >
         Map failed to load: {error}
       </div>
     );
@@ -196,7 +210,9 @@ export default function DistrictMap({
 
   if (loading) {
     return (
-      <div className="h-[440px] grid place-items-center rounded-2xl border bg-slate-50 text-sm text-slate-500">
+      <div
+        className={`h-full ${MIN_MAP_HEIGHT} grid place-items-center rounded-2xl border bg-slate-50 text-sm text-slate-500`}
+      >
         Loading target district map...
       </div>
     );
@@ -210,8 +226,16 @@ export default function DistrictMap({
       // (e.g. Navbar.tsx's sticky z-50) instead of staying scoped to the
       // map — isolate confines all of Leaflet's z-index values inside this
       // element, so the whole map can never render above anything outside it.
-      className="relative isolate overflow-hidden rounded-3xl border border-slate-200 shadow-xl"
-      style={{ height }}
+      //
+      // Height: fills the parent (matching the left column via the grid's
+      // default row-stretch in page.tsx) rather than a fixed pixel value, so
+      // there's no leftover gap below the map. MIN_MAP_HEIGHT is the floor
+      // for layouts with no row to stretch against (e.g. stacked mobile). A
+      // caller-supplied `height` still wins when explicitly passed.
+      className={`relative isolate overflow-hidden rounded-3xl border border-slate-200 shadow-xl ${
+        height === undefined ? `h-full ${MIN_MAP_HEIGHT}` : ""
+      }`}
+      style={height !== undefined ? { height } : undefined}
     >
       <MapContainer
         key="district-map"
@@ -232,10 +256,12 @@ export default function DistrictMap({
             onEachFeature={onEachFeature}
           />
         )}
+
+        <MapResizeHandler />
       </MapContainer>
 
       {/* Map Legend */}
-      <div className="absolute bottom-4 right-4 z-[1000] rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur border border-slate-100">
+      <div className="absolute bottom-4 right-4 z-1000 rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur border border-slate-100">
         <p className="text-xs font-bold text-slate-700 mb-2">
           Yield Scale (MT/Ha)
         </p>
