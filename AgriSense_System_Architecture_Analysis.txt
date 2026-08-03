@@ -1,0 +1,1767 @@
+==================================================
+AgriSense System Analysis & Workflow Documentation
+==================================================
+
+Project directory : d:\Academics\FYP\AgroAI
+Frontend           : dashboard/  (Next.js 16 App Router, TypeScript, React 18.3.1)
+Backend            : src/api.py  (Flask REST API, Python)
+ML / Data pipeline : main.py + src/*.py + src/xai/*.py
+Team               : Arkam B.H.M. (214019K) - ML/DL modelling, evaluation, Flask API
+                      Sharuja B.   (214192G) - data collection, feature engineering
+                      Shathurya P. (214193K) - dashboard, visualisation, explainability UX
+Institution         : University of Moratuwa, Faculty of Information Technology, FYP 2026
+
+This document was produced by reading the actual source code of the repository
+(frontend pages/components, Flask endpoints, ML training pipeline, XAI/ERI
+modules, i18n message files, config files, and generated result artefacts in
+outputs/results*/). Every claim below is grounded in a specific file, function
+or data value found in the repo, not a generic description of what such a
+system "usually" does.
+
+
+==================================================
+# 1. System Overview
+==================================================
+
+## What is AgriSense?
+
+AgriSense (repository name "AgroAI") is an end-to-end decision-support web
+application that predicts big onion (Allium cepa) harvest yield for four
+Sri Lankan districts - Matale, Anuradhapura, Polonnaruwa, and Kurunegala -
+and then explains, scores the reliability of, and translates that
+prediction into concrete, farmer-actionable guidance.
+
+It is not just a "yield calculator." The system is built around a five-stage
+pipeline that always executes in the same order for any single prediction:
+
+    Prediction (ML model)
+        -> Explanation (SHAP)
+        -> Reliability scoring (ERI)
+        -> Decision support (agronomic rule engine)
+        -> Farmer-facing recommendation (localized templates)
+
+## Main objective
+
+Give a farmer or agriculture extension officer, in their own language
+(English / Sinhala / Tamil), a defensible answer to four questions in one
+flow:
+  1. What yield should I expect this season?
+  2. Why - which factors are driving that number up or down?
+  3. How much should I trust this explanation?
+  4. What, concretely, should I do about it?
+
+## Problem it solves
+
+Two problems, one technical and one usability:
+
+  - Technical: publicly available agronomic/remote-sensing data for Sri
+    Lankan onion cultivation is small (28 real district-year observations
+    on the honest "real" data variant - see Section 5) and noisy, so a
+    black-box point prediction alone is not defensible and can silently be
+    wrong with high confidence.
+  - Usability: even a correct, well-explained ML prediction is useless to a
+    farmer if it is delivered as "SHAP contribution for season_total_rainfall
+    = -0.42." Farmers need plain-language cause-and-effect statements and a
+    concrete next action, not a model-internals dump.
+
+AgriSense addresses both by (a) being transparent about model reliability
+instead of hiding it (Section 5 quotes the project's own honest negative
+result), and (b) never presenting AI output to the farmer without routing it
+through a translation/plain-language layer that is itself constrained by
+real SHAP values and real agronomic thresholds (Section 7).
+
+## Target users
+
+  - Primary: onion farmers in the four covered districts, most comfortable
+    in Sinhala or Tamil rather than English.
+  - Secondary: agricultural extension officers who need per-district,
+    per-season figures to advise multiple farmers, and who benefit from the
+    "known data" transparency panel (Section 3) showing exactly which inputs
+    are real measurements vs. statistical fallbacks.
+  - Tertiary: the FYP evaluation panel / future maintainers, who need the
+    system's real (not synthetic-demo) accuracy to be visible, not buried.
+
+## Main technologies used
+
+  Frontend (dashboard/):
+    - Next.js 16.2.6 (App Router), React 18.3.1, TypeScript
+    - next-intl 4.11.2 (three-locale i18n: en / si / ta)
+    - Tailwind CSS v4, clsx, tailwind-merge
+    - leaflet + react-leaflet (interactive district map on the home page)
+    - framer-motion (stat-card stagger animation)
+    - axios (HTTP client to the Flask API)
+    - lucide-react (icon set)
+    - Vitest + Testing Library (30 frontend tests, per README)
+
+  Backend (src/api.py):
+    - Flask 3.x + flask-cors, python-dotenv
+    - joblib (loading trained scikit-learn/XGBoost artefacts)
+    - shap (per-request explanation - TreeExplainer / KernelExplainer)
+    - requests (OpenRouter LLM calls for the chat assistant)
+    - numpy / pandas (feature resolution, dataset queries)
+
+  ML / data pipeline (main.py, src/*.py):
+    - scikit-learn (RandomForest, SVR, permutation importance, GridSearchCV,
+      TimeSeriesSplit)
+    - xgboost (XGBRegressor with a monotonicity constraint)
+    - tensorflow/keras (LSTM, BiLSTM, 1D-CNN, hybrid CNN-LSTM - Python 3.12
+      pinned specifically for this)
+    - gplearn 0.4.2 (genetic-programming symbolic regression - produces a
+      literal closed-form equation)
+    - shap, scipy, statsmodels (evaluation, SHAP, statistical significance
+      testing between models)
+
+## Overall architecture
+
+Three tiers, strictly request/response - the backend never pushes to the
+frontend, and the frontend never talks to the model artefacts directly:
+
+  1. Next.js frontend - locale-prefixed pages under dashboard/app/[locale]/
+     (home, predict, explain, recommend), all client components, all
+     reading/writing one shared prediction object via localStorage
+     (Section 3.6 / Section 9).
+  2. Flask REST API (src/api.py) - a single process holding one loaded model
+     in memory (`_state` dict), exposing ~13 JSON endpoints (Section 4).
+  3. Offline-computed artefacts - trained model .pkl/.keras files
+     (outputs/models{_real}/), the processed dataset
+     (data/processed{_real}/integrated_dataset.csv), and precomputed XAI/ERI
+     JSON files (outputs/results{_real}/*.json) produced by running
+     `main.py` and `python -m src.xai.run_xai` ahead of time. The API only
+     *reads* these at request time; it never retrains or recomputes SHAP
+     background statistics live.
+
+## How the system combines its five pillars
+
+  - Machine Learning Prediction: a model trained offline (Section 5) is
+    loaded once at API startup and produces a point yield estimate plus a
+    calibrated confidence interval per request.
+  - Explainable AI (XAI): SHAP is computed fresh for every single
+    `/predict` call, against that specific request's resolved feature
+    vector - not a cached, generic explanation (Section 6).
+  - Reliability Estimation (ERI): a custom Explanation Reliability Index
+    (src/xai/eri.py) composes three independent trust signals - data
+    grounding, cross-fold stability, and cross-method consensus - into one
+    0-1 score per feature and one aggregate score per prediction, shown
+    everywhere a SHAP-derived claim is shown (Section 6.3).
+  - Decision Support System: a deterministic agronomic rule/threshold
+    engine (dashboard/lib/agronomy.ts) turns the SHAP+ERI output into
+    actionable findings, filtered so only farmer-controllable factors that
+    are both currently hurting the yield *and* agronomically out of range
+    ever surface (Section 7).
+  - Recommendation Generation: those findings are rendered through
+    pre-written, per-locale text templates (next-intl messages), never
+    through a live LLM deciding what to recommend (Section 7.3).
+  - Multilingual User Interface: every screen, including recommendation
+    and error text, is available in English, Sinhala and Tamil via
+    next-intl, with missing translations silently falling back to English
+    rather than rendering blank or a raw key (Section 3.7).
+
+
+==================================================
+# 2. Complete User Journey Flow
+==================================================
+
+    User opens application
+            |
+    Locale routing (middleware.ts forces /en, /si or /ta prefix)
+            |
+    Navbar + Home Dashboard ( / )
+            |
+    User clicks "Start Prediction" -> Predict tab
+            |
+    Select district / season / year (FieldInputCard)
+            |
+    "Known data" auto-fill preview (KnownDataPanel, via GET /context)
+            |
+    Click "Predict Yield" -> POST /predict {district, season, year}
+            |
+    Backend feature resolution + model inference + SHAP + ERI + interval
+            |
+    PredictResponse JSON stored in localStorage ("last_prediction")
+            |
+    Prediction result shown (PredictionResultCard) + ChatAssistant available
+            |
+    User opens Explain tab -> reads the SAME stored prediction
+            |
+    SHAP grouped into ~5 farmer-facing factors, per-factor ERI shown
+            |
+    User opens Recommend tab -> reads the SAME stored prediction again
+            |
+    Client-side agronomic rule engine (lib/agronomy.ts) filters + evaluates
+            |
+    Farmer-facing recommendation & risk cards, reliability shown per card
+            |
+    Decision support output: what happened, why, how sure, what to do next
+
+Below, each step is expanded with what happens, which component is
+responsible, what data enters, what is produced, and how the next step
+consumes it.
+
+--------------------------------------------------
+Step 1 - User opens the application
+--------------------------------------------------
+Component: `dashboard/middleware.ts` (next-intl middleware,
+`localePrefix: "always"`), `dashboard/i18n/routing.ts`.
+What happens: any request to a bare path is redirected to a locale-prefixed
+one (locales = en, ta, si; default en). The matcher excludes `/api`, Next
+internals, and any path with a file extension.
+Data in: raw browser request path.
+Data out: a guaranteed `/{locale}/...` URL.
+Feeds: every subsequent page render, and `LanguageSwitcher.tsx`'s own
+`localStorage["lang"]` bookkeeping (a separate, UI-preference-only key, not
+part of the prediction state).
+
+--------------------------------------------------
+Step 2 - Home Dashboard ( dashboard/app/[locale]/page.tsx )
+--------------------------------------------------
+What happens: on mount, the page calls
+`predictYieldsForAllDistricts("Yala", currentYear, {}, TARGET_DISTRICTS)`
+(TARGET_DISTRICTS = Matale, Anuradhapura, Polonnaruwa, Kurunegala) - four
+parallel `predictYield()` calls, each hitting `POST /predict` with only
+`{district, season, year}`. This is a *separate* batch flow from the
+single-prediction flow used by Predict/Explain/Recommend; its results are
+not written to the shared `last_prediction` localStorage key.
+Data in: nothing from the user (season/year are hardcoded/defaulted).
+Data out: `BatchPredictionResult` - per-district `PredictResponse`s,
+`bestDistrict`, `highestYield`, `averageYield`, `failedDistricts`.
+Component responsible for rendering: `DistrictMap.tsx` (Leaflet choropleth,
+colours districts by predicted yield via `getYieldColor`/`YIELD_CATEGORIES`
+from `lib/api.ts`) and four `StatCard` tiles (Season, Best District, Peak
+Yield, Average Yield), animated with `framer-motion`.
+Next step: clicking a district on the map sets `selectedDistrict` and
+updates the "District Focus" card locally; clicking "Start Prediction"
+navigates to `/${locale}/predict` - the home page's own batch data is not
+carried over.
+
+--------------------------------------------------
+Step 3 - Select district / season / year (Predict tab, part 1)
+--------------------------------------------------
+Component: `dashboard/app/[locale]/predict/page.tsx` +
+`components/FieldInputCard.tsx`.
+What happens: `FieldInputCard` renders three controlled `<select>`s.
+District options come from `GET /districts` (fetched once on mount, then
+filtered/merged down to the four `TARGET_DISTRICTS`). Season is
+Yala-only in the UI (Maha is filtered out even if the backend catalog still
+lists it - Maha was retired per the codebase). Year list = the dataset's
+recorded years for that district plus synthetic "projection years" out to
+`max(lastYear+2, currentYear+2)`.
+State: `farmerInputs` (`{district, season, year}`) is persisted via
+`useLocalJSONState(FARMER_INPUTS_KEY)` - a localStorage-backed hook, not
+plain `useState`, specifically because Next's App Router tears down
+page-level state on any URL change, including a pure locale switch
+(`/en/predict` -> `/si/predict`), which was previously wiping the form.
+Side effect: changing district/season/year clears any existing `result` and
+`predictError`, since a stale prediction for a different location must not
+linger on screen.
+Data out: a valid `{district, season, year}` triple, `isValid = Boolean
+(district && season)` gates the Predict button.
+
+--------------------------------------------------
+Step 4 - "Known data" preview (Predict tab, part 2)
+--------------------------------------------------
+Component: `components/KnownDataPanel.tsx`, driven by `GET /context` and
+`GET /baseline`, called via `Promise.allSettled` whenever district/season/
+year change (partial failure of one call does not blank out the other).
+What happens: shows the ~32 model features the backend will use, grouped
+into Weather / Satellite / Historical / Soil / Interaction (metadata in
+`lib/features.ts`, mirroring `src/config.py`'s five feature groups exactly),
+collapsed by default behind a "View details" toggle. Values shown are
+`resolved_features` (post-prediction, if a result already exists) or the
+`/context` response (pre-prediction preview) - read-only, cannot be edited
+by the farmer in this UI.
+Data in: `GET /context?district&season&year`.
+Data out: a preview of what will be fed to the model, building farmer trust
+*before* they commit to running a prediction.
+Feeds: nothing computationally - this is a transparency step, not part of
+the prediction request itself.
+
+--------------------------------------------------
+Step 5 - Prediction request
+--------------------------------------------------
+Component: `predict/page.tsx`'s `handlePredict()` -> `lib/api.ts`'s
+`predictYield()` -> `axios.post("/predict", {district, season, year})`.
+Data in: exactly three fields - district, season, year. Nothing else is
+sent; the backend resolves everything else itself (Section 5.2).
+What the frontend does while waiting: `loading = true`, spinner shown on
+the Predict button.
+
+--------------------------------------------------
+Step 6 - Backend processing ( src/api.py :: run_prediction() )
+--------------------------------------------------
+This is the heaviest single step in the whole system - see Sections 4 and 5
+for full detail. In order:
+  1. `_resolve_features(data)` - fills all 32 `ALL_FEATURES` via a 7-tier
+     cascade (user -> exact_year_record -> district_season_mean ->
+     district_mean -> season_mean -> global_mean -> zero_fallback), then
+     recomputes the 3 interaction features as products of the resolved
+     inputs.
+  2. The loaded model (`_state['model']`) predicts a point yield.
+  3. SHAP is computed against this exact resolved feature vector via
+     `_state['explainer']` (TreeExplainer for RandomForest/XGBoost,
+     KernelExplainer for SVR).
+  4. `compute_eri(shap_dict)` (src/xai/eri.py) produces `eri` and
+     `per_feature_eri` for this specific prediction.
+  5. A confidence interval is computed via the conformal -> gaussian ->
+     heuristic cascade (Section 5.3).
+  6. `forecast_basis` is classified (conditioned / historical_record /
+     climatological) so the frontend can state honestly whether this is a
+     forecast, a real recorded past season, or a climatological average.
+Data out: one large JSON object - the `PredictResponse` (full shape in
+Section 9).
+
+--------------------------------------------------
+Step 7 - Prediction result shown
+--------------------------------------------------
+Component: `predict/page.tsx` stores the response via
+`setResult(res)` -> `useLocalJSONState(PREDICTION_KEY)` ->
+`localStorage.setItem("last_prediction", JSON.stringify(res))`, and notifies
+all subscribers (see Section 3.6). `components/PredictionResultCard.tsx`
+then renders: the confidence interval (with a plain-language note keyed off
+`interval_method`), the point estimate, a model-reliability tier derived
+from `model_r2` (>=0.7 high / >=0.5 medium / else low / unknown), and a
+comparison against the district's historical baseline (`GET /baseline`,
+percentage delta with a trend badge). A CTA links to the Explain tab.
+Also mounted here: `components/ChatAssistant.tsx` (floating "Ask about this
+prediction" widget) - confirmed to be mounted on the Predict page only, not
+on Explain or Recommend.
+Next step: the farmer can now go to Explain or Recommend - both read this
+exact same stored object, no re-fetch.
+
+--------------------------------------------------
+Step 8 - Explainability generation (Explain tab)
+--------------------------------------------------
+Component: `dashboard/app/[locale]/explain/page.tsx`.
+What happens: reads `prediction` from `PREDICTION_KEY`, runs
+`convertSHAPToExplanation(prediction.shap_values)` (in `lib/api.ts`) to
+group the 32 raw SHAP values into up to 5 farmer-facing display factors
+(e.g. three separate NDVI-variant SHAP values collapse into one "Greenness
+(NDVI)" row), ranked by combined |SHAP|. For each displayed factor it also
+computes a |SHAP|-weighted average of `per_feature_eri` across the raw
+features that rolled into it. No new network call is made - this is pure
+client-side post-processing of data already in the stored prediction.
+Data out: per-factor cards (Impact / Effect / Confidence) plus a top-of-page
+aggregate reliability badge and a single "Key Insight" sentence about the
+strongest factor.
+Next step: the same `shap_values`/`per_feature_eri`/`resolved_features` this
+page used are exactly what the Recommend tab consumes next.
+
+--------------------------------------------------
+Step 9 - Recommendation generation (Recommend tab)
+--------------------------------------------------
+Component: `dashboard/app/[locale]/recommend/page.tsx` +
+`dashboard/lib/agronomy.ts`.
+What happens: `evaluateAgronomicRules(prediction)` runs five DOA/FAO
+threshold rules against `prediction.resolved_features`,
+`prediction.shap_values`, and `prediction.per_feature_eri` - the identical
+three fields the Explain tab just used. A rule only fires when its
+threshold is breached AND the associated SHAP contribution is currently
+negative for this specific prediction (Section 7). No backend call, no LLM
+call, no new model inference - purely a deterministic function of data
+already fetched in Step 6.
+Data out: a `{recommendations, risks}` object; each entry carries category,
+current value, recommended range/threshold, combined SHAP value, and a
+reliability score/tier derived from `per_feature_eri`.
+Rendered as farmer-facing cards with a collapsed-by-default technical
+drawer (Section 8).
+
+--------------------------------------------------
+Step 10 - Decision support output
+--------------------------------------------------
+The farmer now has, from one form submission: an expected yield with a
+calibrated range, a plain-language reason for that range, an honest
+reliability signal at both the prediction level and the per-recommendation
+level, and a short list of concrete actions - each traceable back to a real
+SHAP value and a real agronomic threshold if they choose to expand "Why am
+I seeing this?". A "New Prediction" button (present on all three tabs)
+calls `resetPrediction()`, clearing both localStorage keys and reverting
+all three tabs to their placeholder state simultaneously.
+
+
+==================================================
+# 3. Frontend Architecture Analysis
+==================================================
+
+Directory: `dashboard/app/[locale]/` (App Router, one folder per route),
+`dashboard/components/`, `dashboard/lib/`, `dashboard/messages/` (i18n),
+`dashboard/i18n/` (routing/request config).
+
+## 3.1 Home Dashboard ( app/[locale]/page.tsx )
+
+Purpose: a multi-district overview / entry point, not tied to any single
+farmer's saved prediction.
+Components used: `DistrictMap` (Leaflet, dynamically imported with
+`ssr:false`), `StatCard` x4, `framer-motion` stagger wrapper.
+User interactions: click a district on the map to select it (updates the
+"District Focus" card); click "Start Prediction" to go to `/predict`.
+Data displayed: predicted yield per district (colour-coded on the map),
+best district, peak yield, average yield, current season.
+API calls: `predictYieldsForAllDistricts()` -> 4x `POST /predict`
+(district/season/year only) run in parallel via `Promise.all`, with
+per-district failure tolerated (`Promise.allSettled`-style handling inside
+that helper) - only throws if *all four* fail.
+State management: local `useState` only (`batchResult`, `selectedDistrict`,
+`loading`, `error`) - this page does NOT use the shared localStorage
+prediction state.
+
+## 3.2 Predict Page ( app/[locale]/predict/page.tsx )
+
+Purpose: the single-prediction request form and the canonical producer of
+the app-wide `last_prediction` object.
+
+Input:
+  - District (select, from `GET /districts` filtered to the 4 target
+    districts)
+  - Season (Yala only, in the current UI)
+  - Year (dataset years + projected future years)
+  - No other environmental features are entered by the farmer - the whole
+    point of the design is that the backend resolves weather/satellite/
+    soil/historical values automatically (Section 5.2); the UI only lets
+    the farmer preview them (KnownDataPanel), not edit them.
+
+Process:
+  - `handlePredict()` sends `{district, season, year}` to `POST /predict`.
+  - Result is written to `useLocalJSONState(PREDICTION_KEY)`, i.e.
+    `localStorage["last_prediction"]`.
+  - `handleNewPrediction()` calls `resetPrediction()` (clears
+    `last_prediction` and `last_farmer_inputs`, notifies all subscribers).
+
+Output:
+  - Predicted yield (`predicted_yield_MT_per_Ha`)
+  - Confidence interval (`confidence_lower` / `confidence_upper`) with a
+    plain-language note tied to `interval_method`
+  - Model reliability tier (from `model_r2`)
+  - District-baseline comparison (`GET /baseline`)
+  - A live chat widget (`ChatAssistant`) grounded in this same
+    district/season/year via `POST /api/chat`
+
+Components used: `FieldInputCard`, `KnownDataPanel`, `PredictionResultCard`,
+`ChatAssistant`.
+State management: `useLocalJSONState` for `result` and `farmerInputs`
+(survives locale-switch remounts); plain `useState` for `loading`,
+`predictError`, `districts`, `context`, `contextLoading`, `contextError`,
+`baseline`; a `useRef` guards the form-seeding effect from fighting live
+user edits.
+
+## 3.3 Explanation Page ( app/[locale]/explain/page.tsx )
+
+Purpose: turn the stored prediction's raw SHAP vector into a farmer-legible
+"why" screen, with reliability attached to every claim.
+
+Data displayed:
+  - A summary card: expected yield + one aggregate "Explanation reliability"
+    badge (3-tier: `eri < 0.4` low, `< 0.7` medium, else high; emoji + %).
+  - Up to 5 per-factor cards (`convertSHAPToExplanation` grouping), each
+    showing Impact (up/down arrow + "Increased/Reduced yield"), Effect
+    (High/Medium/Low, from a 0.66/0.33 magnitude threshold relative to the
+    top factor), and Confidence (a *4*-tier reliability label - High/Good/
+    Moderate/Low/Unknown at 90/70/50% cutoffs on `per_feature_eri` - a
+    deliberately different word/threshold scheme than the page-level 3-tier
+    badge, so the same concept isn't shown with two different meanings of
+    the same word).
+  - An expandable "technical details" drawer per card: the SHAP-derived
+    kg/Ha estimate, a diverging (left/right) bar for the raw signed SHAP
+    value, and the underlying raw model feature name(s).
+  - A single "Key Insight" callout naming only the single strongest factor
+    (not a repeat of every card).
+
+Components used: none from `components/` beyond icons - this page renders
+its own cards directly (no shared "ExplanationCard" component exists; the
+card markup lives inline in `explain/page.tsx`). Note:
+`components/charts/ReliabilityWaterfall.tsx` exists (a hand-rolled SVG chart
+that dual-encodes SHAP magnitude via bar length and ERI via opacity/hatch)
+but only its TypeScript type (`ReliabilityBarDatum`) is imported here - the
+component itself is never rendered anywhere in the app; it is effectively
+dead code as of this analysis.
+API calls: none - pure client-side transform of the already-stored
+`PredictResponse`.
+State management: `useLocalJSON(PREDICTION_KEY)` (read-only variant - this
+page never writes the prediction, only Predict does); local `useState` for
+which cards' technical-details drawers are expanded.
+
+## 3.4 Recommendation Page ( app/[locale]/recommend/page.tsx )
+
+Purpose: the farmer decision-support screen - "what should I actually do."
+This page was substantially redesigned (see Section 7 for the full
+architecture rationale) to remove ungrounded/generic advice and a
+free-text LLM banner, replacing them with output from a deterministic
+agronomic rule engine.
+
+Data displayed:
+  - Header: "Recommended Actions" / "Based on your predicted yield and crop
+    conditions."
+  - Recommendation cards (only for rules that actually fired): category
+    icon, Impact ("Reduced expected yield" - always, since only
+    negative-SHAP, threshold-breaching factors ever reach a card), "Why
+    this matters" (plain-language reason with the actual current value and
+    recommended range interpolated in), "Recommended action", and
+    Reliability (emoji + tier + % from `per_feature_eri`).
+  - A collapsed-by-default "Why am I seeing this?" drawer per recommendation
+    card: raw feature name, "SHAP contribution: Negative impact", current
+    value, recommended range, and source ("DOA / FAO onion (Allium cepa)
+    cultivation guideline").
+  - "If you take these actions" - a single static, impact-only statement
+    ("...may help reduce yield loss in future cultivation") shown only when
+    at least one recommendation fired. Deliberately makes no numeric
+    yield-improvement promise.
+  - "Watch for Possible Risks" - risk cards (heat stress, humidity/disease)
+    with a Level badge (High/Medium/Low) plus Reason/Action, no technical
+    drawer.
+  - "Conditions look good" - shown instead of the above when no rule fires
+    at all (a genuinely clean prediction, not an error state).
+  - "Need more help?" - a static closing card directing the farmer to their
+    local agriculture officer.
+Components used: none imported from `components/` - `RecommendationCard`
+and `RiskCard` are local functions defined inside this same file.
+API calls: none. `evaluateAgronomicRules()` from `lib/agronomy.ts` runs
+entirely client-side against the stored prediction.
+State management: `useLocalJSON(PREDICTION_KEY)` (read-only); local
+`useState<Set<string>>` for which recommendation cards' "why" drawers are
+expanded.
+
+## 3.5 Supporting presentational components
+
+  - `FieldInputCard.tsx` - the 3-field form; exports the `FarmerInputs`
+    type consumed by `predict/page.tsx`.
+  - `KnownDataPanel.tsx` - read-only auto-filled-feature display, grouped
+    per `lib/features.ts`'s `FEATURE_GROUPS`.
+  - `PredictionResultCard.tsx` - interval + reliability + baseline
+    comparison + CTA to Explain.
+  - `StatCard.tsx` - generic labelled stat tile (icon, value, optional
+    trend), reused 4x on the Home page.
+  - `ChatAssistant.tsx` - floating chat widget, `POST /api/chat`,
+    conversation-scoped to the current district/season/year (clears its own
+    message history if any of those change), with a collapsible
+    "based on this data" panel per assistant reply showing exactly which
+    structured fields (top SHAP features, baseline, yield history,
+    confidence interval) grounded that answer.
+  - `DistrictMap.tsx` - Leaflet choropleth (GeoJSON of the 4 target
+    districts only), used by the Home page.
+  - `LanguageSwitcher.tsx` - 3-button locale switch (mounted in `Navbar`),
+    preserves the current route when switching language.
+
+## 3.6 Cross-tab state management ( lib/use-local-flag.ts )
+
+This is the mechanism that lets Predict, Explain and Recommend all "just
+know" the current prediction without prop-drilling or a global store
+library:
+
+  - `PREDICTION_KEY = "last_prediction"`, `FARMER_INPUTS_KEY =
+    "last_farmer_inputs"` - shared localStorage keys.
+  - `useLocalJSON<T>(key)` - read-only hook via `useSyncExternalStore`, with
+    a module-level parse cache keyed by the raw string so it returns a
+    referentially-stable object unless the underlying value actually
+    changed (required to avoid an infinite re-render loop).
+  - `useLocalJSONState<T>(key)` - read/write pair; `setValue()` writes to
+    localStorage and notifies a shared `Set` of listeners (also wired to the
+    native cross-tab `storage` event).
+  - `resetPrediction()` - a plain function (not a hook), callable from any
+    "New Prediction" button on any of the three tabs: clears both keys and
+    notifies every listener, so all three tabs revert to their placeholder
+    state together, regardless of which tab triggered the reset.
+
+This design means the Explain and Recommend tabs are *guaranteed* to be
+looking at the exact same SHAP/ERI/resolved-feature data the Predict tab
+just received - there is no code path by which they could recompute or
+re-derive a different explanation.
+
+## 3.7 Internationalisation ( i18n/routing.ts, i18n/request.ts,
+       middleware.ts, messages/{en,si,ta}.json )
+
+  - Three locales: `en` (default), `si` (Sinhala), `ta` (Tamil).
+  - `middleware.ts` uses `next-intl`'s middleware with
+    `localePrefix: "always"` - every route always carries an explicit
+    locale segment.
+  - `mergeMessages(fallback, localeMessages)` (in `i18n/routing.ts`) does a
+    recursive deep-merge of the target locale's JSON over `en.json`, so a
+    key present in English but missing (or empty-string) in Sinhala/Tamil
+    silently falls back to English rather than rendering a raw
+    `recommend.rules.xyz.title`-style key or a blank string. This merge is
+    performed twice - once server-side in `i18n/request.ts` (next-intl's own
+    config hook) and once again in `app/[locale]/layout.tsx` for the client
+    provider.
+  - Feature and UI strings for all 5 feature groups, all recommendation
+    rule templates, chat, predict, explain, and recommend namespaces exist
+    in all three files with the same key structure.
+
+## 3.8 Dependency stack (dashboard/package.json)
+
+Next.js 16.2.6, React 18.3.1 (not React 19), next-intl 4.11.2, axios 1.16,
+leaflet 1.9.4 + react-leaflet 4.2.1, framer-motion 12.38, lucide-react
+1.14, clsx 2.1.1 + tailwind-merge 3.5.0 (combined into a local `cn()`
+helper), Tailwind v4 via `@tailwindcss/postcss`. No charting library
+(recharts etc.) is used anywhere - all charts in the app (the diverging
+SHAP bar in Explain, the unused `ReliabilityWaterfall`) are hand-rolled
+inline SVG. Testing: Vitest 4 + Testing Library + jsdom.
+
+
+==================================================
+# 4. Backend / API Flow
+==================================================
+
+Base URL (default): `http://localhost:5050` (port 5050, not 5000, because
+5000 is reserved by AirPlay on macOS - see `src/api.py` comment).
+CORS: locked to `http://localhost:3000` only (the Next.js dev server) via
+`flask_cors.CORS`, not a wildcard - deliberate, per code comment.
+Frontend HTTP client: a single `axios.create({baseURL})` instance in
+`dashboard/lib/api.ts`, reused by every API function.
+
+--------------------------------------------------
+GET /health
+--------------------------------------------------
+Purpose: liveness/readiness check.
+Input: none.
+Processing: reads only the in-memory `_state` dict.
+Output: `{status: "ok", model: <model_name or null>, service: "BigOnion
+Yield Predictor"}`.
+Used by: not currently called from the dashboard frontend; exists for
+ops/monitoring.
+
+--------------------------------------------------
+POST /predict
+--------------------------------------------------
+Purpose: the core prediction endpoint - resolves features, runs the model,
+computes SHAP, computes ERI, computes a confidence interval.
+Input payload: `{district: str, season: str, year: number}` (any of the 32
+`ALL_FEATURES` may optionally be included to override the auto-resolution
+cascade with a real farmer-supplied value, but the dashboard's Predict form
+never does this - it only ever sends the three required fields).
+Processing logic (full detail in Section 5.2-5.4): `_resolve_features()` ->
+model.predict() -> SHAP via `_state['explainer']` -> `compute_eri()` ->
+confidence-interval cascade -> `forecast_basis` classification.
+Output response (`PredictResponse`): district, season, year,
+predicted_yield_MT_per_Ha, confidence_lower, confidence_upper, confidence
+("High"/"Medium"/"Low"), shap_values (32-key dict), model, model_r2,
+forecast_basis, interval_method, interval_coverage, feature_sources (32-key
+provenance dict), resolved_features (32-key dict, rounded to 4dp),
+data_completeness ({n_features, n_user_supplied, n_grounded, n_zero_filled,
+fraction_grounded}), eri, per_feature_eri.
+Used by: `predict/page.tsx` (single prediction), Home page (4x in parallel
+for the district overview).
+Next component consuming the response: the same JSON object is stored
+verbatim and re-read by Explain and Recommend (no server-side session, no
+database - the response *is* the state).
+
+--------------------------------------------------
+GET /districts
+--------------------------------------------------
+Purpose: populate the district/season/year dropdowns.
+Input: none required.
+Processing: reads `_state['catalog']` (built at load time from the real
+context dataset); falls back to `config.DISTRICTS`/`config.SEASONS` with
+`years: []` and `source: "config_fallback"` if the catalog wasn't built.
+Output: `{districts: [{name, seasons, years}], seasons, years, variant,
+source}`.
+Used by: `predict/page.tsx` on mount (filtered client-side to the 4 target
+districts).
+
+--------------------------------------------------
+GET /context?district&season&year
+--------------------------------------------------
+Purpose: a lightweight, *pre-prediction* preview of what values the model
+would use for a given district/season/year, for `KnownDataPanel`.
+Input: all three query params required (400 if any missing).
+Processing: filters `context_df` to `(District, Season)`; if the exact
+`Year` exists, returns that row's real values with `source: "exact"`;
+otherwise returns the `(district, season)` mean with `source:
+"historical_mean"`. This is a simpler 2-tier version of the fuller 7-tier
+cascade `_resolve_features` uses for the real prediction (Section 5.2) -
+`/context` never falls further to district-only, season-only, or global
+means.
+Output: all 32 `ALL_FEATURES` values, plus district/season/year/source/
+n_years/available_years/source_labels (= `FEATURE_SOURCE_LABELS`, mapping
+each feature group to its real-world provenance: "NASA POWER", "MODIS /
+Sentinel-2", "DCS records", "SoilGrids", "Derived").
+Used by: `predict/page.tsx` (pre-prediction preview only; post-prediction,
+`KnownDataPanel` prefers `resolved_features` from the actual `/predict`
+response instead).
+
+--------------------------------------------------
+GET /baseline?district&season
+--------------------------------------------------
+Purpose: the district's historical yield baseline, for the "vs. district
+average" comparison.
+Input: district and season required (400 otherwise).
+Processing: `get_district_baseline()` reads `_state['baselines']` (built
+from the dataset at load time). If the exact `(district, season)` pair has
+no data, falls back to averaging across all seasons for that district
+(`source: "district_all_seasons"`) rather than failing outright.
+Output: `{district, season, mean, min, max, n_years, years, source}`.
+Used by: `predict/page.tsx` (PredictionResultCard comparison).
+
+--------------------------------------------------
+GET /models/compare
+--------------------------------------------------
+Purpose: expose the offline model-comparison table.
+Processing: reads `outputs/results{_real}/model_comparison.csv` via pandas,
+404 if the pipeline hasn't been run for this `DATA_VARIANT` yet.
+Output: list of `{Model, RMSE, MAE, R2, MAPE, Train_Time_s, Best_Params}`
+rows.
+Used by: not currently called from the dashboard UI; a diagnostics/reporting
+endpoint.
+
+--------------------------------------------------
+GET /feature-importance
+--------------------------------------------------
+Purpose: expose the dataset-level SHAP feature-importance ranking (as
+opposed to `/predict`'s per-request SHAP values).
+Processing: reads `outputs/results{_real}/feature_importance.json` verbatim.
+Used by: not currently called from the dashboard UI.
+
+--------------------------------------------------
+GET /equation
+--------------------------------------------------
+Purpose: expose the symbolic-regression closed-form equation as an
+alternative "fully interpretable" model artefact.
+Processing: reads `outputs/results{_real}/symbolic_equation.json` verbatim.
+Used by: not currently called from the dashboard UI.
+
+--------------------------------------------------
+GET /explanation-reliability, GET /stability, GET /consensus
+--------------------------------------------------
+Purpose: expose the three components that compose ERI at the dataset level
+(as opposed to the per-request `eri`/`per_feature_eri` returned inline by
+`/predict`).
+Processing: read `eri.json`, `explanation_stability.json`,
+`explanation_consensus.json` respectively from `RESULTS_DIR`, all produced
+offline by `python -m src.xai.run_xai`.
+Used by: not currently called from the dashboard UI directly (the frontend
+consumes the per-request `eri`/`per_feature_eri` embedded in the `/predict`
+response instead); available for a future "model transparency" page or for
+report generation.
+
+--------------------------------------------------
+POST /api/chat
+--------------------------------------------------
+Purpose: the "Ask about this prediction" grounded assistant.
+Input: `{query, district, season, year}`.
+Processing: `explanation_context.get_prediction_context(district, season,
+year)` re-runs `run_prediction()` (same function `/predict` uses) to get a
+fresh, consistent view, extracts the top-5 SHAP features, baseline, and
+recent yield history, then calls `_call_openrouter(CHAT_SYSTEM_PROMPT,
+<json of that context>)`. The system prompt explicitly forbids inventing
+numbers or using general agricultural knowledge not present in the
+supplied structured data, and instructs the model to avoid ML jargon.
+Output: `{answer: string, context_used: ChatContextUsed}` - the frontend
+shows `context_used` in a collapsible "based on this data" panel so the
+farmer can see exactly what grounded the answer.
+Used by: `ChatAssistant.tsx` (Predict page only).
+Error handling: 503 if `OPENROUTER_API_KEY` is not configured server-side;
+generic fallback/rate-limit messages on call failure (see Section 10).
+
+--------------------------------------------------
+POST /api/recommend  (present in the backend, currently NOT called by the
+                      redesigned frontend - see Section 7.3 for why)
+--------------------------------------------------
+Purpose: originally, a free-text LLM-generated recommendation for a
+district/season/year, in the requested UI language.
+Input: `{district, season, year, locale}`.
+Processing: reuses `explanation_context.get_prediction_context()` (the same
+grounding data `/api/chat` uses) as the only data source, formats
+`RECOMMEND_SYSTEM_PROMPT_TEMPLATE` (explicitly forbidding invented numbers
+and ML jargon, instructing 2-4 plain sentences in the target language),
+calls OpenRouter, then runs `_looks_like_target_language()` - a
+script-character-ratio check (>=50% Sinhala/Tamil Unicode-block characters)
+- to catch the free-tier model occasionally leaking raw English
+chain-of-thought instead of a clean localized answer, falling back to a
+static pre-translated message if the check fails.
+Output: `{recommendation: string, context_used: ChatContextUsed}`.
+Current status: the Recommend tab was redesigned to source its content from
+the deterministic `lib/agronomy.ts` rule engine plus static, pre-translated
+templates instead (Section 7), specifically because free-text LLM output
+could not be strictly constrained to only agronomically-grounded claims,
+and the endpoint's own code comments document repeated reliability problems
+with free-tier OpenRouter models (garbled tokens, reasoning leaking into
+the visible answer). The endpoint remains implemented and callable, but is
+presently unused by any frontend page.
+
+## Frontend <-> backend communication summary
+
+  - Single axios instance, JSON in / JSON out, no auth/session - anyone who
+    can reach the Flask port can call any endpoint (this is an FYP-scope
+    system, not a hardened multi-tenant product; see Section 11).
+  - Validation is minimal and explicit: a request-side `_finite()` helper
+    (rejects `None`, booleans, and non-finite floats) gates whether a
+    farmer-supplied value is trusted at all; required-param 400s are
+    hand-written per endpoint (`/context`, `/baseline`).
+  - Error handling follows a consistent pattern: 503 when server-side state
+    isn't loaded yet (model/context dataset missing), 404 when a specific
+    requested resource has no data (e.g. `/baseline` for a district/season
+    with zero history), 400 for missing required query/body params. The
+    frontend never assumes success - every API function in `lib/api.ts` is
+    wrapped in a try/catch at the call site with an explicit error state
+    (`predictError`, `aiError`, etc. - see Section 10).
+
+
+==================================================
+# 5. Machine Learning Prediction Pipeline
+==================================================
+
+## 5.1 Input data
+
+Two data "variants" exist side by side, selected via the `DATA_VARIANT`
+environment variable (default `synthetic`):
+
+  - `DATA_VARIANT=real` - the honest, reported variant. 28 district-year
+    rows (4 districts x 7 years, Yala season only, 2019-2025), built by
+    `src/data_loader.py::load_collected_data()` from
+    `data/collected/FYP data(manual) - onion_unique_per_key.csv` (a monthly
+    table with a `source` column; rows marked `source=synthetic` are
+    dropped before aggregation - this is a deliberate fix for a previously
+    discovered leak where ~40% of the seasonal target values were
+    fabricated).
+  - `DATA_VARIANT=synthetic` (default) - a 136-row demo dataset including a
+    5th district (Jaffna) and both seasons, generated by
+    `generate_synthetic_data()`. Explicitly documented in the project
+    README as "not a result" - for UI demos, screenshots and tests only.
+  - A third code path, `load_real_data()` (requiring files under
+    `data/raw/`), exists but is dead: `data/raw/` is empty in this repo, so
+    this branch never actually executes.
+
+Feature groups (32 features total, `src/config.py::ALL_FEATURES`, mirrored
+exactly in `dashboard/lib/features.ts`):
+
+  - Weather (9): season_avg_temp, season_total_rainfall, season_avg_humidity,
+    season_avg_solar_rad, growing_degree_days, heat_stress_days,
+    drought_index_spi, temp_range, max_daily_rainfall. Source: NASA POWER.
+  - Satellite (11): season_mean_ndvi, season_max_ndvi, season_min_ndvi,
+    ndvi_std, ndvi_anomaly, time_to_peak_ndvi, ndvi_growth_rate,
+    season_mean_evi, season_mean_ndwi, season_mean_lst_day,
+    season_mean_lst_night. Source: MODIS/Sentinel-2 (595 16-day NDVI/EVI
+    composites per district, `data/collected/FYP data(manual) -
+    NDVI-EVI.csv`).
+  - Historical (5): prev_season_yield, prev_year_yield, yield_3yr_avg,
+    season_indicator, extent_prev_season. Source: DCS records
+    (`data/collected/FYP data(manual) - real all datas.csv`).
+  - Soil (4): soil_ph, organic_carbon, clay_pct, sand_pct. Source:
+    SoilGrids.
+  - Interaction (3, engineered): rainfall_x_ndvi, temp_x_humidity,
+    ndvi_x_lst - simple products of the corresponding raw features,
+    recomputed both at training time and at inference time (never trusted
+    as a user-supplied override).
+
+Important, honestly-documented data-quality caveats (from the project
+README, directly relevant to interpreting any prediction):
+
+  - Six of the 32 features are effectively constants in the real dataset:
+    `season_avg_solar_rad = 18.0`, `season_mean_ndwi = 0.1`,
+    `organic_carbon = 1.8`, `extent_prev_season = 400.0`, and
+    `heat_stress_days` (computed from monthly-*mean* temperature, which
+    never exceeds the 32C threshold used, so it is always 0 in this data
+    variant). These carry a low "grounding" score in the ERI system
+    (Section 6.3) precisely because of this.
+  - `prev_year_yield` is, in effect, the literal previous year's target
+    (verified in 22 of 24 district-year pairs) - a known leak.
+  - `drought_index_spi` and `ndvi_anomaly` are standardised against the
+    *entire* 2019-2025 panel rather than a held-out climatology - another
+    known leak (`data_loader.py:244`).
+  - Kurunegala and Matale share a single NASA POWER weather grid cell
+    (byte-identical daily weather on 100% of days).
+  - Sequence inputs fed to the LSTM/BiLSTM/CNN models are *not* real
+    monthly time series - `feature_engineer.py` expands 4 seasonal scalars
+    into a 5-step trajectory using a fixed sine curve and fixed weights,
+    documented in its own docstring as "Synthetic-only."
+
+## 5.2 Preprocessing and feature resolution
+
+Offline (training time): `src/preprocessor.py::preprocess()` drops rows with
+no/non-positive target, validates District/Season against `config.py`,
+forward/back-fills historical-yield columns per (district, season),
+median-fills remaining NaNs, and winsorises the target at the 1st/99th
+percentile before writing `data/processed{_real}/integrated_dataset.csv`.
+
+Online (per-request, `src/api.py::_resolve_features()`): for each of the 32
+`ALL_FEATURES`, the first match in this exact priority order wins:
+
+    1. user            - value present in the POST body and passes _finite()
+    2. exact_year_record - a real dataset row for this exact
+                           (district, season, year)
+    3. district_season_mean - group mean for this (district, season)
+    4. district_mean   - mean across all seasons/years for this district
+    5. season_mean      - mean across all districts/years for this season
+    6. global_mean       - dataset-wide mean
+    7. zero_fallback     - literal 0.0, only if every tier above is empty
+
+The 3 interaction features are then always overwritten as the product of
+their already-resolved raw inputs and tagged `derived`, regardless of which
+tier they individually landed on - guaranteeing internal consistency. The
+per-feature outcome of this cascade is returned to the frontend as
+`feature_sources` and is what `data_completeness.fraction_grounded`
+summarises (Section 10). Since the dashboard's Predict form only ever
+supplies district/season/year, in practice almost every feature resolves at
+tier 2 or lower for a historical (district, season, year) combination that
+exists in the dataset, and at tier 3-6 for a future year.
+
+## 5.3 The prediction process
+
+    Resolved 32-feature vector
+            |
+    Loaded model (`_state['model']`) . predict()
+            |
+    Point yield estimate
+            |
+    Confidence interval cascade (conformal -> gaussian -> heuristic)
+            |
+    SHAP explainer invoked on the same resolved vector
+            |
+    ERI computed from the resulting SHAP values
+            |
+    Full PredictResponse assembled and returned
+
+Confidence-interval logic, in priority order:
+  1. `conformal_{X}pct` - used when a per-model conformal calibration exists
+     (`outputs/results{_real}/conformal.json`, produced by
+     `src/conformal.py` from leave-one-year-out out-of-fold residuals). The
+     percentage in the label is read from that file's `coverage_target`
+     field (defaults to 90% only if absent), not hardcoded.
+  2. `gaussian_1.96rmse` - fallback: `margin = 1.96 * RMSE` from the served
+     model's own row in `model_comparison.csv`, if conformal data is
+     unavailable for this model.
+  3. `heuristic_15pct` - last resort: `margin = prediction * 0.15`, used
+     only if neither of the above is available.
+
+## 5.4 Model training, selection, and what is actually deployed
+
+`main.py` is the offline training pipeline entry point (`python main.py`
+for the synthetic demo variant, `python main.py --real` for the honest real
+variant), run in this order:
+
+    1. load_data()              (src/data_loader.py)
+    2. preprocess()              (src/preprocessor.py)
+    3. engineer_features()       (src/feature_engineer.py)
+    4. run_eda()                 (src/eda.py)
+    5. train_all_ml_models()     (src/ml_models.py: RandomForest, XGBoost, SVR)
+    6. train_symbolic_regression() (src/symbolic.py: gplearn genetic programming)
+    7. train_physics_residual()  (src/physics_residual.py: FAO-33 mechanistic
+                                   backbone + RandomForest on the residual)
+    8. train_all_dl_models()     (src/dl_models.py: LSTM, BiLSTM, 1D-CNN,
+                                   hybrid CNN-LSTM)
+    9. run_ablation_study()      (src/ablation.py)
+   10. run_shap_analysis()       (src/explainer.py)
+   11. run_stacking()            (src/stacking.py: 3 combiner strategies)
+   12. generate_final_comparison() (src/evaluator.py - always runs)
+   13. compute_conformal()       (src/conformal.py - always runs)
+
+Two further pipelines are separate scripts, not invoked by `main.py`:
+`src/run_padr.py` (a "PADR" novelty model, writes `oof_padr.json` into the
+same results directory) and `src/xai/run_xai.py` (the ERI/stability/
+consensus offline computation - Section 6.3).
+
+Training protocol for the three tabular models (`src/ml_models.py`): an
+*inner* `GridSearchCV` over reduced/fast hyperparameter grids using
+`TimeSeriesSplit`, an *outer* Leave-One-Year-Out loop for honest
+out-of-fold metrics, then a final refit on all data with the tuned
+hyperparameters as the deployed artefact. XGBoost additionally applies a
+monotonicity constraint forcing predicted yield to be non-decreasing in the
+NDVI/EVI vegetation features - an explicit agronomic prior baked into model
+structure, not just post-hoc explanation.
+
+Final model selection is not a single "pick the best CV score" step inside
+training - `src/evaluator.py::generate_final_comparison()` globs every
+`oof_*.json` file the various training scripts wrote (13 models on the real
+variant: RandomForest, XGBoost, SVR, LSTM, BiLSTM, CNN, CNN-LSTM hybrid,
+SymbolicRegression, PhysResidual, PADR, and 3 stacking combiners), ranks
+them all by R2, and writes `best_model_metrics.json` naming the top row
+("crowned" model) plus `model_comparison.csv` and a plain-text
+`final_summary.txt`.
+
+Critically, the crowned model is often NOT what the live API actually
+serves: `src/api.py::_load_state()` only has loadable artefacts for
+RandomForest, XGBoost and SVR (`candidates` dict of `.pkl` files). If the
+crowned model isn't one of those three, the API falls back to whichever
+*servable* model has the best own R2, and logs this explicitly:
+
+  - On the real data variant, the crowned model is SymbolicRegression
+    (R2 = -0.209), which is not servable, so the API falls back and serves
+    SVR (R2 = -0.3068, the best of the three servable candidates - beating
+    RandomForest at -0.5423 and XGBoost at -0.7106).
+  - On the default synthetic demo variant, the crowned model is
+    StackConvex (R2 = 0.8478), also not servable, so the API falls back and
+    serves RandomForest (R2 = 0.8421, best of the three servable candidates
+    - beating XGBoost at 0.8041 and SVR at 0.6963).
+
+Deep-learning models are trained and benchmarked for the comparison table
+but are never loadable by the live API at all (no `.keras` entry in
+`candidates`).
+
+## 5.5 Honest headline result (real data variant)
+
+Quoting the project's own README directly, because this is the single most
+important, and most easily misrepresented, fact about the system:
+
+  "This project reports a negative result, and that is the finding rather
+  than a failure. On the real data - 28 district-year rows, Yala only,
+  2019-2025 - no model beats predicting the training-year average."
+  Climatology baseline: R2 = -0.215, RMSE = 6.73 MT/Ha.
+  Best model (SymbolicRegression): R2 = -0.209, RMSE = 6.72 MT/Ha.
+  "63.6% of the target's variance lies between years, and LOYO removes
+  exactly that; measurement error accounts for over half of what remains
+  within a year. The attainable R2 ceiling on this panel is +0.162, so the
+  proposal-stage target of 0.75 (config.TARGET_R2) was never reachable."
+
+This is why the dashboard surfaces `model_r2` and a reliability tier
+directly to the farmer/officer (Section 3.2, Section 11) rather than
+presenting the point yield estimate as if it were unconditionally precise -
+the UI's own "Model reliability: Low" copy is not boilerplate, it is a
+faithful reflection of a genuinely low real-data R2 in the variant most
+representative of production use.
+
+The synthetic demo variant, by contrast, reaches R2 = 0.8478 (StackConvex)
+/ 0.8421 (RandomForest, the one actually served) - explicitly not
+comparable to the real numbers above, and not to be quoted as the system's
+accuracy.
+
+
+==================================================
+# 6. Explainability Module (XAI)
+==================================================
+
+## 6.1 SHAP flow
+
+    Resolved feature vector (same one the model just predicted from)
+            |
+    _init_explainer(model_name) picks TreeExplainer or KernelExplainer
+            |
+    explainer.shap_values(...) computed fresh, for THIS request only
+            |
+    shap_dict: {feature_name: signed SHAP value} for all 32 features
+            |
+    convertSHAPToExplanation() (frontend) groups raw features into
+    ~5 farmer-facing display factors, ranked by |combined SHAP|
+            |
+    Per-factor Impact / Effect / Confidence cards (Explain tab)
+
+Explainer selection (`src/api.py::_init_explainer`), decided once at API
+startup based on which model got loaded:
+  - RandomForest / XGBoost -> `shap.TreeExplainer(model)` - exact,
+    fast, introspects the tree structure directly.
+  - SVR (or any other non-tree model) -> `shap.KernelExplainer`, model-
+    agnostic, wrapping a `predict_fn` that applies the fitted
+    `StandardScaler` internally. Its background reference set is a
+    `shap.kmeans` summary of up to 25 representative rows from the real
+    processed dataset (not synthetic noise), to bound per-call latency.
+    Called at inference time with `nsamples=100, l1_reg=0` - the `l1_reg=0`
+    is a deliberate fix: SHAP's default LASSO-based feature selection was
+    previously silently zeroing out 22 of the 32 features' contributions.
+
+Positive vs. negative contribution: a positive SHAP value means that
+feature's actual resolved value pushed the prediction above what the model
+would have said with an "average" input; negative means it pulled the
+prediction down. The frontend never shows the raw signed number as the
+primary claim - it converts sign to an up/down arrow and one of two fixed
+phrases ("Increased yield" / "Reduced yield").
+
+Feature importance vs. per-request SHAP: `GET /feature-importance` exposes
+a dataset-level ranking (`outputs/results{_real}/feature_importance.json`,
+produced offline by `src/explainer.py::run_shap_analysis()` against
+whichever of RandomForest/XGBoost has the better R2 - SHAP `TreeExplainer`
+only, deep-learning models are explicitly skipped here even if one has
+better raw accuracy, since the artefact is meant to represent "the
+strongest interpretable tabular learner"). This is a *general* statement
+about the model; it is not shown on the Explain tab, which only ever shows
+the per-request `shap_values` embedded in that specific `/predict` response.
+
+## 6.2 Feature grouping for farmer legibility
+
+`dashboard/lib/api.ts::convertSHAPToExplanation()` and
+`featureDisplayKey()`: several raw model features collapse into one
+display label so the same underlying signal doesn't appear as 2-3 near-
+duplicate rows - e.g. `season_mean_ndvi`, `season_max_ndvi`,
+`season_min_ndvi` all render as one "Greenness (NDVI)" factor, with their
+SHAP values summed before ranking (grouping happens before picking the
+top-5, not after, specifically to avoid the same concept appearing 3 times
+with 3 different partial numbers).
+
+## 6.3 ERI - Explanation Reliability Index
+
+What ERI represents: a trust score, separate from the model's own
+accuracy, answering "how much should this specific SHAP explanation be
+believed" - because a SHAP value can be large and confident-looking even
+when it is hanging on a constant proxy or a value the model has never seen
+vary.
+
+How it is calculated (`src/xai/eri.py::compute_eri()`):
+
+    ERI_j          = (stability_j + grounding_j + consensus_j) / 3
+    ERI_prediction = sum(|SHAP_j| * ERI_j) / sum(|SHAP_j|)   over this
+                     prediction's own features
+
+Its three components, each computed by a separate module:
+
+  - Grounding (`src/xai/grounding.py`, `GROUNDING_REGISTRY`) - a static,
+    hand-curated per-feature score answering "is this value a real
+    measurement or an invented fallback?" 1.00 for directly measured
+    values (e.g. `season_avg_temp`, `soil_ph`), down to 0.05 for
+    hard-coded constants with zero variance in the collected data (e.g.
+    `season_avg_solar_rad`, `organic_carbon`), 0.15 for algebraic proxies/
+    interaction terms.
+  - Stability (`src/xai/stability.py`) - whether a feature's SHAP magnitude
+    survives a Leave-One-Year-Out refit. Computed as
+    `1 - IQR(shap_j across LOYO folds)/(|median_j|+eps)`, clipped to
+    [0,1]. Real-variant global "Explanation Stability Coefficient"
+    (mean pairwise Spearman correlation between folds' full importance
+    vectors) = 0.7501.
+  - Consensus (`src/xai/consensus.py`) - a 3-way vote per feature: is it in
+    the SHAP top-10, the permutation-importance top-10, and/or the
+    symbolic-regression equation's feature list? `consensus_j = votes/3`.
+
+`ERI_j` and the aggregate `eri` are computed live inside `run_prediction()`
+for every `/predict` call (using stability/grounding/consensus scores that
+were themselves precomputed offline by `python -m src.xai.run_xai`, but
+weighted by *this request's own* SHAP values) - so the reliability number
+shown is specific to the prediction just made, not a single static number
+reused everywhere.
+
+How it improves trust / how it is displayed: every place a SHAP-derived
+claim appears (Explain tab per-card "Confidence," Explain tab page-level
+"Explanation reliability" badge, Recommend tab per-card "Reliability")
+carries this score, using consistent emoji + tier conventions (green >=90%,
+yellow >=70%, orange >=50%, red below, grey/"Unknown" if ERI could not be
+computed for that feature at all). A recommendation or explanation with low
+confirmed reliability is still shown - the UI never hides an uncertain
+claim - but it is never shown as if it were as trustworthy as a
+well-grounded one.
+
+Honest caveat, worth stating for a viva: `run_xai.py`'s own
+`weight_sensitivity_sweep()` found that on the real data variant, 97%
+(64/66) of alternative (stability, grounding, consensus) weightings produce
+a *different* top-5 "most reliable feature" ranking than the equal-weight
+baseline the system actually uses - meaning ERI's own internal weighting
+choice is a real design decision with a measurable effect on its output,
+not a settled, weight-free ground truth. The aggregate real-variant ERI
+score itself is 0.6219.
+
+## 6.4 Technical vs. farmer-facing explanation - a concrete example
+
+Technical (what the backend actually computes and what
+`per_feature_eri`/`shap_values` literally contain):
+    "season_mean_ndvi: shap_value = +0.32, per_feature_eri = 0.90"
+
+Farmer-facing (what the Explain tab renders for the exact same number):
+    Card: "Greenness (NDVI)"
+    Impact: "↑ Increased yield"
+    Effect: "High"
+    Confidence: "🟢 High reliability" (90%)
+    (Technical details, collapsed by default: "Greenness (NDVI) increased
+    your predicted yield by about 320 kg/Ha." + a diverging bar + the raw
+    feature name.)
+
+The same discipline continues one step further into the Recommend tab
+(Section 7-8), where the equivalent negative-SHAP, low-value case for soil
+pH becomes: "Soil pH is below the recommended range for big onion growth"
+/ "Improve soil condition before the next cultivation stage" - never a raw
+number as the primary sentence, always available one tap away.
+
+
+==================================================
+# 7. Recommendation System Architecture
+==================================================
+
+## 7.0 The governing constraint
+
+The recommendation system does NOT make independent predictions, and does
+NOT let a language model decide what to recommend. Every recommendation
+shown to a farmer must be traceable to two concrete, already-computed
+facts: a real SHAP value from the current `/predict` response, and a real
+agronomic threshold comparison against the current resolved feature value.
+This is enforced structurally, not by convention - the recommendation code
+(`dashboard/lib/agronomy.ts`) has no network access and cannot call an LLM;
+it is a pure function of data already sitting in the shared prediction
+object.
+
+    Prediction (POST /predict response, already in localStorage)
+            |
+    SHAP Explanation (prediction.shap_values - same object Explain tab uses)
+            |
+    ERI Reliability (prediction.per_feature_eri - same object Explain tab uses)
+            |
+    Actionable Feature Filtering (only 4 of 32 features are eligible at all)
+            |
+    Agronomic Rule / Threshold Engine (5 DOA/FAO-style rules, dual-gated)
+            |
+    Recommendation Template (next-intl, pre-translated en/si/ta)
+            |
+    (LLM Language Layer - see 7.3: implemented as static templates today,
+     not a live model call, precisely to guarantee this constraint holds)
+            |
+    Final Recommendation (card UI, Section 8)
+
+## 7.1 Actionable Feature Filtering
+
+Not every feature with a negative SHAP contribution is shown as advice.
+Historical yield features, satellite vegetation indices, soil texture
+(clay/sand percentage), solar radiation, and land-surface-temperature
+proxies are all *excluded* from the rule engine entirely, because they are
+either not something a farmer can act on this season, or (per Section 6.4's
+grounding scores) not reliably measured to begin with. Only four raw
+feature groups are wired into any rule:
+
+    Kept (actionable, each backing exactly one rule):
+      - soil_ph                              -> soil condition rule
+      - season_total_rainfall + drought_index_spi -> water management rule
+      - heat_stress_days + season_avg_temp    -> heat stress risk
+      - season_avg_humidity                   -> disease-risk (humidity)
+
+    Excluded (not actionable / not reliable enough to act on):
+      - NDVI/EVI/NDWI/LST family (a consequence of conditions, not a lever
+        a farmer pulls)
+      - prev_season_yield / prev_year_yield / yield_3yr_avg / season_indicator
+      - clay_pct / sand_pct (soil texture, not practically changeable
+        mid-season)
+      - organic_carbon, season_avg_solar_rad (constant proxies - see
+        Section 6.3 grounding scores of 0.05)
+      - extent_prev_season
+
+Note the framing difference from a naive "rainfall/temperature caused this,
+so tell the farmer to change rainfall/temperature": the system never
+recommends changing the weather. Rainfall/drought becomes an *irrigation*
+recommendation (a controllable response to the weather), and heat becomes a
+*monitoring/irrigation-timing* risk flag, not an instruction to lower the
+temperature.
+
+## 7.2 Rule / Threshold Engine ( dashboard/lib/agronomy.ts )
+
+Five rules, each a literature-level DOA/FAO big-onion (Allium cepa)
+cultivation threshold. A rule fires only when BOTH conditions hold:
+
+    IF   the feature's resolved value breaches its agronomic threshold
+    AND  the SHAP contribution for that feature (in THIS prediction) is
+         negative (i.e. it is actually pulling this yield estimate down)
+    THEN generate the corresponding recommendation/risk finding
+
+The five rules, verbatim thresholds from the code:
+
+  1. soil_ph_low       - soil_ph < 5.5           -> recommendation (soil)
+  2. soil_ph_high      - soil_ph > 6.5            -> recommendation (soil)
+     (recommended range shown to the farmer: 5.5-6.5 pH)
+  3. water_deficit     - season_total_rainfall < 350mm OR
+                         drought_index_spi <= -1.0 -> recommendation (water)
+  4. heat_stress       - heat_stress_days > 10 OR
+                         season_avg_temp > 30C     -> risk (heat)
+  5. humidity_disease_risk - season_avg_humidity > 85% -> risk (humidity,
+                         disease-conducive conditions such as purple blotch)
+
+If a rule's threshold is breached but the SHAP contribution for that
+factor is not negative for this specific prediction (e.g. soil pH is
+technically outside range, but the model is not actually attributing any
+of this prediction's shortfall to it), the rule does NOT fire - this is the
+exact mechanism that prevents ungrounded, generic advice from ever
+appearing.
+
+Severity/effect tiers reuse the same 0.66/0.33 magnitude convention as the
+Explain tab (Section 3.3), anchored against the single largest |SHAP|
+across all 32 features for this prediction, so a "High" effect on the
+Recommend tab means the same thing as a "High" effect on the Explain tab.
+Reliability per finding is the |SHAP|-weighted average of
+`per_feature_eri` across exactly the raw feature(s) that rule uses -
+identical methodology to the Explain tab's per-card confidence
+calculation, just re-run against a different subset of features.
+
+If no rule fires at all, the Recommend tab shows a "Conditions look good"
+state rather than forcing generic filler content - this was previously not
+the case (the old design always filled 3+ "Strategies for Improvement"
+cards regardless of whether they applied).
+
+## 7.3 The Template + "LLM" Language Layer
+
+By design intent (and by the architecture diagram this document was asked
+to describe), a language layer sits between the rule engine's structured
+output and the farmer-visible text, and that layer's only job is:
+
+    - Sentence generation from a template
+    - Translation into the farmer's chosen language
+    - Natural-language phrasing/polish
+
+It must NOT decide which recommendations to show, invent new agronomic
+rules, or alter the prediction.
+
+Current implementation status (important to state precisely, since it
+differs from a literal "live LLM call" reading of the diagram): this layer
+is realised as static, pre-translated next-intl message templates
+(`messages/en.json`, `si.json`, `ta.json`, under the `recommend.rules.*`
+namespace), not a live model call at request time. Each rule ID maps to a
+`{title, reason, action}` template with `{current}`/`{min}`/`{max}`
+placeholders that next-intl interpolates with the real resolved value and
+threshold at render time - e.g.
+
+    en: "Soil pH ({current}) is below the recommended range for big onion
+         growth ({min}-{max})."
+    si / ta: professionally translated equivalents, same placeholders.
+
+This choice was made deliberately during the Recommend-tab redesign, for a
+concrete, code-documented reason: the backend's `POST /api/recommend`
+endpoint (Section 4), which *does* call a live free-tier OpenRouter LLM,
+carries extensive defensive code (`_looks_like_target_language()` script-
+ratio validation, static fallback/rate-limit messages) written specifically
+because that free-tier model was observed to occasionally leak raw English
+reasoning into a Sinhala/Tamil response, or degrade under load. Given that
+observed unreliability, and given the explicit instruction that an LLM must
+never be trusted to decide farmer-facing agronomic content, the safer and
+simpler realisation of "the language layer" for this rule-engine-driven
+tab is deterministic, professionally pre-translated templates rather than a
+live call whose failure mode would otherwise have to be defended against on
+every single page load. `POST /api/recommend` remains implemented and
+callable server-side (e.g. for a future free-form "explain this in your own
+words" feature) but is not part of the Recommend tab's current data flow.
+
+What the LLM layer explicitly does NOT do in this system, and why that
+matters: it does not see the rule engine's raw output and choose whether to
+mention a factor (the rule engine already decided that, in TypeScript, with
+no model in the loop); it does not compute or restate SHAP values in
+prose from scratch (the numbers are interpolated into a fixed template, not
+generated); and it cannot introduce an agronomic rule that isn't in the
+`RULES` array, because there is no code path from an LLM response back into
+which cards get rendered.
+
+
+==================================================
+# 8. Recommendation User Interface Flow
+==================================================
+
+Recommendation card - real example (soil pH):
+
+    🌱 Soil condition
+
+    Impact:
+    Reduced expected yield
+
+    Why this matters:
+    Soil pH (4.8) is below the recommended range for big onion growth
+    (5.5-6.5).
+
+    Recommended action:
+    Improve soil condition before the next cultivation stage - apply
+    agricultural lime to raise soil pH.
+
+    Reliability:
+    🟢 High reliability  90%
+
+    ▼ Why am I seeing this?  (collapsed by default)
+        Feature: Soil pH
+        SHAP contribution: Negative impact
+        Current value: 4.8 pH
+        Recommended range: 5.5 - 6.5 pH
+        Source: DOA / FAO onion (Allium cepa) cultivation guideline
+
+Risk card - real example (heat stress), a lighter-weight variant with no
+technical drawer:
+
+    ⚠ Heat stress risk
+
+    Level: Medium
+
+    Reason:
+    High temperature conditions (14 heat-stress days this season) reduced
+    your expected yield.
+
+    Action:
+    Monitor soil moisture and maintain irrigation during hot spells.
+
+Page-level structure, top to bottom:
+  1. Header ("Recommended Actions" / subtitle) + "New Prediction" reset.
+  2. Recommendation cards grid (only rules that fired; soil/water
+     category).
+  3. "If you take these actions" - one impact-only sentence, shown only if
+     at least one recommendation fired; explicitly makes no numeric yield
+     promise ("Improving these conditions may help reduce yield loss in
+     future cultivation" - not "your yield will increase to X").
+  4. "Watch for Possible Risks" - risk cards (heat/humidity category),
+     shown only if any risk rule fired.
+  5. "Conditions look good" - replaces steps 2-4 entirely if nothing fired.
+  6. "Need more help?" - static closing card: "Contact your local
+     agriculture officer for field-specific guidance."
+
+The expandable technical-details drawer exists on recommendation cards
+(not risk cards, to keep the risk section lighter-weight) and always shows
+the same five fields in the same order: Feature, SHAP contribution
+(qualitative - "Negative impact," never the raw signed number, matching the
+Explain tab's own restraint), Current value, Recommended range, Source.
+
+
+==================================================
+# 9. Data Flow Between Modules
+==================================================
+
+The single most important data-flow fact in this system: Predict, Explain
+and Recommend do not each fetch their own data - they all read one shared
+object.
+
+PredictResponse (produced once by POST /predict, stored under localStorage
+key "last_prediction"):
+
+    {
+      district, season, year,
+      predicted_yield_MT_per_Ha,
+      confidence_lower, confidence_upper, confidence,
+      shap_values: { <32 feature keys>: signed SHAP value },
+      model, model_r2,
+      forecast_basis: { basis, year_is_model_feature,
+                         year_affects_prediction, n_observed_inputs, note },
+      interval_method, interval_coverage,
+      feature_sources: { <32 feature keys>: provenance tier },
+      resolved_features: { <32 feature keys>: value actually used },
+      data_completeness: { n_features, n_user_supplied, n_grounded,
+                            n_zero_filled, fraction_grounded },
+      eri,
+      per_feature_eri: { <32 feature keys>: 0-1 reliability score }
+    }
+
+Used by:
+  - Predict Page - writes this object (the only writer); reads it back to
+    render PredictionResultCard.
+  - Explanation Page - reads shap_values + per_feature_eri (read-only,
+    never writes).
+  - Recommendation Page - reads resolved_features + shap_values +
+    per_feature_eri (read-only, never writes).
+  - ChatAssistant - does not read this stored object directly; it re-derives
+    an equivalent grounding context server-side per query via
+    `explanation_context.get_prediction_context()` (same underlying
+    `run_prediction()` function, so numerically consistent, but fetched
+    fresh over the wire rather than reused from localStorage).
+
+What is explicitly NOT shared: the Home page's batch multi-district
+predictions (`predictYieldsForAllDistricts`) are never written to
+`last_prediction` - selecting a district on the home map does not
+pre-populate the Predict form or the Explain/Recommend tabs. Farmer input
+form state (`last_farmer_inputs`) is a separate localStorage key from the
+prediction result itself, so the form can be pre-filled without implying a
+result already exists.
+
+Secondary shared shape - `ChatContextUsed` (used identically by both
+`POST /api/chat`'s response and, historically, `POST /api/recommend`'s
+response, both built by the same `explanation_context.get_prediction_context()`
+function): predicted_yield_MT_per_Ha, confidence_lower/upper, confidence,
+interval_method, model_r2, top_shap_features (top 5, {feature, shap_value}),
+historical_baseline, recent_yield_history (last 5 years), comparison
+(district-vs-district), intent (comparison/uncertainty/explanation/
+general, from simple keyword matching in `extract_intent()`). Sharing this
+one function guarantees the chat assistant can never state a fact that
+contradicts what `/predict` itself would say for the same
+district/season/year.
+
+
+==================================================
+# 10. Error Handling and Edge Cases
+==================================================
+
+API failure (network error / 500 / timeout):
+  - Predict page: `predictError` state set to a localized message
+    (`t("predict.error")`); the Predict button remains usable for a retry;
+    no partial/fake result is ever shown.
+  - Home page batch flow: `predictYieldsForAllDistricts` uses
+    Promise.allSettled-style handling internally, tolerating individual
+    district failures (`failedDistricts` array) and only throwing if *all*
+    four districts fail - so one bad district doesn't blank the whole
+    dashboard.
+  - ChatAssistant: `error` state shown inline in the chat panel; distinct
+    "not configured" message (`t("chat.notConfigured")`) is used when the
+    backend explicitly returns the 503 for a missing `OPENROUTER_API_KEY`,
+    versus a generic `t("chat.error")` for other failures.
+
+Missing prediction (farmer opens Explain or Recommend before ever
+predicting, or after "New Prediction"):
+  - Both pages check `!prediction` (i.e. `PREDICTION_KEY` is null) and
+    render an identical-pattern placeholder: an icon, "No Prediction
+    Found"/"No Recommendations Yet" heading, explanatory text, and a CTA
+    button back to `/predict`. Neither page attempts to fetch anything or
+    show a spinner in this state - it is a deterministic, immediate branch.
+
+Missing explanation data (SHAP/ERI absent from an otherwise-valid
+prediction - e.g. the SHAP explainer failed to initialise server-side, or
+mock data is in use):
+  - `convertSHAPToExplanation({})` on an empty/missing `shap_values` simply
+    returns an empty array, so the Explain page renders zero factor cards
+    rather than crashing; the "Key Insight" callout is conditionally
+    rendered only `if (top)`.
+  - `evaluateAgronomicRules()` on missing `resolved_features` returns
+    `{recommendations: [], risks: []}` immediately (an explicit early
+    return), which the Recommend page shows as the honest "Conditions look
+    good"-shaped path - notably, this means an *absence* of data and a
+    *genuinely clean* prediction currently render identically; this is a
+    known simplification, not a bug the system tries to disguise.
+  - `per_feature_eri` lookups throughout use `?? undefined`-safe access;
+    missing ERI for a given feature renders as the explicit "Unknown"/grey
+    tier rather than defaulting to a fake mid-range confidence number.
+
+Missing recommendation (no rule fires): the "Conditions look good" state
+(Section 7.2/8) - a deliberate, positive-framed outcome, not an error.
+
+Invalid inputs: `_finite()` server-side rejects `None`, booleans, and
+non-finite floats (NaN/inf) from ever being treated as a trusted
+user-supplied value, falling through to the resolution cascade instead of
+poisoning the model with garbage; `/context` and `/baseline` 400 outright
+if their required query params are missing.
+
+Model unavailable (backend hasn't finished loading, or the pipeline was
+never run for the active `DATA_VARIANT`): endpoints that depend on
+`_state['model']`/`_state['context_df']`/`_state['baselines']` return 503
+with a plain-English error rather than a stack trace; file-backed endpoints
+(`/models/compare`, `/feature-importance`, `/equation`,
+`/explanation-reliability`, `/stability`, `/consensus`) return 404 if their
+backing JSON/CSV hasn't been generated yet for this variant.
+
+Zero-fallback data gap: when a feature has no data at any resolution tier
+(the rarest case - `feature_sources[feature] == "zero_fallback"`), it is
+counted in `data_completeness.n_zero_filled` / surfaced via
+`fraction_grounded` rather than silently blended in as if it were a normal
+average - this was a deliberate fix (per code comments) replacing an older
+behaviour where an all-zero feature vector could still produce a
+falsely-confident-looking prediction.
+
+LLM-specific failure modes (POST /api/chat, and historically /api/recommend):
+multi-layer defence - 503 if no API key configured; a generic
+fallback/rate-limit message pair (localized per-language) if the OpenRouter
+call itself errors or is rate-limited; and, for the recommend endpoint
+specifically, an explicit post-hoc script-ratio check discarding any
+response that isn't actually in the requested Sinhala/Tamil script before
+it would ever reach the farmer.
+
+
+==================================================
+# 11. Security and Reliability Considerations
+==================================================
+
+API validation: every prediction-affecting input is passed through
+`_finite()` before being trusted (Section 5.2/10); required query
+parameters are validated per-endpoint with explicit 400 responses rather
+than silently defaulting; CORS is explicitly scoped to
+`http://localhost:3000` rather than reflecting any origin, limiting which
+web contexts can call the API from a browser.
+
+Secrets handling: `OPENROUTER_API_KEY` is read only from a server-side
+`.env` file / environment variable and is never sent to, or readable by,
+the frontend; both LLM-backed endpoints fail closed (503) rather than
+silently proceeding without a key.
+
+Model reliability transparency: rather than hiding a weak real-data model
+behind a single confident-looking number, the system surfaces `model_r2`
+directly and derives an explicit, farmer-facing reliability tier from it
+(Section 3.2, Section 5.5) - a low R2 genuinely renders as "Low
+reliability" copy warning that the range is "close to predicting the
+district average," not suppressed or reworded away.
+
+Data consistency across tabs: because Explain and Recommend both read the
+exact same stored `shap_values`/`per_feature_eri`/`resolved_features`
+object rather than each independently recomputing an explanation, it is
+structurally impossible for the two tabs to disagree about why a
+prediction came out the way it did (Section 3.6, Section 9) - there is only
+one computation of SHAP/ERI per prediction, done once, server-side, at
+`/predict` time.
+
+Avoiding unsupported recommendations: the dual-gate design (threshold
+breach AND negative SHAP, Section 7.2) plus the actionable-feature
+allowlist (Section 7.1) are the concrete mechanisms that keep the
+Recommend tab from showing generic, ungrounded advice categories that
+existed in an earlier design (e.g. a blanket "Pest Monitoring" card that
+was not backed by any real pest-observation feature in the dataset at all,
+and was removed specifically because no feature exists to ground it).
+
+Maintaining explainability under redesign: the recommendation architecture
+was deliberately built to consume, not recompute, the SHAP/ERI values
+already produced for the Explain tab (Section 7.0) - this was an explicit
+design constraint (no new model logic, no independent LLM decision-making)
+precisely to avoid two different "why" stories existing for the same
+prediction.
+
+Known, documented limitations that affect reliability claims (should be
+disclosed alongside any accuracy statement, not discovered later):
+prev_year_yield / drought_index_spi / ndvi_anomaly leakage, six
+constant-valued features, shared weather grid cell for two of the four
+districts, and manufactured (non-real) input sequences for the deep-
+learning models (Section 5.1) - all explicitly documented in the project
+README rather than omitted.
+
+Out of scope / not implemented: no authentication/authorization layer, no
+rate limiting on the Flask side beyond what OpenRouter itself imposes, no
+database persistence (a commented-out `# TODO: Implement PostgreSQL
+storage here` exists in `run_prediction()`, i.e. predictions are not
+currently logged server-side at all - only client-side in localStorage).
+This is appropriate for the system's current FYP-demonstration scope but
+would need to be addressed before any multi-user production deployment.
+
+
+==================================================
+# 12. Complete System Architecture Diagram (Text Format)
+==================================================
+
+    Farmer / Agriculture Officer (browser, en/si/ta)
+            |
+    Next.js Frontend (dashboard/, App Router)
+      Navbar -> Home | Predict | Explain | Recommend
+            |                                   ^
+    axios (POST /predict, GET /districts,       |
+           GET /context, GET /baseline,         |
+           POST /api/chat)                      |
+            |                                   |
+            v                                   |
+    Flask REST API (src/api.py)                 |
+      CORS locked to :3000                      |
+            |                                   |
+      _resolve_features()  <-- data/processed{_real}/integrated_dataset.csv
+            |                  (7-tier fallback cascade)                |
+            v                                                            |
+      Loaded model (_state['model'])  <-- outputs/models{_real}/*.pkl    |
+      RandomForest | XGBoost | SVR  (only these 3 are servable)          |
+            |                                                            |
+      Point yield prediction                                             |
+            |                                                            |
+      Confidence interval (conformal -> gaussian -> heuristic)           |
+      <-- outputs/results{_real}/conformal.json, model_comparison.csv    |
+            |                                                            |
+      SHAP explainer (_state['explainer'])                               |
+      TreeExplainer (RF/XGB) | KernelExplainer (SVR)                     |
+            |                                                            |
+      shap_values{32 features}                                          |
+            |                                                            |
+      compute_eri(shap_values)  (src/xai/eri.py)                        |
+      = (stability + grounding + consensus) / 3, per feature            |
+      <-- outputs/results{_real}/{explanation_stability,                 |
+          feature_grounding,explanation_consensus}.json                 |
+      (all produced offline by `python -m src.xai.run_xai`) -------------
+            |
+      eri, per_feature_eri
+            |
+    Full PredictResponse JSON  ------------------------------------------>
+            |
+            v
+    localStorage["last_prediction"]  (single shared client-side state)
+            |
+      -------------------------------------------------
+      |                    |                            |
+      v                    v                            v
+    Predict tab        Explain tab                 Recommend tab
+    (writer)          (SHAP -> ~5 farmer          (lib/agronomy.ts:
+                       factors + per-card ERI)      actionable filter
+                                                     + DOA/FAO threshold
+                                                     engine, dual-gated
+                                                     on threshold breach
+                                                     AND negative SHAP)
+                                                            |
+                                                     next-intl templates
+                                                     (en/si/ta, static,
+                                                     pre-translated)
+                                                            |
+                                                            v
+                                                  Farmer-facing recommendation
+                                                  + risk cards + reliability
+                                                  + "Why am I seeing this?"
+
+    (Separate, parallel path, not through localStorage:)
+    ChatAssistant (Predict tab) --POST /api/chat--> explanation_context.py
+      --> run_prediction() (same function as above) --> OpenRouter LLM
+      (phrasing/translation only, grounded strictly in structured context)
+
+
+==================================================
+# 13. Research Contribution Mapping
+==================================================
+
+RQ1: Can a small, real, honestly-evaluated agronomic dataset (28
+district-year rows) support a useful yield prediction model, and how does
+that compare to what a naive baseline achieves?
+    -> System feature: the full 13-model Leave-One-Year-Out benchmark
+       (src/ml_models.py, dl_models.py, symbolic.py, physics_residual.py,
+       run_padr.py, stacking.py), unified by src/evaluator.py.
+    -> Evaluation: `outputs/results_real/model_comparison.csv` and
+       `final_summary.txt`, explicitly compared against a climatology
+       baseline (R2=-0.215) rather than only against other ML models - the
+       honest finding that no model beats the baseline is itself the
+       evaluated result (Section 5.5).
+
+RQ2: Can SHAP-based explanations be translated into a form non-technical
+farmers can act on without losing traceability back to the underlying
+model evidence?
+    -> System feature: the Explain tab's factor-grouping
+       (`convertSHAPToExplanation`), plain-language Impact/Effect labels,
+       and the collapsed-by-default "technical details" drawer that always
+       keeps the raw SHAP number one tap away rather than discarding it
+       (Section 3.3, 6.4).
+    -> Evaluation basis in the code: a consistent, testable contract - every
+       farmer-facing claim in the Explain tab is a deterministic function of
+       a real `shap_values` entry, verifiable by expanding the drawer.
+
+RQ3: Can the trustworthiness of an individual explanation be quantified,
+rather than assumed uniform across all features and predictions?
+    -> System feature: the Explanation Reliability Index (src/xai/eri.py),
+       composing grounding + stability + consensus per feature, weighted by
+       that prediction's own SHAP magnitudes into one aggregate score.
+    -> Evaluation: `outputs/results_real/eri.json` (aggregate 0.6219),
+       `explanation_stability.json` (global coefficient 0.7501), plus the
+       system's own self-critical `weight_sensitivity_sweep()` finding that
+       97% of alternative component-weightings would reorder the top-5
+       "most reliable" features - an honest robustness check on the metric
+       itself, not just a number presented as settled (Section 6.3).
+
+RQ4: Can farmer recommendations be generated that are provably grounded in
+both statistical evidence (SHAP) and domain knowledge (agronomic
+thresholds), rather than an opaque or free-text LLM decision?
+    -> System feature: the dual-gated agronomic rule engine
+       (dashboard/lib/agronomy.ts) - a recommendation can only exist if a
+       real threshold is breached AND a real SHAP value is negative for
+       that exact prediction; the language layer is constrained to
+       phrasing/translation only (Section 7).
+    -> Evaluation: structural, by design - the previous, less-constrained
+       implementation (a free-text LLM banner plus hardcoded generic
+       "Nutrient Boost"/"Pest Monitoring" cards unconditionally shown) was
+       identified and removed specifically because it could not satisfy
+       this constraint; the redesigned engine is directly inspectable
+       (5 explicit rules, no hidden state).
+
+RQ5: Can the system be genuinely usable by Sinhala- and Tamil-speaking
+farmers, not just translated as an afterthought?
+    -> System feature: next-intl-driven 3-locale UI covering every screen
+       including recommendation rule templates and error/fallback text, an
+       English-fallback deep-merge so partial translations never surface a
+       raw key, and locale-preserving navigation (Section 3.7).
+    -> Evaluation: coverage-based - every `recommend.rules.*`, `explain.*`,
+       and `predict.*` key exists with a real (not machine-stub) Sinhala
+       and Tamil translation in `messages/si.json` / `messages/ta.json`.
+
+
+==================================================
+# 14. Final System Summary
+==================================================
+
+AgriSense is a single pipeline, not four separate features glued together.
+One `/predict` call produces one JSON object that already contains the
+point estimate, its calibrated interval, its full SHAP explanation, and its
+per-feature reliability score - and that one object, stored once in
+localStorage, is the only thing the Explain and Recommend tabs ever read.
+There is no second prediction, no second SHAP computation, and no
+independent recommendation-generation model anywhere in the client-visible
+flow; the agronomic rule engine is a pure, inspectable function of data the
+backend already computed and returned.
+
+The system is explainable by construction, not by an added-on summary
+screen: every number a farmer sees on the Explain or Recommend tab can be
+traced, via a one-tap "technical details" or "why am I seeing this"
+disclosure, back to a real signed SHAP value and, for recommendations, a
+real threshold comparison against a real resolved feature value. Nothing in
+that farmer-facing text is generated by an LLM deciding content - where a
+language model is used at all (the optional chat assistant, and the
+currently-unused `/api/recommend` endpoint), it is explicitly constrained
+by a system prompt to only restate structured data it was given, and its
+output is validated (language-script checking) before being trusted.
+
+Recommendations are trustworthy specifically because they are dual-gated:
+a rule only fires when an agronomic threshold is breached AND the model's
+own SHAP explanation agrees that factor is currently hurting this
+prediction. This is a stricter bar than either signal alone, and it is why
+the redesigned Recommend tab can honestly show "Conditions look good"
+instead of manufacturing filler advice when neither condition is met.
+
+What distinguishes this from a normal prediction dashboard is the refusal
+to stop at the number. A typical yield-prediction demo would show a point
+estimate and perhaps a bar chart of feature importance. This system
+insists on answering four questions together for every prediction - what
+happened, why, how sure are we, and what should be done - and, just as
+importantly, is transparent about the honest limits of "how sure are we":
+the project's own README documents a negative real-data result rather than
+quietly shipping only the flattering synthetic-demo numbers, and the
+Explanation Reliability Index is presented alongside its own documented
+sensitivity to its weighting scheme rather than as an unquestionable ground
+truth. That combination - a working end-to-end pipeline, and an honest
+account of where it is and isn't reliable - is the actual deliverable.
+
+==================================================
+End of document.
+==================================================

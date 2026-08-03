@@ -1,0 +1,750 @@
+================================================================================
+ERI (EXPLAINABILITY RELIABILITY INDEX) - IMPLEMENTATION ANALYSIS
+================================================================================
+Scope        : AgroAI (Big Onion Yield Prediction), branch shathurya-update-final
+Method       : Read directly from source code (src/xai/eri.py, stability.py,
+               consensus.py, grounding.py, run_xai.py, src/api.py, src/conformal.py,
+               dashboard/lib/*.ts, dashboard/app/[locale]/explain/page.tsx,
+               dashboard/app/[locale]/recommend/page.tsx,
+               dashboard/components/charts/ReliabilityWaterfall.tsx) and by
+               running the live pipeline (`python -m src.xai.run_xai`) and a
+               live `POST /predict` call to confirm the numbers on disk match
+               what the code actually produces.
+Disclaimer   : This document describes the REAL, CURRENT implementation, not
+               an idealised or aspirational one. Where the code disagrees with
+               the project report, an internal audit doc, or the viva deck
+               narration, that disagreement is stated explicitly in Section 9
+               rather than silently reconciled in favour of any one source.
+
+
+================================================================================
+1. ERI OVERVIEW
+================================================================================
+
+Purpose
+-------
+ERI is a single interpretable score in [0, 1], attached to every prediction,
+that answers a question a raw SHAP bar chart or a raw prediction interval
+cannot answer by itself: "how much should a non-technical user trust THIS
+explanation and THIS interval, right now, for this specific
+district/season/year?" It is shown as a badge/percentage alongside the
+prediction rather than requiring the user to interpret SHAP values or MT/Ha
+interval widths directly.
+
+What ERI actually measures
+---------------------------
+ERI does NOT measure model accuracy. Predictive accuracy is a separate field
+in the API response, `confidence` (High/Medium/Low), derived purely from the
+served model's R^2 (src/api.py, run_prediction(), lines ~593-598) and has
+nothing to do with ERI.
+
+ERI is a blend of two different kinds of reliability:
+  1. Explanation reliability - does the SHAP attribution (which features
+     drive the prediction, and by how much) hold up when the model is
+     refit on different years, or does it just reflect an artefact of one
+     fit on a very small dataset (28 real rows / 136 synthetic rows)?
+  2. Uncertainty-based reliability - how tight is the model's calibrated
+     prediction interval, relative to how much yield actually varies
+     historically in that specific district?
+
+It is explicitly NOT a black-box model trained to predict its own
+reliability - both inputs are direct, already-published numbers (see
+src/xai/eri.py's module docstring, lines 21-25), so it can be recomputed
+"by hand" from two JSON files (explanation_stability.json, conformal.json)
+plus one CSV column (district yield history).
+
+Where ERI is displayed in the frontend
+---------------------------------------
+- dashboard/app/[locale]/explain/page.tsx
+    - Top summary card: "Explanation reliability" badge + percentage,
+      driven directly by `prediction.eri` (3-tier scheme).
+    - One "Confidence" badge + percentage inside each of the ~5 factor
+      cards below it, driven by a client-side SHAP-|value|-weighted
+      average of `prediction.per_feature_eri` across that card's raw
+      features (4-tier scheme, different cut points from the summary).
+- dashboard/app/[locale]/recommend/page.tsx (via dashboard/lib/agronomy.ts)
+    - One "Reliability" badge + percentage inside each recommendation/risk
+      card, computed the same SHAP-weighted way, independently
+      re-implemented in agronomy.ts's `evaluateAgronomicRules()`.
+- dashboard/components/charts/ReliabilityWaterfall.tsx
+    - A hand-rolled SVG bar chart that dual-encodes SHAP magnitude (bar
+      length) and ERI (opacity + diagonal hatch overlay). ONLY its
+      TypeScript type (`ReliabilityBarDatum`) is imported by
+      explain/page.tsx; the component itself is never mounted/rendered
+      anywhere in the app as of this analysis - it is dead code.
+- GET /explanation-reliability, GET /stability, GET /consensus (src/api.py)
+  all exist and return ERI-related JSON, but grepping dashboard/ turns up
+  NO caller for any of the three - the live dashboard only ever consumes
+  the `eri` / `per_feature_eri` fields that ride along inline inside the
+  POST /predict response.
+
+
+================================================================================
+2. ERI CALCULATION FLOW
+================================================================================
+
+There are TWO separate flows: (A) a live, per-request flow that runs on
+every `POST /predict`, and (B) an offline, dataset-level flow that only runs
+when a developer manually executes `python -m src.xai.run_xai`. The two
+share the *cross_fold_shap_consistency* number (flow B computes and persists
+it; flow A only reads it) but compute *interval_reliability* independently
+by two different call paths.
+
+--------------------------------------------------------------------------------
+FLOW A - Live, per-prediction (every POST /predict)
+--------------------------------------------------------------------------------
+
+    Client (dashboard/lib/api.ts: predictYield())
+        |  POST /predict {district, season, year, ...optional overrides}
+        v
+    src/api.py : predict()  ->  run_prediction(data)
+        |
+        |-- _resolve_features(data)                      [src/api.py]
+        |       resolves all 32 ALL_FEATURES values via the fallback
+        |       cascade: user-supplied > exact-year record >
+        |       district+season mean > district mean > season mean >
+        |       global mean > zero fallback
+        |
+        |-- _state['model'].predict(model_input)         [src/api.py]
+        |       point estimate (predicted_yield_MT_per_Ha)
+        |
+        |-- conf = _state['conformal'][_state['model_name']]
+        |       looked up from outputs/results{_variant}/conformal.json,
+        |       loaded into memory once at server startup
+        |       (produced offline by src/conformal.py: compute_conformal())
+        |
+        |-- SHAP Explainer                                [src/api.py]
+        |       _state['explainer'].shap_values(...)
+        |       - shap.TreeExplainer  if served model is RandomForest/XGBoost
+        |       - shap.KernelExplainer otherwise (e.g. SVR) - model-agnostic,
+        |         wraps model.predict + the fitted scaler
+        |       explainer built once at startup by _init_explainer(name)
+        |       -> shap_dict = {feature: signed SHAP value}   (32 features)
+        v
+    ERI CALCULATION                                       [src/api.py + src/xai/eri.py]
+        conformal_interval_width = 2 * conf['q']            (None if no
+                                                              conformal calib.
+                                                              for this model)
+        district_yield_range = _state['district_yield_ranges'][data['district']]
+              (precomputed ONCE at server startup by
+               src/xai/eri.py: resolve_district_yield_ranges(context_df),
+               reading data/processed{_variant}/integrated_dataset.csv)
+
+        eri_result = src/xai/eri.py : compute_eri(
+                         conformal_interval_width, district_yield_range)
+              |
+              |-- cross_fold_shap_consistency = _load_cross_fold_consistency()
+              |       reads the ALREADY-PERSISTED field of that name from
+              |       outputs/results{_variant}/explanation_stability.json
+              |       (written offline by Flow B - NOT recomputed here)
+              |
+              |-- interval_reliability_score = interval_reliability(
+              |       conformal_interval_width, district_yield_range)
+              |
+              |-- eri = _combine(cross_fold_shap_consistency,
+              |                  interval_reliability_score)
+              |       = 0.5*cross_fold_shap_consistency + 0.5*interval_reliability
+              |
+              `-- per_feature_eri = dict.fromkeys(ALL_FEATURES, eri)
+                      (same scalar copied under all 32 feature keys)
+        v
+    ERI SCORE  ->  response = {..., 'eri': eri, 'per_feature_eri': {...}}
+        v
+    src/api.py : predict()  ->  jsonify(response)
+        v
+    dashboard/app/[locale]/predict/page.tsx
+        writes the full PredictResponse (incl. eri/per_feature_eri) into
+        localStorage ("last_prediction")
+        v
+    dashboard/app/[locale]/explain/page.tsx  (and recommend/page.tsx)
+        reads the SAME stored PredictResponse - no re-fetch, no
+        recomputation - and renders the Explanation UI badges (Section 8).
+
+--------------------------------------------------------------------------------
+FLOW B - Offline, dataset-level (`python -m src.xai.run_xai`)
+--------------------------------------------------------------------------------
+
+    src/xai/run_xai.py : main()
+        |
+        |-- run_loyo_fold_diagnostics(X, y, feature_names, years)  [stability.py]
+        |       ONE Leave-One-Year-Out pass, reusing
+        |       src/ml_models.py: _loyo_predictions()'s canonical refit loop:
+        |       for each held-out year -> refit the best TREE model
+        |       (RandomForest or XGBoost, via src/explainer.py:
+        |       _load_best_tree_model()) on the remaining years -> for that
+        |       fold's fitted model, compute mean(|SHAP|) per feature over
+        |       the FULL dataset (_FoldCapture._record) + permutation
+        |       importance on the held-out fold (used by consensus.py only)
+        v
+        |-- get_stability_scores(diagnostics)               [stability.py]
+        |       per_feature_stability (IQR-based, per feature - NOT part of
+        |       ERI), explanation_stability_coefficient (fold-vs-fold
+        |       Spearman rho - NOT part of ERI), and
+        |       cross_fold_shap_consistency (fold-vs-FULL-DATA-MODEL Spearman
+        |       rho - see Component 1 below) -> written to
+        |       outputs/results{_variant}/explanation_stability.json
+        |
+        |-- get_consensus_scores(diagnostics)                [consensus.py]
+        |       writes explanation_consensus.json (SHAP/permutation/symbolic
+        |       agreement) - still computed, still served by GET /consensus,
+        |       but NOT read by eri.py at all
+        v
+    ERI CALCULATION (dataset-level)
+        compute_dataset_level_eri(model_name=diagnostics['model_name'])  [eri.py]
+              |-- cross_fold_shap_consistency = _load_cross_fold_consistency()
+              |       (reads the field just written above)
+              |-- q = _load_conformal_q(model_name)   [reads conformal.json]
+              |-- ranges = resolve_district_yield_ranges()
+              |       [reads integrated_dataset.csv directly, no df passed]
+              |-- per_district_interval_reliability = {
+              |       district: interval_reliability(2*q, range)
+              |       for district, range in ranges.items() }
+              |-- mean_interval_reliability = mean(per_district_interval_reliability)
+              `-- eri = _combine(cross_fold_shap_consistency, mean_interval_reliability)
+        v
+    ERI SCORE  ->  outputs/results{_variant}/eri.json
+        v
+    GET /explanation-reliability  (src/api.py)  ->  serves this file verbatim
+        (no frontend caller currently reads this route - see Section 1/8)
+
+
+================================================================================
+3. ERI FORMULA
+================================================================================
+
+Exact formula, as implemented in src/xai/eri.py:
+
+    ERI = W_SHAP_CONSISTENCY * cross_fold_shap_consistency
+        + W_INTERVAL_RELIABILITY * interval_reliability
+
+    where:
+        W_SHAP_CONSISTENCY      = 0.5   (module-level constant, eri.py line 74)
+        W_INTERVAL_RELIABILITY  = 0.5   (module-level constant, eri.py line 75)
+
+Both weights are HARD-CODED. The in-code comment states they are
+"equal-weighted ... unless an existing config file specifies different
+weights" - no such config file exists anywhere in this project, so 0.5/0.5
+is not just the default, it is the only value ever used.
+
+--- Term 1: cross_fold_shap_consistency -----------------------------------
+
+    cross_fold_shap_consistency =
+        clip( mean_over_folds( spearman_rho(fold_shap_vector_f,
+                                             full_data_shap_vector) ),
+              0.0, 1.0 )
+
+    - fold_shap_vector_f  : mean(|SHAP value|) per feature, for LOYO fold f's
+                            refit model, evaluated over the WHOLE dataset
+                            (src/xai/stability.py, _FoldCapture._record())
+    - full_data_shap_vector : mean(|SHAP value|) per feature, from
+                            outputs/results{_variant}/feature_importance.json
+                            (src/explainer.py: run_shap_analysis(), the
+                            single best tree model's SHAP over the whole
+                            dataset). This file only ever stores the TOP 15
+                            (of 32) features by design (explainer.py's own
+                            persisted artefact shape), so the Spearman
+                            correlation is computed over the INTERSECTION of
+                            features common to both vectors, requiring at
+                            least 3 common features or the result is None
+                            (src/xai/stability.py lines 236-249).
+    - Negative or undefined correlations are clipped to 0 (a fold that
+      actively DISAGREES with the full-data ranking contributes zero
+      reliability, not negative reliability).
+    - If explanation_stability.json doesn't exist yet, or the
+      `cross_fold_shap_consistency` field inside it is null (feature
+      count too small, or feature_importance.json missing at the time
+      stability.py ran), this term falls back to a neutral 0.5
+      (src/xai/eri.py: _load_cross_fold_consistency(), lines 78-96).
+
+--- Term 2: interval_reliability -------------------------------------------
+
+    interval_reliability = clip( 1 - (interval_width / district_yield_range),
+                                  0.0, 1.0 )
+
+    - interval_width       : 2 * q, where q is the split-conformal
+                              half-width (src/conformal.py:
+                              compute_conformal()) for the currently served
+                              model, read from
+                              outputs/results{_variant}/conformal.json.
+                              q is calibrated on that model's own
+                              Leave-One-Year-Out out-of-fold residuals,
+                              targeting ~90% empirical coverage
+                              (alpha=0.1 default).
+    - district_yield_range  : max(Avg_Yield_MT_per_Ha) - min(Avg_Yield_MT_per_Ha)
+                              for the target district, across every
+                              recorded season/year in
+                              data/processed{_variant}/integrated_dataset.csv
+                              (src/xai/eri.py: resolve_district_yield_ranges()).
+    - Normalisation is deliberately RELATIVE, not absolute: the same
+      absolute MT/Ha interval width scores differently for a low-yield,
+      low-variance district than for a high-yield, high-variance one.
+    - Falls back to neutral 0.5 if interval_width is None (served model has
+      no conformal calibration yet) or district_yield_range is None/<=0
+      (district absent from the processed dataset, or has only one
+      recorded yield).
+
+--- Combination and rounding ------------------------------------------------
+
+    _combine(a, b) = round(W_SHAP_CONSISTENCY*a + W_INTERVAL_RELIABILITY*b, 4)
+
+Both component scores and the final `eri` value are rounded to 4 decimal
+places. Because each term is independently clipped to [0, 1] and the
+weights sum to 1.0, the final ERI is mathematically guaranteed to stay
+within [0, 1] without needing an extra clip on the sum itself.
+
+--- Aggregation across features: NONE ---------------------------------------
+
+Unlike an older version of this code (see Section 9), there is NO
+per-feature computation and NO SHAP-magnitude weighting anywhere in the
+current formula. `per_feature_eri` is produced by
+`dict.fromkeys(ALL_FEATURES, eri)` - i.e. the single scalar `eri` value,
+copied identically under all 32 `ALL_FEATURES` keys. It is kept in the
+return payload purely for API-shape backward compatibility with frontend
+code that keys off `per_feature_eri` (see Section 5).
+
+
+================================================================================
+4. ERI COMPONENTS
+================================================================================
+
+--------------------------------------------------------------------------------
+Component: Cross-Fold SHAP Consistency
+--------------------------------------------------------------------------------
+Purpose:
+    Measures whether the model's explanation is a stable signal or an
+    artefact of fitting one particular tree model on a very small dataset.
+    Answers: "if I'd trained on a different subset of years, would the
+    model still point at roughly the same features, in roughly the same
+    order of importance?"
+
+Calculation:
+    1. Leave-One-Year-Out: for each held-out year, refit the best available
+       TREE model (RandomForest or XGBoost - chosen for shap.TreeExplainer
+       speed, see src/explainer.py: _load_best_tree_model()) on the other
+       years.
+    2. For that fold's fitted model, compute mean(|SHAP value|) per feature,
+       evaluated over the ENTIRE dataset (not just the held-out rows) so
+       every fold is explained against the same, larger evaluation set.
+    3. Spearman rank-correlate each fold's per-feature vector against the
+       full-data model's own top-15 SHAP ranking (feature_importance.json).
+    4. Average the per-fold correlations, clip to [0, 1].
+
+Implementation:
+    src/xai/stability.py
+        -> run_loyo_fold_diagnostics()        (LOYO refit loop, lines 127-160)
+        -> _FoldCapture._record()             (per-fold SHAP capture, lines 101-124)
+        -> _load_full_data_shap_importance()  (reads feature_importance.json, lines 163-177)
+        -> get_stability_scores()             (Spearman correlation + write-out,
+                                                lines 180-271; the
+                                                cross_fold_shap_consistency block
+                                                is lines 225-249)
+    src/xai/eri.py
+        -> _load_cross_fold_consistency()     (read-back for ERI, lines 78-96)
+
+Input data required:
+    - data/processed{_variant}/features_tabular.csv (LOYO training matrix)
+    - outputs/models{_variant}/{rf_best.pkl | xgb_best.pkl}
+    - outputs/results{_variant}/feature_importance.json (full-data SHAP ranking)
+
+Output range:
+    [0.0, 1.0], or a neutral 0.5 fallback if inputs are missing/insufficient.
+
+IMPORTANT NUANCE (verified in code, not obvious from the formula alone):
+    The tree model whose LOYO stability is measured here (RandomForest or
+    XGBoost, chosen purely for SHAP speed) is NOT necessarily the same
+    model actually SERVING live predictions in src/api.py. On the real
+    data variant, for example, the evaluator crowns/serves SVR
+    (`[api] Loaded SVR` - confirmed by a live server run this session),
+    while stability.py's LOYO pass always uses RandomForest/XGBoost
+    regardless. So a live prediction's `cross_fold_shap_consistency` term
+    describes the explanation stability of a DIFFERENT model family than
+    the one that produced that prediction's own `shap_values`. This is a
+    real architectural coupling in the current code, not a bug introduced
+    by this analysis.
+
+--------------------------------------------------------------------------------
+Component: Conformal Interval Reliability
+--------------------------------------------------------------------------------
+Purpose:
+    Measures how trustworthy the prediction's stated uncertainty range is,
+    relative to how much yield naturally varies in that specific district -
+    so a +-15 MT/Ha interval is read as far more damning for a district
+    whose yields only ever range 10-15 MT/Ha than for one that ranges
+    5-30 MT/Ha.
+
+Calculation:
+    interval_reliability = clip(1 - (2*q / district_yield_range), 0, 1)
+    where q is the model's split-conformal half-width (src/conformal.py),
+    calibrated on that model's LOYO out-of-fold residuals to hit ~90%
+    empirical coverage.
+
+Implementation:
+    src/conformal.py : compute_conformal()          (produces q per model,
+                                                       writes conformal.json)
+    src/xai/eri.py    : interval_reliability()        (the formula itself,
+                                                       lines 144-154)
+                        resolve_district_yield_ranges()(district ranges,
+                                                       lines 99-123)
+                        _load_conformal_q()            (dataset-level q lookup
+                                                       only, lines 126-141)
+    src/api.py         : run_prediction()              (live q lookup via
+                                                       _state['conformal'],
+                                                       and the
+                                                       conformal_interval_width /
+                                                       district_yield_range
+                                                       computation immediately
+                                                       before calling compute_eri(),
+                                                       lines ~609-622)
+
+Input data required:
+    - outputs/results{_variant}/conformal.json (needs
+      outputs/results{_variant}/oof_*.json out-of-fold prediction files to
+      have been generated first)
+    - data/processed{_variant}/integrated_dataset.csv (District,
+      Avg_Yield_MT_per_Ha columns)
+
+Output range:
+    [0.0, 1.0], or a neutral 0.5 fallback if no conformal calibration exists
+    for the served model, or the district's yield range is unusable.
+
+--------------------------------------------------------------------------------
+Explicitly NOT components of ERI (present in the codebase, but disconnected)
+--------------------------------------------------------------------------------
+- Feature Grounding (src/xai/grounding.py, GROUNDING_REGISTRY,
+  feature_grounding.json): a hand-curated, static per-feature table scoring
+  how "real" each of the 32 features' data actually is (1.00 = directly
+  measured ... 0.05 = hardcoded constant). Its own module docstring now
+  reads "FLAGGED FOR REMOVAL": get_grounding_scores() is no longer called
+  by run_xai.py, no live API route reads feature_grounding.json, and
+  nothing else in the codebase imports GROUNDING_REGISTRY.
+- Explanation Consensus (src/xai/consensus.py, get_consensus_scores(),
+  explanation_consensus.json): fraction of {SHAP top-10, permutation
+  top-10, symbolic-equation membership} that agree a feature matters.
+  Still computed by run_xai.py and still served live via GET /consensus,
+  but its output is never read by eri.py.
+- Per-feature Stability (`per_feature_stability` inside
+  explanation_stability.json, IQR-based): still computed and still served
+  via GET /stability, but a DIFFERENT field from `cross_fold_shap_consistency`
+  and not itself read by eri.py.
+
+
+================================================================================
+5. FEATURE-LEVEL VS PREDICTION-LEVEL ERI
+================================================================================
+
+ERI is calculated PER PREDICTION ONLY (plus one extra, separate,
+dataset-wide aggregate produced offline). It is explicitly NOT calculated
+per feature in the current code:
+
+- cross_fold_shap_consistency is one scalar for the whole model/fold-set.
+- interval_reliability is one scalar per (served model, district) pair.
+- Neither term varies across the 32 individual features.
+
+`per_feature_eri` in the API response is consequently NOT a genuine
+per-feature quantity - it is `dict.fromkeys(ALL_FEATURES, eri)`
+(src/xai/eri.py, lines 183 and 216): the exact same prediction-level `eri`
+float, repeated under all 32 feature-name keys.
+
+Why it is still shaped this way (per the module docstring, eri.py lines
+43-51): the dashboard's Explain and Recommend tabs pre-date this rewrite
+and both do their OWN client-side aggregation - a SHAP-|value|-weighted
+average of `per_feature_eri` across whichever raw features feed a
+displayed card (dashboard/app/[locale]/explain/page.tsx, lines 114-144;
+dashboard/lib/agronomy.ts, lines 191-207). Feeding every key the same
+constant makes that weighted average trivially collapse back to that same
+constant for every card, which keeps the existing frontend code working
+unmodified while still being mathematically consistent with "this is one
+score for the prediction as a whole." A practical consequence: on any
+given prediction, every reliability percentage shown anywhere on the
+Explain and Recommend tabs is now numerically identical, because they are
+all, ultimately, re-derived weighted-averages of the same repeated number.
+
+Historical note: an older version of eri.py DID compute a genuinely
+different `ERI_j` per feature, from `(stability_j + grounding_j +
+consensus_j) / 3`, then combined them into one prediction-level score via
+`Sum(|SHAP_j| * ERI_j) / Sum(|SHAP_j|)`. That formula, and the functions
+that implemented it (`weight_sensitivity_sweep()` in particular), have
+been removed entirely from the current src/xai/eri.py. See Section 9 for
+where this older formula is still (incorrectly) documented elsewhere in
+the repo.
+
+
+================================================================================
+6. DATA SOURCES USED
+================================================================================
+
+SHAP values
+    - Live per-request: src/api.py, run_prediction(), via
+      _state['explainer'] (TreeExplainer or KernelExplainer). Feeds
+      `shap_values` in the response and the frontend's per-card weighting,
+      but is NOT read directly by the ERI formula itself.
+    - Offline per-LOYO-fold: src/xai/stability.py, _FoldCapture, feeding
+      `cross_fold_shap_consistency`.
+    - Offline full-data: src/explainer.py: run_shap_analysis() ->
+      feature_importance.json (top 15 features only).
+
+Cross-validation results
+    - Leave-One-Year-Out folds, src/xai/stability.py:
+      run_loyo_fold_diagnostics(), reusing src/ml_models.py:
+      _loyo_predictions()'s canonical split/refit loop.
+
+Prediction intervals
+    - Split-conformal calibration, src/conformal.py: compute_conformal(),
+      calibrated on each model's own LOYO out-of-fold residuals
+      (outputs/results{_variant}/oof_*.json), default alpha=0.1 (~90%
+      target coverage).
+
+Historical data
+    - data/processed{_variant}/integrated_dataset.csv (District, Season,
+      Year, Avg_Yield_MT_per_Ha, + all 32 features) - source for
+      district_yield_range, and (via features_tabular.csv) for the LOYO
+      stability pass.
+
+Model outputs
+    - outputs/models{_variant}/*.pkl (RandomForest/XGBoost artefacts used
+      for the LOYO refit pass and for feature_importance.json).
+    - outputs/results{_variant}/best_model_metrics.json (used by
+      _load_best_tree_model() to prefer whichever tree model the
+      evaluator actually crowned, if it is a tree model).
+
+Manually defined / hand-curated scores
+    - NONE feed into the current ERI formula.
+    - GROUNDING_REGISTRY (src/xai/grounding.py) IS a manually-defined,
+      static per-feature score table, but - per Section 4 - it is no
+      longer part of ERI.
+
+Weights / configuration
+    - src/xai/eri.py module constants: W_SHAP_CONSISTENCY = 0.5,
+      W_INTERVAL_RELIABILITY = 0.5. Hard-coded; not read from any config
+      file (none exists for this purpose in the project).
+
+
+================================================================================
+7. CURRENT ERI OUTPUT
+================================================================================
+
+Values below were produced this session by actually running
+`python -m src.xai.run_xai` (both DATA_VARIANT=synthetic and
+DATA_VARIANT=real) and a live `POST /predict` call against the real-data
+API - not copied from stale files.
+
+Dataset-level (outputs/results/eri.json, synthetic variant, LOYO model=RandomForest):
+    eri                        = 0.7928
+    cross_fold_shap_consistency = 0.9538
+    interval_reliability        = 0.6318  (mean across 4 districts)
+    per_district_interval_reliability:
+        Anuradhapura = 0.6257, Jaffna = 0.6046,
+        Matale = 0.6781, Polonnaruwa = 0.6188
+    conformal_q (RandomForest)  = 3.3984
+
+Dataset-level (outputs/results_real/eri.json, real variant, LOYO model=RandomForest):
+    eri                        = 0.1714
+    cross_fold_shap_consistency = 0.3429
+    interval_reliability        = 0.0     (every district: interval wider
+                                            than the district's entire
+                                            historical yield range)
+    per_district_interval_reliability:
+        Anuradhapura = Kurunegala = Matale = Polonnaruwa = 0.0
+    conformal_q (RandomForest)  = 17.5749
+
+Live per-prediction example (POST /predict, real variant, served model=SVR):
+    Request : {"district": "Anuradhapura", "season": "Yala", "year": 2024}
+    Response: eri = 0.1714; per_feature_eri uniformly 0.1714 across all 32 keys
+    Hand check: conformal q for SVR = 15.2337 -> interval_width = 30.4674 MT/Ha
+                Anuradhapura's historical range = 25.5609 - 10.24665 = 15.31425 MT/Ha
+                normalized width = 30.4674/15.31425 = 1.99 -> clipped to 0.0
+                eri = 0.5*0.3429 + 0.5*0.0 = 0.17145 -> rounds to 0.1714  (matches)
+
+Score range
+    [0.0, 1.0] by construction (both terms independently clipped to [0,1];
+    weights sum to 1.0).
+
+Thresholds for High/Medium/Low
+    NOT defined anywhere in the backend - src/xai/eri.py returns only the
+    raw float, with no tiering logic at all. Tiering is entirely a
+    FRONTEND concern, and there are two DIFFERENT, independently defined
+    threshold schemes applied to the same underlying number:
+
+    (a) Explain tab page-level "Explanation reliability" summary badge
+        (dashboard/app/[locale]/explain/page.tsx, lines ~171-178):
+            eri <  0.4  -> "Low"
+            eri <  0.7  -> "Medium"
+            else        -> "High"                          (3 tiers)
+
+    (b) Explain tab per-card "Confidence" badge AND every Recommend tab
+        card's "Reliability" badge (explain/page.tsx lines ~56-66;
+        dashboard/lib/agronomy.ts: reliabilityTierFor(), lines 142-149):
+            pct >= 90   -> "High reliability"
+            pct >= 70   -> "Good reliability"
+            pct >= 50   -> "Moderate reliability"
+            else        -> "Low reliability"                (4 tiers)
+
+    Because `per_feature_eri` is now a constant equal to `eri` (Section 5),
+    both schemes end up being applied, on the same page, to what is
+    numerically the exact same value - just with different cut points and
+    different label sets.
+
+Interpretation shown to the user (dashboard/messages/en.json,
+explain.reliability.summaryNote.*):
+    High / levelHigh    -> "This explanation is well grounded - you can
+                            trust these factors."
+    Medium / levelMedium -> "This explanation is reasonably grounded -
+                            treat it as a helpful guide alongside your own
+                            judgement."
+    Low / levelLow      -> "This explanation has limited grounding - treat
+                            these factors as a rough guide only."
+    Unknown             -> "We don't have a reliability score for this
+                            explanation yet." (shown when `eri` is
+                            undefined, e.g. mock data, or requests where
+                            no conformal calibration/district data exists)
+
+
+================================================================================
+8. FRONTEND USAGE
+================================================================================
+
+Endpoint
+    POST /predict (src/api.py) - `eri` and `per_feature_eri` ride inline in
+    the same JSON payload as the prediction/SHAP/interval fields; there is
+    no separate ERI-fetching network call from the dashboard.
+    GET /explanation-reliability also returns the dataset-level eri.json
+    content, but no dashboard code currently calls this route (confirmed
+    by grep across dashboard/) - same for GET /stability and GET /consensus.
+
+JSON structure (relevant subset of the POST /predict response; see
+dashboard/lib/api.ts's `PredictResponse` interface, lines 39-68):
+    {
+      ...,
+      "eri": 0.1714,
+      "per_feature_eri": {
+        "season_avg_temp": 0.1714,
+        "season_total_rainfall": 0.1714,
+        ... (all 32 ALL_FEATURES keys, identical value) ...
+        "ndvi_x_lst": 0.1714
+      }
+    }
+
+React components
+    - dashboard/app/[locale]/explain/page.tsx
+        reads `prediction.eri` for the top "Explanation reliability" card;
+        builds `reliabilityItems` (a SHAP-|value|-weighted average of
+        `prediction.per_feature_eri` per displayed factor) for the per-card
+        "Confidence" badges.
+    - dashboard/app/[locale]/recommend/page.tsx, via
+      dashboard/lib/agronomy.ts: evaluateAgronomicRules()
+        same weighting logic, independently re-implemented, drives each
+        recommendation/risk card's "Reliability" badge.
+    - dashboard/components/charts/ReliabilityWaterfall.tsx
+        built to render ERI as bar opacity/hatch; imported for its
+        TypeScript type only; never mounted in any page - dead code.
+
+What the user actually sees
+    Explain tab: one "Explanation reliability: {emoji} {tier} NN%" line
+    near the top of the page, plus a "Confidence: {emoji} {tier} NN%" line
+    inside each factor card below it.
+    Recommend tab: a "Reliability: {emoji} {tier} NN%" line inside each
+    recommendation/risk card.
+    Since `per_feature_eri` is now constant per prediction (Section 5),
+    every one of these NN% values reads identically for a given
+    prediction - only the tier LABEL can differ, because the summary badge
+    and the per-card badges use different threshold schemes (Section 7).
+
+
+================================================================================
+9. CONSISTENCY CHECK
+================================================================================
+
+| Source                                                   | ERI Components                                                                                                                  | Formula                                                                                                                                                              |
+|------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Report (verbatim Sec 5.9.2 / 6.13, provided directly this session) | Exactly two: (1) cross-fold SHAP rank-correlation consistency; (2) conformal interval width normalised by the district's historical yield range. Explicitly rejects scoring one model's reliability with a second black-box model. | "a composite formed from two components ... equal-weighted combination ... unless an existing config file specifies different weights." No config file exists, so equal-weighted. |
+| Poster (outputs/Final_Poster_AgroAI.pdf, read directly this session) | Not mentioned at all. The poster covers PADR (agronomic constant estimation), the LOYO variance-decomposition finding, and the "R^2 > 0.75 was unattainable" headline result. ERI/explainability does not appear anywhere on it. | N/A - no ERI content on the poster to compare.                                                                                                                        |
+| Viva deck narration (src/build_viva_deck.py, slide11(), the closest available "presentation script" artefact in the repo) | FOUR signals: cross-fold consistency, cross-method "explanation agreement", "stability under [input] perturbation", and conformal interval width vs. district range. | Not given as an equation - described narratively as "compressing several reliability signals into one interpretable badge."                                          |
+| docs/09_SYSTEM_AUDIT.md (repo-internal audit document)     | THREE: grounding_j + stability_j + consensus_j, SHAP-magnitude-weighted into one prediction-level score.                          | `ERI_j = (stability_j + grounding_j + consensus_j)/3`; `ERI = Sum(&#124;SHAP_j&#124;*ERI_j) / Sum(&#124;SHAP_j&#124;)` - documents `weight_sensitivity_sweep()`, which no longer exists in code. |
+| Code (src/xai/eri.py, as run and verified this session)    | Exactly two: `cross_fold_shap_consistency` (src/xai/stability.py) + `interval_reliability` (src/conformal.py + district yield range). Grounding and consensus explicitly excluded (Section 4). | `ERI = 0.5*cross_fold_shap_consistency + 0.5*interval_reliability`, each term and the result clipped/rounded to [0,1].                                               |
+
+Mismatches, stated explicitly:
+
+- Report vs Code: MATCH. The current implementation is a direct, faithful
+  rewrite to the report's two-component, equal-weighted, hand-auditable
+  formula. This appears to be the authoritative target definition, and
+  the code was deliberately rewritten this session to match it exactly
+  (down to the "equal-weighted unless a config file says otherwise"
+  wording, reflected literally in eri.py's own comments).
+
+- Poster vs Code: NOT COMPARABLE. The poster does not discuss ERI or
+  explainability reliability at all - there is nothing in it to
+  reconcile against the code.
+
+- Viva deck vs Code: MISMATCH. The deck (src/build_viva_deck.py, slide 11
+  and its speaker notes) still narrates FOUR signals - it adds
+  "explanation agreement" (cross-method consensus) and "stability under
+  input perturbation" as if both were still part of the badge. Neither
+  is computed by the current eri.py. Read literally, the deck's own
+  speaker notes ("Four signals... ") actually echo the REPORT'S framing
+  of four *candidate* dimensions that were *considered* before two were
+  adopted - but the deck slide never states that only two were ultimately
+  implemented, so on its own it overstates what the shipped code
+  actually computes.
+
+- docs/09_SYSTEM_AUDIT.md vs Code: MISMATCH - stale documentation. This
+  file documents the PRIOR version of eri.py: its formula
+  (`ERI_j = (stability_j+grounding_j+consensus_j)/3`, SHAP-weighted
+  aggregation), its function names (`compute_eri(shap_values)`,
+  `weight_sensitivity_sweep()` - neither exists in the current
+  src/xai/eri.py), and dataset-level numeric values (0.7434 synthetic /
+  0.6219 real) that no longer match what the pipeline currently produces
+  (0.7928 synthetic / 0.1714 real, per Section 7). This document should
+  be treated as a historical snapshot, not current documentation, for
+  anything ERI-related.
+
+- Additional code-internal nuance (not a cross-source mismatch, but worth
+  flagging as part of documenting the "real" implementation): the tree
+  model whose LOYO stability feeds `cross_fold_shap_consistency`
+  (RandomForest/XGBoost, chosen for SHAP speed) is not necessarily the
+  model actually serving the live prediction that ERI is attached to
+  (e.g. SVR on the real-data variant). See Section 4.
+
+
+================================================================================
+10. FINAL SUMMARY
+================================================================================
+
+The current application calculates ERI by combining exactly two signals
+into one equal-weighted 0-1 score per prediction: (1)
+cross_fold_shap_consistency - how well a Leave-One-Year-Out-refit tree
+model's SHAP feature ranking agrees, via Spearman rank correlation, with
+the production model's own full-dataset SHAP ranking, computed offline by
+src/xai/stability.py and persisted to explanation_stability.json; and (2)
+interval_reliability - the served model's conformal prediction interval
+width (2xq from src/conformal.py), expressed as a fraction of the target
+district's historical yield range and inverted so a narrower relative
+interval scores higher, computed by src/xai/eri.py:interval_reliability()
+from data cached in src/api.py at server startup. These are combined as
+ERI = 0.5*cross_fold_shap_consistency + 0.5*interval_reliability inside
+src/xai/eri.py's compute_eri() (per-prediction) and
+compute_dataset_level_eri() (offline, dataset-wide) functions.
+
+The result is NOT computed per feature: the API's `per_feature_eri` field
+is the same prediction-level number copied under all 32 feature keys, kept
+only so the dashboard's existing SHAP-weighted-average frontend code
+(explain/page.tsx, agronomy.ts) keeps rendering without modification - a
+side effect being that every reliability percentage shown anywhere on the
+Explain and Recommend tabs is now numerically identical for a given
+prediction. No High/Medium/Low thresholds exist server-side; two
+independently defined, differently-cut threshold schemes exist
+client-side and are both applied to that same underlying number.
+
+Two other diagnostics computed elsewhere in the codebase - feature
+grounding (src/xai/grounding.py) and cross-method consensus
+(src/xai/consensus.py) - still power their own GET endpoints but do not
+feed into ERI; grounding.py's own module docstring flags itself as unused
+dead code pending deletion. This two-component design matches the project
+report's own description of ERI almost exactly (Sec 5.9.2/6.13); it does
+NOT match an internal audit document (docs/09_SYSTEM_AUDIT.md) or the
+viva presentation deck (src/build_viva_deck.py), both of which describe
+an older three- or four-component version of the score that no longer
+exists anywhere in the running code.
+
+================================================================================
+END OF DOCUMENT
+================================================================================

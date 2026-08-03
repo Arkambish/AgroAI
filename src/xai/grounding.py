@@ -1,5 +1,13 @@
 """Feature grounding registry — how "real" each of the 32 features actually is.
 
+FLAGGED FOR REMOVAL: this was previously one of three inputs to the old
+per-feature ERI formula (see eri.py's module docstring for the report-driven
+rewrite that dropped it). No live endpoint reads feature_grounding.json and
+nothing else in the codebase imports GROUNDING_REGISTRY, so this module and
+`run_xai.py`'s (now-removed) call to `get_grounding_scores()` are dead code
+kept only for reference — delete both this file and any lingering
+feature_grounding.json output once that's confirmed safe.
+
 Grounding answers a different question than SHAP or stability: not "does the
 model lean on this feature" but "if it leans on it, is that signal coming from
 a genuine measurement, or from filler the pipeline invented because the real

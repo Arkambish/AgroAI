@@ -160,10 +160,31 @@ def run_loyo_fold_diagnostics(X, y, feature_names, years, model=None,
     }
 
 
+def _load_full_data_shap_importance() -> dict | None:
+    """mean(|SHAP|) per feature from the production model's own full-dataset
+    SHAP pass (`explainer.run_shap_analysis` -> feature_importance.json) —
+    the "full-data attribution" each LOYO fold's SHAP is compared against for
+    `cross_fold_shap_consistency`. That file only ever persists the top 15
+    features by design (explainer.py's own API/dashboard artefact, not
+    something to change here), so this returns whatever subset it has;
+    callers correlate over the intersection rather than requiring all of
+    `feature_names`. None if the file doesn't exist yet."""
+    path = os.path.join(RESULTS_DIR, 'feature_importance.json')
+    if not os.path.exists(path):
+        return None
+    with open(path) as fh:
+        payload = json.load(fh)
+    return {entry['name']: entry['mean_abs_shap'] for entry in payload}
+
+
 def get_stability_scores(diagnostics: dict | None = None) -> dict:
     """Per-feature stability_j = 1 - normalised IQR of that feature's LOYO-fold
-    SHAP importance, plus the global Explanation Stability Coefficient (mean
-    pairwise Spearman rho between fold importance vectors). Writes
+    SHAP importance, the global Explanation Stability Coefficient (mean
+    pairwise Spearman rho between fold importance vectors), and
+    cross_fold_shap_consistency — mean Spearman rho between each fold's SHAP
+    attribution and the production model's full-data SHAP attribution
+    (feature_importance.json). The last of these is the SHAP-consistency term
+    the ERI badge (src/xai/eri.py) is built from. Writes
     outputs/results_{variant}/explanation_stability.json.
 
     `diagnostics`: pass in an already-computed `run_loyo_fold_diagnostics(...)`
@@ -201,11 +222,41 @@ def get_stability_scores(diagnostics: dict | None = None) -> dict:
                 rhos.append(rho)
     explanation_stability_coefficient = float(np.mean(rhos)) if rhos else 0.0
 
+    # Cross-fold SHAP consistency (the ERI badge's SHAP-consistency term):
+    # mean Spearman rho between each fold's SHAP attribution and the
+    # production model's full-data attribution — a different comparison than
+    # the fold-vs-fold coefficient above (fold vs. the *deployed* model, not
+    # fold vs. other folds). Correlated over feature_importance.json's top-15
+    # subset (its own persisted shape) intersected with this dataset's
+    # features, since that's the full-data ranking that actually exists. If
+    # feature_importance.json isn't available yet, or the intersection is too
+    # small for a meaningful rank correlation, this stays None and the ERI
+    # badge falls back to a neutral score (see eri.py).
+    full_data_shap = _load_full_data_shap_importance()
+    common_features = (
+        [f for f in feature_names if f in full_data_shap] if full_data_shap else []
+    )
+    cross_fold_rhos = []
+    if len(common_features) >= 3:
+        full_vector = [full_data_shap[f] for f in common_features]
+        for fold in folds:
+            fold_vector = [fold['shap_mean_abs'][f] for f in common_features]
+            rho, _ = spearmanr(fold_vector, full_vector)
+            if not np.isnan(rho):
+                cross_fold_rhos.append(float(rho))
+    cross_fold_shap_consistency = (
+        float(np.clip(np.mean(cross_fold_rhos), 0.0, 1.0)) if cross_fold_rhos else None
+    )
+
     payload = {
         'model_name': diagnostics['model_name'],
         'n_folds': n_folds,
         'per_feature_stability': per_feature_stability,
         'explanation_stability_coefficient': round(explanation_stability_coefficient, 4),
+        'cross_fold_shap_consistency': (
+            round(cross_fold_shap_consistency, 4) if cross_fold_shap_consistency is not None else None
+        ),
+        'cross_fold_shap_consistency_per_fold': [round(r, 4) for r in cross_fold_rhos],
     }
 
     os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -215,6 +266,8 @@ def get_stability_scores(diagnostics: dict | None = None) -> dict:
     print(f'  Saved -> {out_path}')
     print(f'  Explanation Stability Coefficient = {payload["explanation_stability_coefficient"]} '
           f'({n_folds} LOYO folds, model={diagnostics["model_name"]})')
+    print(f'  Cross-Fold SHAP Consistency = {payload["cross_fold_shap_consistency"]} '
+          f'(ERI SHAP-consistency term)')
     return per_feature_stability
 
 

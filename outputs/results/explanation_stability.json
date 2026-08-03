@@ -35,5 +35,25 @@
     "temp_x_humidity": 0.8461143855497529,
     "ndvi_x_lst": 0.8301865926433998
   },
-  "explanation_stability_coefficient": 0.8388
+  "explanation_stability_coefficient": 0.8388,
+  "cross_fold_shap_consistency": 0.9538,
+  "cross_fold_shap_consistency_per_fold": [
+    0.9321,
+    0.925,
+    0.9857,
+    0.9321,
+    0.9679,
+    0.9429,
+    0.9429,
+    0.925,
+    0.9571,
+    0.9607,
+    0.9714,
+    0.9536,
+    0.9679,
+    0.9321,
+    0.9714,
+    0.9893,
+    0.9571
+  ]
 }

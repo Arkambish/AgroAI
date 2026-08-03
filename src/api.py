@@ -46,7 +46,7 @@ from config import (
     INTERACTION_FEATURES,
 )
 import explanation_context
-from xai.eri import compute_eri
+from xai.eri import compute_eri, resolve_district_yield_ranges
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Loads OPENROUTER_API_KEY (and anything else) from a git-ignored .env at the
@@ -151,6 +151,7 @@ _state = {
     'model': None, 'metrics': None, 'model_name': None, 'scaler': None,
     'context_df': None, 'explainer': None, 'conformal': None,
     'defaults': None, 'baselines': None, 'catalog': None,
+    'district_yield_ranges': None,
 }
 
 # Where each feature group's values actually come from. Surfaced to the
@@ -475,6 +476,10 @@ def _load_state() -> None:
         _state['defaults'] = _build_defaults(df)
         _state['baselines'] = _build_baselines(df)
         _state['catalog'] = _build_catalog(df)
+        # ERI's interval-reliability term needs each district's historical
+        # yield range (src/xai/eri.py); reuses this already-loaded df so
+        # every /predict doesn't re-read integrated_dataset.csv.
+        _state['district_yield_ranges'] = resolve_district_yield_ranges(df)
         print(
             f'[api] Loaded context dataset ({len(df)} rows, '
             f'{len(_state["catalog"])} districts) + default cascade'
@@ -601,11 +606,20 @@ def run_prediction(data: dict):
     )
     n_zero = sum(1 for s in feature_sources.values() if s == 'zero_fallback')
 
-    # Explanation Reliability Index — per-feature and SHAP-weighted aggregate
-    # trust score for this specific prediction's explanation (see
-    # src/xai/eri.py). Falls back gracefully to neutral component scores if
-    # `python -m src.xai.run_xai` hasn't been run yet for this DATA_VARIANT.
-    eri_result = compute_eri(shap_dict)
+    # Explainability Reliability Index — a single trust badge for this
+    # prediction's explanation, combining (a) cross-fold SHAP consistency
+    # (how much the explanation holds up across LOYO refits — see
+    # src/xai/stability.py) and (b) this prediction's own conformal interval
+    # width, normalised against the target district's historical yield range
+    # (see src/xai/eri.py). Uses the *conformal* interval specifically (not
+    # `margin`, which can fall back to a Gaussian/heuristic width above) —
+    # falls back to a neutral interval-reliability score when no conformal
+    # calibration exists yet for the served model. Falls back gracefully to
+    # neutral component scores overall if `python -m src.xai.run_xai` hasn't
+    # been run yet for this DATA_VARIANT.
+    conformal_interval_width = 2 * float(conf['q']) if conf and conf.get('q') else None
+    district_yield_range = (_state.get('district_yield_ranges') or {}).get(data.get('district'))
+    eri_result = compute_eri(conformal_interval_width, district_yield_range)
 
     # What kind of statement is this number, really?
     #
@@ -724,10 +738,11 @@ def equation():
 
 @app.route('/explanation-reliability', methods=['GET'])
 def explanation_reliability():
-    """Dataset-level Explanation Reliability Index (src/xai/eri.py), computed
-    once by `python -m src.xai.run_xai` using the dataset's aggregate SHAP
-    importance as the feature weighting. For a single prediction's own ERI,
-    see the `eri` / `per_feature_eri` fields on POST /predict instead."""
+    """Dataset-level Explainability Reliability Index (src/xai/eri.py),
+    computed once by `python -m src.xai.run_xai`: cross-fold SHAP consistency
+    combined with conformal interval reliability averaged across every
+    district in the dataset. For a single prediction's own ERI, see the
+    `eri` / `per_feature_eri` fields on POST /predict instead."""
     path = os.path.join(RESULTS_DIR, 'eri.json')
     if not os.path.exists(path):
         return jsonify({'error': 'eri.json not found — run `python -m src.xai.run_xai` first.'}), 404
