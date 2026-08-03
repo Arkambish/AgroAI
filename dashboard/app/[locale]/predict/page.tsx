@@ -15,7 +15,9 @@ import {
   type BaselineResponse,
   type DistrictInfo,
 } from "@/lib/api";
+import { EDITABLE_FEATURES, FEATURE_META_BY_NAME } from "@/lib/features";
 import {
+  useLocalFlag,
   useLocalJSONState,
   resetPrediction,
   PREDICTION_KEY,
@@ -23,8 +25,13 @@ import {
 } from "@/lib/use-local-flag";
 import FieldInputCard, { type FarmerInputs } from "@/components/FieldInputCard";
 import KnownDataPanel from "@/components/KnownDataPanel";
+import AdvancedOverrides, {
+  validateOverride,
+} from "@/components/AdvancedOverrides";
 import PredictionResultCard from "@/components/PredictionResultCard";
 import ChatAssistant from "@/components/ChatAssistant";
+
+const ADVANCED_KEY = "agrisense_advanced_mode";
 
 const DEFAULT_FARMER_INPUTS: FarmerInputs = {
   district: "",
@@ -35,6 +42,7 @@ const DEFAULT_FARMER_INPUTS: FarmerInputs = {
 export default function PredictPage() {
   const t = useTranslations();
   const tForm = useTranslations("form");
+  const tAdvanced = useTranslations("advanced");
   const locale = useLocale();
 
   const [loading, setLoading] = useState(false);
@@ -62,6 +70,22 @@ export default function PredictPage() {
   const [contextLoading, setContextLoading] = useState(false);
   const [contextError, setContextError] = useState<string | null>(null);
   const [baseline, setBaseline] = useState<BaselineResponse | null>(null);
+
+  // Tier C — expert overrides (Advanced Inputs / Officer Mode), kept in
+  // their own bucket so they never collide with the farmer's district/
+  // season/year. The officer-mode preference persists across sessions.
+  const [advanced, handleAdvancedToggle] = useLocalFlag(ADVANCED_KEY);
+  const [overrides, setOverrides] = useState<Record<string, number>>({});
+  const [overrideErrors, setOverrideErrors] = useState<Record<string, string>>(
+    {}
+  );
+  // Which overrides the officer actually typed, as opposed to ones this page
+  // auto-filled from `context`. Only untouched fields get resynced when
+  // `context` changes (e.g. a district switch) — an officer's own entry is
+  // never silently overwritten.
+  const [touchedOverrides, setTouchedOverrides] = useState<
+    Record<string, boolean>
+  >({});
 
   // Read via a ref rather than a dependency: the seed effect below should
   // only re-seed when it actually needs to, not every time the persisted
@@ -141,6 +165,44 @@ export default function PredictPage() {
 
   const { district, season, year } = farmerInputs;
 
+  // Read via refs rather than dependencies, same reasoning as
+  // farmerInputsRef above: `loadArea` below only needs each value's state
+  // *at the moment its fetch resolves*, not a reason to re-fetch context
+  // every time officer mode or an override is toggled.
+  const advancedRef = useRef(advanced);
+  useEffect(() => {
+    advancedRef.current = advanced;
+  }, [advanced]);
+  const touchedOverridesRef = useRef(touchedOverrides);
+  useEffect(() => {
+    touchedOverridesRef.current = touchedOverrides;
+  }, [touchedOverrides]);
+
+  // Merges the system estimate for every not-yet-officer-edited field into
+  // `overrides`, so Advanced mode always shows (and sends) a real number
+  // rather than a blank field. Shared by the initial/district-change fetch
+  // below and by the Advanced toggle handler.
+  const seedOverridesFrom = useCallback(
+    (source: ContextResponse) => {
+      setOverrides((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const meta of EDITABLE_FEATURES) {
+          if (touchedOverridesRef.current[meta.name]) continue;
+          const raw = source[meta.name] as number | undefined;
+          if (raw === undefined || !Number.isFinite(raw)) continue;
+          const seeded = Number(raw.toFixed(meta.decimals));
+          if (next[meta.name] !== seeded) {
+            next[meta.name] = seeded;
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    },
+    []
+  );
+
   // Fetch the area's known values + historical baseline whenever the location
   // changes. Only `context`/`baseline` are touched — overrides survive.
   useEffect(() => {
@@ -159,6 +221,10 @@ export default function PredictPage() {
 
       if (ctxResult.status === "fulfilled") {
         setContext(ctxResult.value);
+        // Officer mode may already be on (persisted from a previous visit,
+        // or the district just changed under an open panel) — keep its
+        // untouched fields in sync with the area that was just resolved.
+        if (advancedRef.current) seedOverridesFrom(ctxResult.value);
       } else {
         setContext(null);
         setContextError(tForm("contextUnavailable"));
@@ -172,7 +238,7 @@ export default function PredictPage() {
     return () => {
       active = false;
     };
-  }, [district, season, year, tForm]);
+  }, [district, season, year, tForm, seedOverridesFrom]);
 
   const handleFarmerChange = useCallback(
     (patch: Partial<FarmerInputs>) => {
@@ -214,9 +280,118 @@ export default function PredictPage() {
     [districts, farmerInputs, setFarmerInputs, setResult]
   );
 
+  const handleOverrideChange = useCallback(
+    (name: string, raw: string) => {
+      const meta = FEATURE_META_BY_NAME[name];
+      if (!meta) return;
+
+      setOverrides((prev) => {
+        const next = { ...prev };
+        if (raw === "") {
+          delete next[name];
+        } else {
+          next[name] = Number(raw);
+        }
+        return next;
+      });
+
+      // Clearing the field back to blank hands it back to the system
+      // estimate (re-synced by the seeding effect / onBlur below) rather
+      // than leaving it permanently marked as officer-entered.
+      setTouchedOverrides((prev) => {
+        if (raw === "") {
+          if (!prev[name]) return prev;
+          const next = { ...prev };
+          delete next[name];
+          return next;
+        }
+        return prev[name] ? prev : { ...prev, [name]: true };
+      });
+
+      setOverrideErrors((prev) => {
+        const next = { ...prev };
+        if (raw === "") {
+          delete next[name];
+          return next;
+        }
+        const problem = validateOverride(meta, Number(raw));
+        if (problem) {
+          next[name] = tAdvanced(problem.key, {
+            min: problem.min,
+            max: problem.max,
+          });
+        } else {
+          delete next[name];
+        }
+        return next;
+      });
+    },
+    [tAdvanced]
+  );
+
+  // "Check and correct": on leaving a field, silently clamp an out-of-range
+  // number back into [min, max] (rather than just leaving it red), and drop
+  // a field left blank back to the current system estimate — Advanced mode
+  // always leaves every field holding a real, valid number.
+  const handleOverrideBlur = useCallback(
+    (name: string) => {
+      const meta = FEATURE_META_BY_NAME[name];
+      if (!meta) return;
+
+      setOverrides((prev) => {
+        const current = prev[name];
+        if (current === undefined) {
+          const raw = context?.[name] as number | undefined;
+          if (raw === undefined || !Number.isFinite(raw)) return prev;
+          return { ...prev, [name]: Number(raw.toFixed(meta.decimals)) };
+        }
+        const min = meta.min ?? -Infinity;
+        const max = meta.max ?? Infinity;
+        const clamped = Math.min(Math.max(current, min), max);
+        const corrected = Number(clamped.toFixed(meta.decimals));
+        return corrected === current ? prev : { ...prev, [name]: corrected };
+      });
+
+      setOverrideErrors((prev) => {
+        if (!prev[name]) return prev;
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    },
+    [context]
+  );
+
+  const handleResetOverrides = useCallback(() => {
+    setOverrides({});
+    setOverrideErrors({});
+    setTouchedOverrides({});
+  }, []);
+
+  // Turning officer mode on immediately fills every field with the current
+  // system estimate (so there's a real number to edit, not a blank form);
+  // turning it off drops any entered/seeded values entirely, rather than
+  // leaving them silently attached to the next prediction — "off" means
+  // back to the plain farmer flow.
+  const handleToggleAdvanced = useCallback(
+    (next: boolean) => {
+      handleAdvancedToggle(next);
+      if (next) {
+        if (context) seedOverridesFrom(context);
+      } else {
+        setOverrides({});
+        setOverrideErrors({});
+        setTouchedOverrides({});
+      }
+    },
+    [handleAdvancedToggle, context, seedOverridesFrom]
+  );
+
+  const hasOverrideErrors = Object.keys(overrideErrors).length > 0;
+
   const isValid = useMemo(
-    () => Boolean(district && season),
-    [district, season]
+    () => Boolean(district && season && !hasOverrideErrors),
+    [district, season, hasOverrideErrors]
   );
 
   const handlePredict = async () => {
@@ -225,14 +400,16 @@ export default function PredictPage() {
     setPredictError(null);
 
     try {
-      // Send only what the farmer actually chose. The backend resolves every
-      // other feature (rainfall, temperature, NDVI, soil, prior yield, ...)
-      // from its per-district defaults and recomputes the interaction terms,
-      // so nothing here can be silently zero-filled or farmer-edited.
+      // Send what the farmer chose, plus any officer-entered overrides. The
+      // backend resolves every other feature (rainfall, temperature, NDVI,
+      // soil, prior yield, ...) from its per-district defaults and
+      // recomputes the interaction terms, so nothing here can be silently
+      // zero-filled or left ambiguous between farmer and system values.
       const payload: Record<string, unknown> = {
         district,
         season,
         year,
+        ...overrides,
       };
 
       // TEMP DEBUG — remove once district/year propagation is verified.
@@ -264,6 +441,9 @@ export default function PredictPage() {
   const handleNewPrediction = useCallback(() => {
     resetPrediction();
     setPredictError(null);
+    setOverrides({});
+    setOverrideErrors({});
+    setTouchedOverrides({});
     setContext(null);
     setContextError(null);
     setBaseline(null);
@@ -296,6 +476,18 @@ export default function PredictPage() {
             resolved={result?.resolved_features}
             loading={contextLoading}
             error={contextError}
+          />
+
+          <AdvancedOverrides
+            enabled={advanced}
+            onToggle={handleToggleAdvanced}
+            context={context}
+            overrides={overrides}
+            touched={touchedOverrides}
+            errors={overrideErrors}
+            onOverrideChange={handleOverrideChange}
+            onOverrideBlur={handleOverrideBlur}
+            onReset={handleResetOverrides}
           />
 
           <div className="flex gap-3">
@@ -334,6 +526,12 @@ export default function PredictPage() {
               </button>
             )}
           </div>
+
+          {hasOverrideErrors && (
+            <p className="text-center text-sm font-medium text-red-600">
+              {tAdvanced("fixErrors")}
+            </p>
+          )}
         </section>
 
         <section className="space-y-6 lg:col-span-5">

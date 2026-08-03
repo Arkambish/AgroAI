@@ -78,6 +78,29 @@
     "ndvi_x_lst": "Greenness × land temperature"
   },
 
+  "advanced": {
+    "title": "Advanced Agricultural Inputs (For Extension Officers)",
+    "description": "Optional inputs for users with field measurements. Leave unchanged to use system-estimated values.",
+    "toggleShow": "Advanced",
+    "on": "On",
+    "off": "Off",
+    "categoryClimate": "Climate Features",
+    "categoryRemoteSensing": "Remote Sensing Indicators",
+    "categorySoil": "Soil Properties",
+    "systemEstimate": "System-estimated value",
+    "yourValue": "Your entered value",
+    "noEstimate": "No estimate available",
+    "overrideCount": "{count, plural, one {# value overridden} other {# values overridden}}",
+    "noOverrides": "Using system-estimated values for your area.",
+    "resetDefaults": "Reset to system estimates",
+    "outOfRange": "Enter a value between {min} and {max}.",
+    "fixErrors": "Please correct the highlighted values before predicting.",
+    "tooltipNdvi": "Vegetation health indicator from satellite data.",
+    "tooltipEvi": "Improved vegetation measurement from satellite imagery.",
+    "tooltipPh": "Soil acidity level affecting crop growth.",
+    "tooltipOrganicCarbon": "Soil nutrient quality indicator."
+  },
+
   "button": {
     "predict": "Predict Yield",
     "start": "Start Prediction",

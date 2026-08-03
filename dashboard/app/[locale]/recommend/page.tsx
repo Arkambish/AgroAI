@@ -255,7 +255,7 @@ function RecommendationCard({
         </p>
       </div>
 
-      <div>
+      {/* <div>
         <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
           {t("recommend.reliabilityLabel")}
         </p>
@@ -268,7 +268,7 @@ function RecommendationCard({
             </span>
           )}
         </p>
-      </div>
+      </div> */}
 
       <button
         type="button"
