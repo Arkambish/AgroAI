@@ -18,6 +18,16 @@ outputs/results*/). Every claim below is grounded in a specific file, function
 or data value found in the repo, not a generic description of what such a
 system "usually" does.
 
+Revision note: Section 6.3 (ERI) and every cross-reference to it have been
+updated to describe the CURRENT `src/xai/eri.py` implementation - a
+two-component (cross-fold SHAP consistency + conformal interval
+reliability), equal-weighted, prediction-level formula that replaced an
+earlier three-component (grounding + stability + consensus), per-feature,
+SHAP-weighted formula. Numeric ERI values throughout this document were
+re-verified against a live run of `python -m src.xai.run_xai` and a live
+`POST /predict` call on the date of this revision, not carried over from
+the earlier draft.
+
 
 ==================================================
 # 1. System Overview
@@ -138,11 +148,12 @@ frontend, and the frontend never talks to the model artefacts directly:
   - Explainable AI (XAI): SHAP is computed fresh for every single
     `/predict` call, against that specific request's resolved feature
     vector - not a cached, generic explanation (Section 6).
-  - Reliability Estimation (ERI): a custom Explanation Reliability Index
-    (src/xai/eri.py) composes three independent trust signals - data
-    grounding, cross-fold stability, and cross-method consensus - into one
-    0-1 score per feature and one aggregate score per prediction, shown
-    everywhere a SHAP-derived claim is shown (Section 6.3).
+  - Reliability Estimation (ERI): a custom Explainability Reliability Index
+    (src/xai/eri.py) combines exactly two signals - cross-fold SHAP
+    consistency and conformal-interval reliability (interval width relative
+    to the district's historical yield range) - into one equal-weighted 0-1
+    score per prediction (not per feature - see Section 6.3), shown
+    everywhere a SHAP-derived claim is shown.
   - Decision Support System: a deterministic agronomic rule/threshold
     engine (dashboard/lib/agronomy.ts) turns the SHAP+ERI output into
     actionable findings, filtered so only farmer-controllable factors that
@@ -296,13 +307,20 @@ for full detail. In order:
      recomputes the 3 interaction features as products of the resolved
      inputs.
   2. The loaded model (`_state['model']`) predicts a point yield.
-  3. SHAP is computed against this exact resolved feature vector via
+  3. A confidence interval is computed via the conformal -> gaussian ->
+     heuristic cascade (Section 5.3); the conformal half-width (if any) is
+     kept for step 5 below.
+  4. SHAP is computed against this exact resolved feature vector via
      `_state['explainer']` (TreeExplainer for RandomForest/XGBoost,
      KernelExplainer for SVR).
-  4. `compute_eri(shap_dict)` (src/xai/eri.py) produces `eri` and
-     `per_feature_eri` for this specific prediction.
-  5. A confidence interval is computed via the conformal -> gaussian ->
-     heuristic cascade (Section 5.3).
+  5. `compute_eri(conformal_interval_width, district_yield_range)`
+     (src/xai/eri.py) produces `eri` and `per_feature_eri` for this
+     request - NOT from this request's own SHAP values (Section 6.3
+     explains why). `conformal_interval_width` is `2 * q` from the
+     conformal lookup in step 3; `district_yield_range` is looked up from
+     a table precomputed once at server startup
+     (`resolve_district_yield_ranges()`, from
+     `data/processed{_real}/integrated_dataset.csv`).
   6. `forecast_basis` is classified (conditioned / historical_record /
      climatological) so the frontend can state honestly whether this is a
      forecast, a real recorded past season, or a climatological average.
@@ -626,8 +644,10 @@ Input payload: `{district: str, season: str, year: number}` (any of the 32
 cascade with a real farmer-supplied value, but the dashboard's Predict form
 never does this - it only ever sends the three required fields).
 Processing logic (full detail in Section 5.2-5.4): `_resolve_features()` ->
-model.predict() -> SHAP via `_state['explainer']` -> `compute_eri()` ->
-confidence-interval cascade -> `forecast_basis` classification.
+model.predict() -> confidence-interval cascade -> SHAP via
+`_state['explainer']` -> `compute_eri()` (fed the interval width + district
+yield range, not the SHAP output - Section 6.3) -> `forecast_basis`
+classification.
 Output response (`PredictResponse`): district, season, year,
 predicted_yield_MT_per_Ha, confidence_lower, confidence_upper, confidence
 ("High"/"Medium"/"Low"), shap_values (32-key dict), model, model_r2,
@@ -718,9 +738,14 @@ Used by: not currently called from the dashboard UI.
 --------------------------------------------------
 GET /explanation-reliability, GET /stability, GET /consensus
 --------------------------------------------------
-Purpose: expose the three components that compose ERI at the dataset level
-(as opposed to the per-request `eri`/`per_feature_eri` returned inline by
-`/predict`).
+Purpose: `/explanation-reliability` exposes the dataset-level ERI badge (the
+same two-component formula as the per-request `eri`, but averaged across
+every district rather than tied to one prediction - Section 6.3);
+`/stability` exposes per-feature LOYO-refit stability diagnostics *and* the
+`cross_fold_shap_consistency` field ERI actually reads; `/consensus`
+exposes a SHAP/permutation/symbolic-equation agreement score that is
+computed alongside the others but is NOT an input to ERI (kept only as an
+independent diagnostic - Section 6.3 explains why it was dropped).
 Processing: read `eri.json`, `explanation_stability.json`,
 `explanation_consensus.json` respectively from `RESULTS_DIR`, all produced
 offline by `python -m src.xai.run_xai`.
@@ -847,8 +872,11 @@ README, directly relevant to interpreting any prediction):
     `organic_carbon = 1.8`, `extent_prev_season = 400.0`, and
     `heat_stress_days` (computed from monthly-*mean* temperature, which
     never exceeds the 32C threshold used, so it is always 0 in this data
-    variant). These carry a low "grounding" score in the ERI system
-    (Section 6.3) precisely because of this.
+    variant). These carry a low "grounding" score in `src/xai/grounding.py`'s
+    static per-feature registry precisely because of this - a diagnostic
+    that fed the ERI formula in an earlier version of this system but is no
+    longer part of it (Section 6.3); `grounding.py` is now flagged in its
+    own module docstring as unused, pending removal.
   - `prev_year_yield` is, in effect, the literal previous year's target
     (verified in 22 of 24 district-year pairs) - a known leak.
   - `drought_index_spi` and `ndvi_anomaly` are standardised against the
@@ -903,7 +931,8 @@ exists in the dataset, and at tier 3-6 for a future year.
             |
     SHAP explainer invoked on the same resolved vector
             |
-    ERI computed from the resulting SHAP values
+    ERI computed from the conformal interval width (above) and the target
+    district's historical yield range - NOT from this SHAP output
             |
     Full PredictResponse assembled and returned
 
@@ -944,7 +973,9 @@ variant), run in this order:
 Two further pipelines are separate scripts, not invoked by `main.py`:
 `src/run_padr.py` (a "PADR" novelty model, writes `oof_padr.json` into the
 same results directory) and `src/xai/run_xai.py` (the ERI/stability/
-consensus offline computation - Section 6.3).
+consensus offline computation - Section 6.3). `run_xai.py` no longer runs
+`src/xai/grounding.py`'s step at all - grounding was dropped from the
+pipeline along with its removal from the ERI formula.
 
 Training protocol for the three tabular models (`src/ml_models.py`): an
 *inner* `GridSearchCV` over reduced/fast hyperparameter grids using
@@ -1071,70 +1102,116 @@ SHAP values summed before ranking (grouping happens before picking the
 top-5, not after, specifically to avoid the same concept appearing 3 times
 with 3 different partial numbers).
 
-## 6.3 ERI - Explanation Reliability Index
+## 6.3 ERI - Explainability Reliability Index
+
+NOTE ON THIS SECTION: an earlier version of `src/xai/eri.py` computed ERI
+from three components (grounding + stability + consensus, SHAP-weighted
+per feature). That formula was replaced this project cycle with the
+two-component formula below, to match the project report's own
+methodology (report Section 5.9.2/6.13: "a composite formed from two
+components... equal-weighted... deliberately avoiding a black-box model
+trained to predict reliability"). Grounding and consensus are NOT part of
+ERI any more - see the end of this section for what happened to them.
 
 What ERI represents: a trust score, separate from the model's own
-accuracy, answering "how much should this specific SHAP explanation be
-believed" - because a SHAP value can be large and confident-looking even
-when it is hanging on a constant proxy or a value the model has never seen
-vary.
+accuracy, answering "how much should this prediction's explanation and
+its stated uncertainty be believed" - not "how large is this SHAP value,"
+since a SHAP value can look large and confident even when the explanation
+behind it is unstable, or the interval around the point estimate is wide
+relative to what this district's yield actually does.
 
-How it is calculated (`src/xai/eri.py::compute_eri()`):
+How it is calculated (`src/xai/eri.py::compute_eri()` /
+`compute_dataset_level_eri()`):
 
-    ERI_j          = (stability_j + grounding_j + consensus_j) / 3
-    ERI_prediction = sum(|SHAP_j| * ERI_j) / sum(|SHAP_j|)   over this
-                     prediction's own features
+    ERI = W_SHAP_CONSISTENCY * cross_fold_shap_consistency
+        + W_INTERVAL_RELIABILITY * interval_reliability
 
-Its three components, each computed by a separate module:
+    W_SHAP_CONSISTENCY = W_INTERVAL_RELIABILITY = 0.5 (hardcoded, equal
+    weights - no config file in this project overrides them)
 
-  - Grounding (`src/xai/grounding.py`, `GROUNDING_REGISTRY`) - a static,
-    hand-curated per-feature score answering "is this value a real
-    measurement or an invented fallback?" 1.00 for directly measured
-    values (e.g. `season_avg_temp`, `soil_ph`), down to 0.05 for
-    hard-coded constants with zero variance in the collected data (e.g.
-    `season_avg_solar_rad`, `organic_carbon`), 0.15 for algebraic proxies/
-    interaction terms.
-  - Stability (`src/xai/stability.py`) - whether a feature's SHAP magnitude
-    survives a Leave-One-Year-Out refit. Computed as
-    `1 - IQR(shap_j across LOYO folds)/(|median_j|+eps)`, clipped to
-    [0,1]. Real-variant global "Explanation Stability Coefficient"
-    (mean pairwise Spearman correlation between folds' full importance
-    vectors) = 0.7501.
-  - Consensus (`src/xai/consensus.py`) - a 3-way vote per feature: is it in
-    the SHAP top-10, the permutation-importance top-10, and/or the
-    symbolic-regression equation's feature list? `consensus_j = votes/3`.
+Its two components:
 
-`ERI_j` and the aggregate `eri` are computed live inside `run_prediction()`
-for every `/predict` call (using stability/grounding/consensus scores that
-were themselves precomputed offline by `python -m src.xai.run_xai`, but
-weighted by *this request's own* SHAP values) - so the reliability number
-shown is specific to the prediction just made, not a single static number
-reused everywhere.
+  - cross_fold_shap_consistency (`src/xai/stability.py`) - mean Spearman
+    rank correlation between each Leave-One-Year-Out fold's SHAP
+    attribution (that fold's refit RandomForest/XGBoost model, evaluated
+    over the full dataset) and the production model's own full-data SHAP
+    ranking (`feature_importance.json`, top-15 features), clipped to
+    [0,1]. Precomputed offline by `python -m src.xai.run_xai` and written
+    to `explanation_stability.json`; `/predict` reads this ALREADY-COMPUTED
+    number rather than recomputing it per request - it does not depend on
+    the current prediction's own SHAP values at all. Current verified
+    values: real variant = 0.3429 (7 LOYO folds), synthetic variant =
+    0.9538 (17 folds). The older, DIFFERENT "Explanation Stability
+    Coefficient" (mean pairwise Spearman rho between folds' own importance
+    vectors, not fold-vs-full-data) still exists in the same file for
+    diagnostic purposes but is NOT the number ERI uses; current real-variant
+    value is 0.6818.
+  - interval_reliability (`src/xai/eri.py`, using `src/conformal.py`'s
+    output) - `1 - (2*q / district_yield_range)`, clipped to [0,1], where
+    `q` is the served model's split-conformal half-width
+    (`outputs/results{_real}/conformal.json`) and `district_yield_range`
+    is that district's historical (max-min) recorded yield
+    (`data/processed{_real}/integrated_dataset.csv`), looked up from a
+    table built once at API startup. Computed PER REQUEST (it depends on
+    the served model's own conformal `q` and the specific district asked
+    about), but never touches this request's SHAP values either.
+
+`per_feature_eri` in the API response is NOT a genuinely per-feature
+number any more: it is the single prediction-level `eri` value, copied
+identically under all 32 feature keys
+(`dict.fromkeys(ALL_FEATURES, eri)`). This is a deliberate compatibility
+choice - the frontend's existing per-card weighting logic
+(Section 3.3/7.2) still runs an |SHAP|-weighted average over
+`per_feature_eri`, and since every input to that average is now the same
+number, it always collapses back to that same number, so every reliability
+badge shown for one prediction currently reads identically (see the
+worked example in Section 6.4).
+
+Grounding and consensus, and what happened to them: `src/xai/grounding.py`
+(the static per-feature "how real is this data" registry) is no longer
+called by `run_xai.py` at all, is read by no live endpoint, and is flagged
+in its own module docstring as unused dead code pending deletion.
+`src/xai/consensus.py` (SHAP/permutation/symbolic-equation agreement) is
+still computed by `run_xai.py` and still served live via `GET /consensus`
+(Section 4) as an independent diagnostic - it is simply no longer an input
+to the ERI score. Neither module was deleted outright, only disconnected
+from ERI, so their own numbers/endpoints in this document (Section 4, 7.1)
+remain accurate as *standalone* diagnostics.
 
 How it improves trust / how it is displayed: every place a SHAP-derived
 claim appears (Explain tab per-card "Confidence," Explain tab page-level
 "Explanation reliability" badge, Recommend tab per-card "Reliability")
-carries this score, using consistent emoji + tier conventions (green >=90%,
-yellow >=70%, orange >=50%, red below, grey/"Unknown" if ERI could not be
-computed for that feature at all). A recommendation or explanation with low
-confirmed reliability is still shown - the UI never hides an uncertain
-claim - but it is never shown as if it were as trustworthy as a
-well-grounded one.
+carries this score, using tier conventions currently duplicated across two
+different, independently-coded threshold schemes: a 3-tier scheme for the
+page-level summary badge (<0.4 low / <0.7 medium / else high) and a 4-tier
+scheme for every per-card badge (>=90% high / >=70% good / >=50% moderate /
+else low / grey "Unknown" if ERI is unavailable). Because `per_feature_eri`
+is now uniform per prediction (above), both schemes are, in the current
+code, applied to what is numerically the same underlying number.
 
-Honest caveat, worth stating for a viva: `run_xai.py`'s own
-`weight_sensitivity_sweep()` found that on the real data variant, 97%
-(64/66) of alternative (stability, grounding, consensus) weightings produce
-a *different* top-5 "most reliable feature" ranking than the equal-weight
-baseline the system actually uses - meaning ERI's own internal weighting
-choice is a real design decision with a measurable effect on its output,
-not a settled, weight-free ground truth. The aggregate real-variant ERI
-score itself is 0.6219.
+Honest caveat, worth stating for a viva: the interval-reliability term
+regularly clips to 0 on the real data variant - the served model's
+conformal half-width (e.g. SVR's q=15.23 MT/Ha) is wider than several
+districts' entire historical yield range (e.g. Anuradhapura's is only
+15.31 MT/Ha), so `interval_reliability` floors at 0 for every district on
+that variant. Current verified dataset-level aggregate ERI:
+real variant = 0.1714 (cross_fold_shap_consistency=0.3429,
+interval_reliability=0.0 across all 4 districts); synthetic variant =
+0.7928 (cross_fold_shap_consistency=0.9538, interval_reliability=0.6318).
+The old three-component formula's `weight_sensitivity_sweep()` diagnostic
+(which quantified how much the equal-weight choice affected the top-5
+"most reliable feature" ranking) no longer exists in the current code -
+it was a per-feature-weighting analysis that stopped being meaningful once
+ERI stopped being a per-feature score at all.
 
 ## 6.4 Technical vs. farmer-facing explanation - a concrete example
 
 Technical (what the backend actually computes and what
-`per_feature_eri`/`shap_values` literally contain):
-    "season_mean_ndvi: shap_value = +0.32, per_feature_eri = 0.90"
+`per_feature_eri`/`shap_values` literally contain - note, per Section 6.3,
+that `per_feature_eri` is the SAME number for every one of the 32 features
+on a given prediction, not a genuinely feature-specific score):
+    "season_mean_ndvi: shap_value = +0.32, per_feature_eri = 0.90 (this
+    prediction's single aggregate eri, repeated under every feature key)"
 
 Farmer-facing (what the Explain tab renders for the exact same number):
     Card: "Greenness (NDVI)"
@@ -1144,6 +1221,9 @@ Farmer-facing (what the Explain tab renders for the exact same number):
     (Technical details, collapsed by default: "Greenness (NDVI) increased
     your predicted yield by about 320 kg/Ha." + a diverging bar + the raw
     feature name.)
+    Every OTHER factor card on this same prediction would also show "90%"
+    for Confidence, since all 32 `per_feature_eri` entries are identical -
+    a direct consequence of the Section 6.3 formula change.
 
 The same discipline continues one step further into the Recommend tab
 (Section 7-8), where the equivalent negative-SHAP, low-value case for soil
@@ -1191,9 +1271,10 @@ Not every feature with a negative SHAP contribution is shown as advice.
 Historical yield features, satellite vegetation indices, soil texture
 (clay/sand percentage), solar radiation, and land-surface-temperature
 proxies are all *excluded* from the rule engine entirely, because they are
-either not something a farmer can act on this season, or (per Section 6.4's
-grounding scores) not reliably measured to begin with. Only four raw
-feature groups are wired into any rule:
+either not something a farmer can act on this season, or (per
+`src/xai/grounding.py`'s static per-feature scores - a standalone
+diagnostic, no longer an ERI input, see Section 6.3) not reliably measured
+to begin with. Only four raw feature groups are wired into any rule:
 
     Kept (actionable, each backing exactly one rule):
       - soil_ph                              -> soil condition rule
@@ -1208,7 +1289,7 @@ feature groups are wired into any rule:
       - clay_pct / sand_pct (soil texture, not practically changeable
         mid-season)
       - organic_carbon, season_avg_solar_rad (constant proxies - see
-        Section 6.3 grounding scores of 0.05)
+        `src/xai/grounding.py` grounding scores of 0.05)
       - extent_prev_season
 
 Note the framing difference from a naive "rainfall/temperature caused this,
@@ -1610,15 +1691,20 @@ would need to be addressed before any multi-user production deployment.
       SHAP explainer (_state['explainer'])                               |
       TreeExplainer (RF/XGB) | KernelExplainer (SVR)                     |
             |                                                            |
-      shap_values{32 features}                                          |
+      shap_values{32 features}  (feeds shap_values in the response       |
+      and the frontend's factor grouping - NOT fed into ERI below)       |
             |                                                            |
-      compute_eri(shap_values)  (src/xai/eri.py)                        |
-      = (stability + grounding + consensus) / 3, per feature            |
-      <-- outputs/results{_real}/{explanation_stability,                 |
-          feature_grounding,explanation_consensus}.json                 |
-      (all produced offline by `python -m src.xai.run_xai`) -------------
+      compute_eri(conformal_interval_width, district_yield_range)        |
+      (src/xai/eri.py)                                                   |
+      = 0.5*cross_fold_shap_consistency + 0.5*interval_reliability       |
+      <-- outputs/results{_real}/explanation_stability.json              |
+          (cross_fold_shap_consistency - precomputed offline)            |
+      <-- outputs/results{_real}/conformal.json + district yield range   |
+          from integrated_dataset.csv (interval_reliability - live)      |
+      (stability precomputed offline by `python -m src.xai.run_xai`;     |
+       grounding.py/consensus.py are NOT inputs to ERI any more) --------
             |
-      eri, per_feature_eri
+      eri, per_feature_eri (per_feature_eri = eri, repeated per feature)
             |
     Full PredictResponse JSON  ------------------------------------------>
             |
@@ -1681,15 +1767,23 @@ model evidence?
 
 RQ3: Can the trustworthiness of an individual explanation be quantified,
 rather than assumed uniform across all features and predictions?
-    -> System feature: the Explanation Reliability Index (src/xai/eri.py),
-       composing grounding + stability + consensus per feature, weighted by
-       that prediction's own SHAP magnitudes into one aggregate score.
-    -> Evaluation: `outputs/results_real/eri.json` (aggregate 0.6219),
-       `explanation_stability.json` (global coefficient 0.7501), plus the
-       system's own self-critical `weight_sensitivity_sweep()` finding that
-       97% of alternative component-weightings would reorder the top-5
-       "most reliable" features - an honest robustness check on the metric
-       itself, not just a number presented as settled (Section 6.3).
+    -> System feature: the Explainability Reliability Index (src/xai/eri.py),
+       combining cross-fold SHAP consistency and conformal-interval
+       reliability (interval width vs. the district's historical yield
+       range) into one equal-weighted, auditable-by-hand aggregate score
+       per prediction (Section 6.3) - deliberately not per feature, and
+       deliberately not a second black-box model scoring the first.
+    -> Evaluation: `outputs/results_real/eri.json` (aggregate 0.1714;
+       cross_fold_shap_consistency=0.3429, interval_reliability=0.0 - the
+       served model's conformal interval is wider than every one of the 4
+       districts' own historical yield range on this variant, a genuinely
+       low-reliability finding the system reports rather than hides), vs.
+       `outputs/results/eri.json` on the synthetic demo variant (aggregate
+       0.7928). An earlier version of this score used a three-component,
+       per-feature-weighted formula with its own self-critical
+       `weight_sensitivity_sweep()` robustness check; that formula and
+       diagnostic were replaced by the current two-component design to
+       match the project report's own methodology (Section 6.3).
 
 RQ4: Can farmer recommendations be generated that are provably grounded in
 both statistical evidence (SHAP) and domain knowledge (agronomic
@@ -1723,9 +1817,10 @@ farmers, not just translated as an afterthought?
 
 AgriSense is a single pipeline, not four separate features glued together.
 One `/predict` call produces one JSON object that already contains the
-point estimate, its calibrated interval, its full SHAP explanation, and its
-per-feature reliability score - and that one object, stored once in
-localStorage, is the only thing the Explain and Recommend tabs ever read.
+point estimate, its calibrated interval, its full SHAP explanation, and one
+aggregate reliability score (ERI, Section 6.3 - a single prediction-level
+number, not a genuinely per-feature one) - and that one object, stored once
+in localStorage, is the only thing the Explain and Recommend tabs ever read.
 There is no second prediction, no second SHAP computation, and no
 independent recommendation-generation model anywhere in the client-visible
 flow; the agronomic rule engine is a pure, inspectable function of data the
@@ -1757,10 +1852,13 @@ happened, why, how sure are we, and what should be done - and, just as
 importantly, is transparent about the honest limits of "how sure are we":
 the project's own README documents a negative real-data result rather than
 quietly shipping only the flattering synthetic-demo numbers, and the
-Explanation Reliability Index is presented alongside its own documented
-sensitivity to its weighting scheme rather than as an unquestionable ground
-truth. That combination - a working end-to-end pipeline, and an honest
-account of where it is and isn't reliable - is the actual deliverable.
+Explainability Reliability Index reports a genuinely low real-variant score
+(0.1714 - Section 6.3) precisely because the served model's conformal
+interval is wider than several districts' entire historical yield range,
+rather than being tuned or reworded to look more reassuring than the
+underlying evidence supports. That combination - a working end-to-end
+pipeline, and an honest account of where it is and isn't reliable - is the
+actual deliverable.
 
 ==================================================
 End of document.
