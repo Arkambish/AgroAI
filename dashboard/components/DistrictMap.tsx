@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import "leaflet/dist/leaflet.css";
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 
 import { formatNumber } from "@/lib/utils";
 import { getYieldColor, YIELD_CATEGORIES } from "@/lib/api";
@@ -76,6 +77,7 @@ export default function DistrictMap({
   onSelectDistrict,
   selectedDistrict,
 }: Props) {
+  const t = useTranslations();
   const [geo, setGeo] = React.useState<FeatureCollection | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -183,7 +185,7 @@ export default function DistrictMap({
           <div class="text-emerald-700 font-extrabold mt-0.5">${
             value !== undefined
               ? `${formatNumber(value, 2)} MT/Ha`
-              : "No prediction"
+              : t("map.noPrediction")
           }</div>
         </div>`,
         { sticky: true, className: "rounded-lg shadow-md border-0 bg-white" }
@@ -195,7 +197,7 @@ export default function DistrictMap({
         }
       });
     },
-    [normalizedPredictions, onSelectDistrict]
+    [normalizedPredictions, onSelectDistrict, t]
   );
 
   if (error) {
@@ -203,7 +205,7 @@ export default function DistrictMap({
       <div
         className={`h-full ${MIN_MAP_HEIGHT} grid place-items-center rounded-2xl border border-red-200 bg-red-50 text-sm text-red-600`}
       >
-        Map failed to load: {error}
+        {t("map.loadError", { error })}
       </div>
     );
   }
@@ -213,7 +215,7 @@ export default function DistrictMap({
       <div
         className={`h-full ${MIN_MAP_HEIGHT} grid place-items-center rounded-2xl border bg-slate-50 text-sm text-slate-500`}
       >
-        Loading target district map...
+        {t("map.loading")}
       </div>
     );
   }
@@ -263,7 +265,7 @@ export default function DistrictMap({
       {/* Map Legend */}
       <div className="absolute bottom-4 right-4 z-1000 rounded-2xl bg-white/95 p-3 shadow-lg backdrop-blur border border-slate-100">
         <p className="text-xs font-bold text-slate-700 mb-2">
-          Yield Scale (MT/Ha)
+          {t("map.legendTitle")}
         </p>
         <div className="flex flex-col space-y-1.5 text-[11px]">
           {YIELD_CATEGORIES.map((cat) => (
@@ -272,7 +274,9 @@ export default function DistrictMap({
                 className="h-3 w-3 rounded-full shadow-sm"
                 style={{ backgroundColor: cat.color }}
               />
-              <span className="font-semibold text-slate-700">{cat.label}</span>
+              <span className="font-semibold text-slate-700">
+                {t(`yieldCategory.${cat.key}`)}
+              </span>
             </div>
           ))}
         </div>

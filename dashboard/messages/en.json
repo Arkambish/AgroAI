@@ -117,7 +117,32 @@
     "no_recommendation": "No Recommendations Yet",
     "make_prediction": "Please make a prediction first to see personalized agricultural advice.",
     "best_district": "Best District",
-    "weather_summary": "Weather Summary"
+    "weather_summary": "Weather Summary",
+    "badge": "Sri Lanka Big Onion Prediction",
+    "districtFocus": "District Focus",
+    "predictedYield": "Predicted Yield",
+    "confidenceRange": "Confidence Range",
+    "yieldSuffix": "Yield",
+    "mapHint": "Click any highlighted district on the map to view yield insights.",
+    "peakTargetYield": "Peak Target Yield",
+    "averageYield": "Average Yield",
+    "loadingValue": "Loading...",
+    "unavailable": "Unavailable"
+  },
+
+  "yieldCategory": {
+    "veryHigh": "Very High",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "veryLow": "Very Low"
+  },
+
+  "map": {
+    "legendTitle": "Yield Scale (MT/Ha)",
+    "loadError": "Map failed to load: {error}",
+    "loading": "Loading target district map...",
+    "noPrediction": "No prediction"
   },
 
   "predict": {

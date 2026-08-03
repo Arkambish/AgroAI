@@ -352,9 +352,14 @@ export interface BatchPredictionResult {
 
 // 🎨 Yield Color Scaling Utility
 export type YieldCategoryLabel = "Very High" | "High" | "Medium" | "Low" | "Very Low";
+// Locale-agnostic key mirroring `label` — used to look up the translated
+// name (see messages/*.json `yieldCategory`) since `label` itself stays
+// hardcoded English for backwards-compat with existing tests/consumers.
+export type YieldCategoryKey = "veryHigh" | "high" | "medium" | "low" | "veryLow";
 
 export interface YieldCategoryInfo {
   label: YieldCategoryLabel;
+  key: YieldCategoryKey;
   color: string;
   bgClass: string;
   textClass: string;
@@ -363,16 +368,16 @@ export interface YieldCategoryInfo {
 }
 
 export const YIELD_CATEGORIES: YieldCategoryInfo[] = [
-  { label: "Very High", color: "#15803d", bgClass: "bg-emerald-700", textClass: "text-emerald-700", min: 16, max: Infinity },
-  { label: "High", color: "#22c55e", bgClass: "bg-emerald-500", textClass: "text-emerald-600", min: 13, max: 16 },
-  { label: "Medium", color: "#eab308", bgClass: "bg-amber-400", textClass: "text-amber-600", min: 10, max: 13 },
-  { label: "Low", color: "#f97316", bgClass: "bg-orange-500", textClass: "text-orange-600", min: 7, max: 10 },
-  { label: "Very Low", color: "#ef4444", bgClass: "bg-red-500", textClass: "text-red-600", min: -Infinity, max: 7 },
+  { label: "Very High", key: "veryHigh", color: "#15803d", bgClass: "bg-emerald-700", textClass: "text-emerald-700", min: 16, max: Infinity },
+  { label: "High", key: "high", color: "#22c55e", bgClass: "bg-emerald-500", textClass: "text-emerald-600", min: 13, max: 16 },
+  { label: "Medium", key: "medium", color: "#eab308", bgClass: "bg-amber-400", textClass: "text-amber-600", min: 10, max: 13 },
+  { label: "Low", key: "low", color: "#f97316", bgClass: "bg-orange-500", textClass: "text-orange-600", min: 7, max: 10 },
+  { label: "Very Low", key: "veryLow", color: "#ef4444", bgClass: "bg-red-500", textClass: "text-red-600", min: -Infinity, max: 7 },
 ];
 
 export function getYieldCategory(value?: number): YieldCategoryInfo {
   if (value === undefined || value === null || isNaN(value)) {
-    return { label: "Medium", color: "#cbd5e1", bgClass: "bg-slate-300", textClass: "text-slate-500", min: 0, max: 0 };
+    return { label: "Medium", key: "medium", color: "#cbd5e1", bgClass: "bg-slate-300", textClass: "text-slate-500", min: 0, max: 0 };
   }
   if (value >= 16) return YIELD_CATEGORIES[0];
   if (value >= 13) return YIELD_CATEGORIES[1];

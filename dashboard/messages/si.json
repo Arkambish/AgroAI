@@ -104,7 +104,32 @@
     "no_recommendation": "නිර්දේශ නොමැත",
     "make_prediction": "කරුණාකර පළමුව අනාවැකි කරන්න, පසුව පුද්ගලික කෘෂිකර්ම උපදෙස් ලබා ගන්න.",
     "best_district": "හොඳම දිස්ත්‍රික්කය",
-    "weather_summary": "කාලගුණ සාරාංශය"
+    "weather_summary": "කාලගුණ සාරාංශය",
+    "badge": "ශ්‍රී ලංකා මහ ලූණු අස්වැන්න අනාවැකිය",
+    "districtFocus": "දිස්ත්‍රික්ක අවධානය",
+    "predictedYield": "අනාවැකි කළ අස්වැන්න",
+    "confidenceRange": "විශ්වසනීයත්ව පරාසය",
+    "yieldSuffix": "අස්වැන්න",
+    "mapHint": "අස්වැන්න පිළිබඳ තොරතුරු බැලීමට සිතියමේ ඉස්මතු කර ඇති ඕනෑම දිස්ත්‍රික්කයක් තෝරන්න.",
+    "peakTargetYield": "ඉහළම ඉලක්ක අස්වැන්න",
+    "averageYield": "සාමාන්‍ය අස්වැන්න",
+    "loadingValue": "පූරණය වෙමින්...",
+    "unavailable": "ලබා ගත නොහැක"
+  },
+
+  "yieldCategory": {
+    "veryHigh": "ඉතා ඉහළ",
+    "high": "ඉහළ",
+    "medium": "මධ්‍යම",
+    "low": "අඩු",
+    "veryLow": "ඉතා අඩු"
+  },
+
+  "map": {
+    "legendTitle": "අස්වැන්න පරිමාණය (MT/Ha)",
+    "loadError": "සිතියම පූරණය කිරීමට අසමත් විය: {error}",
+    "loading": "ඉලක්ක දිස්ත්‍රික්ක සිතියම පූරණය වෙමින්...",
+    "noPrediction": "අනාවැකියක් නැත"
   },
   "predict": {
     "eyebrow": "AI තීරණ සහාය",

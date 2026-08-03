@@ -112,35 +112,40 @@ export default function Home() {
 
   const currentYear = new Date().getFullYear();
   const seasonValue = loading
-    ? "Loading..."
+    ? t("dashboard.loadingValue")
     : batchResult
-    ? `Yala ${currentYear}`
+    ? `${t("seasons.yala")} ${currentYear}`
     : error
-    ? "Unavailable"
+    ? t("dashboard.unavailable")
     : "--";
 
   const averageYieldValue = loading
-    ? "Loading..."
+    ? t("dashboard.loadingValue")
     : batchResult
     ? `${batchResult.averageYield.toFixed(2)} MT/Ha`
     : error
-    ? "Unavailable"
+    ? t("dashboard.unavailable")
     : "--";
 
+  const translateDistrict = (name: string) =>
+    t.has(`districts.${name.toLowerCase()}`)
+      ? t(`districts.${name.toLowerCase()}`)
+      : name;
+
   const bestDistrictValue = loading
-    ? "Loading..."
+    ? t("dashboard.loadingValue")
     : batchResult
-    ? batchResult.bestDistrict
+    ? translateDistrict(batchResult.bestDistrict)
     : error
-    ? "Unavailable"
+    ? t("dashboard.unavailable")
     : "--";
 
   const highestYieldValue = loading
-    ? "Loading..."
+    ? t("dashboard.loadingValue")
     : batchResult
     ? `${batchResult.highestYield.toFixed(2)} MT/Ha`
     : error
-    ? "Unavailable"
+    ? t("dashboard.unavailable")
     : "--";
 
   const selectedPrediction =
@@ -168,7 +173,7 @@ export default function Home() {
             <div className="relative z-10">
               <div className="inline-flex items-center space-x-2 rounded-full bg-emerald-100/80 px-3 py-1 text-xs font-bold text-emerald-800 mb-4">
                 <Sparkles size={14} />
-                <span>Sri Lanka Big Onion Prediction</span>
+                <span>{t("dashboard.badge")}</span>
               </div>
 
               <h1 className="text-4xl font-extrabold tracking-tight md:text-5xl">
@@ -208,10 +213,10 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    District Focus
+                    {t("dashboard.districtFocus")}
                   </span>
                   <h3 className="text-2xl font-black text-slate-900">
-                    {selectedPrediction.district}
+                    {translateDistrict(selectedPrediction.district)}
                   </h3>
                 </div>
                 <div
@@ -221,18 +226,21 @@ export default function Home() {
                     ).bgClass
                   }`}
                 >
-                  {
-                    getYieldCategory(
-                      selectedPrediction.predicted_yield_MT_per_Ha
-                    ).label
-                  } Yield
+                  {t(
+                    `yieldCategory.${
+                      getYieldCategory(
+                        selectedPrediction.predicted_yield_MT_per_Ha
+                      ).key
+                    }`
+                  )}{" "}
+                  {t("dashboard.yieldSuffix")}
                 </div>
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-4">
                 <div className="rounded-2xl bg-emerald-50/70 p-4 border border-emerald-100">
                   <p className="text-xs font-semibold text-emerald-700">
-                    Predicted Yield
+                    {t("dashboard.predictedYield")}
                   </p>
                   <p className="mt-1 text-2xl font-black text-emerald-900">
                     {selectedPrediction.predicted_yield_MT_per_Ha.toFixed(2)}{" "}
@@ -241,7 +249,7 @@ export default function Home() {
                 </div>
                 <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
                   <p className="text-xs font-semibold text-slate-500">
-                    Confidence Range
+                    {t("dashboard.confidenceRange")}
                   </p>
                   <p className="mt-1 text-sm font-bold text-slate-800">
                     {selectedPrediction.confidence_lower.toFixed(1)} –{" "}
@@ -252,7 +260,7 @@ export default function Home() {
             </div>
           ) : (
             <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-              Click any highlighted district on the map to view yield insights.
+              {t("dashboard.mapHint")}
             </div>
           )}
         </div>
@@ -296,7 +304,7 @@ export default function Home() {
         </motion.div>
         <motion.div variants={item}>
           <StatCard
-            label="Peak Target Yield"
+            label={t("dashboard.peakTargetYield")}
             value={highestYieldValue}
             icon={BarChart3}
             color="bg-emerald-600"
@@ -304,7 +312,7 @@ export default function Home() {
         </motion.div>
         <motion.div variants={item}>
           <StatCard
-            label="Average Yield"
+            label={t("dashboard.averageYield")}
             value={averageYieldValue}
             icon={TrendingUp}
             color="bg-lime-500"
