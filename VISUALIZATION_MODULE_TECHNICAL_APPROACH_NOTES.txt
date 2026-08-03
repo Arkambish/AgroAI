@@ -1,0 +1,497 @@
+================================================================================
+VISUALIZATION & DECISION SUPPORT MODULE — TECHNICAL APPROACH NOTES
+================================================================================
+Project : An Explainable AI-Driven Decision Support System for Big Onion Yield
+          Prediction Using Multi-Source Remote Sensing and Climate Data in Sri
+          Lanka
+Module  : Research Area 5 — Visualization & Decision Support
+Format  : ROUGH NOTES, organised by the 7 topics you asked for — rewrite into
+          report prose yourself; not chapter-ready text. No citations, per
+          your instruction (add these when you turn this into prose).
+Method  : Read directly from dashboard/ source (all file paths below are
+          relative to dashboard/ unless prefixed src/), cross-checked
+          against src/api.py for exactly what each endpoint returns. Where
+          the code doesn't match the module boundary or your stated scope,
+          it's flagged explicitly rather than smoothed over — see the
+          DISCREPANCY blocks throughout and the consolidated list at the end.
+
+--------------------------------------------------------------------------------
+MODULE BOUNDARY USED IN THIS DOCUMENT
+--------------------------------------------------------------------------------
+Per your confirmation: this module = dashboard/ (the Next.js presentation
+layer) ONLY. Everything in src/ — model training, SHAP computation, ERI
+computation, conformal calibration, RAG retrieval (explanation_context.py),
+the LLM wrapper (api.py:_call_openrouter) — belongs to the Prediction
+Engine / REST Service modules (per the poster's own module-ownership table:
+"REST service" and "Prediction engine" both credited to Arkam B.H.M.; only
+"Dashboard" is credited to you). Below, anything computed in src/ is
+described as CONSUMED by this module via an HTTP endpoint, never as
+something this module computes. Where I describe src/ code at all, it's
+only as necessary context for how the dashboard consumes it — flag me if
+any of that context creeps too far into "implementation" language for your
+chapter.
+
+
+================================================================================
+1. USERS, INPUTS, OUTPUTS, PROCESS
+================================================================================
+
+Users (as evidenced by the code, not just the poster's framing)
+- Farmers / smallholder onion growers — explicit in both LLM system prompts
+  (src/api.py CHAT_SYSTEM_PROMPT, RECOMMEND_SYSTEM_PROMPT_TEMPLATE: "for
+  Sri Lankan onion farmers"), and in the plain-language design throughout
+  explain/page.tsx and recommend/page.tsx (no ML jargon shown by default,
+  jargon hidden behind "Technical details" disclosures).
+- Agricultural extension officers — features.ts's own comment: "A farmer
+  cannot supply NDVI, EVI, clay % or solar radiation... lets an extension
+  officer override them behind the Advanced toggle" (FieldInputCard.tsx).
+- No role-based access control, login, or distinct UI per user type exists
+  in the code — one generic UI serves all audiences; "farmer" vs "officer"
+  is a design assumption baked into copy/defaults, not an enforced role.
+- Poster's broader END USERS box (Dept. of Census & Statistics, Dept. of
+  Agriculture policy planners, district agricultural officers, researchers
+  & students) is not reflected in any code-level differentiation — worth
+  noting if your users section claims role-specific views.
+
+Inputs actually collected by this module
+- Required (Predict tab, FieldInputCard.tsx): district (one of the 4 study
+  districts — Matale, Anuradhapura, Polonnaruwa, Kurunegala, from
+  lib/api.ts:TARGET_DISTRICTS), season (Yala only — see Discrepancy list),
+  year (numeric input, defaults to current year).
+- Optional "Advanced/Officer" overrides: a SUBSET of the 32 model features
+  flagged editable:true in lib/features.ts — season_avg_temp,
+  season_total_rainfall, season_avg_humidity, season_avg_solar_rad,
+  season_mean_ndvi, season_mean_evi, soil_ph, organic_carbon, clay_pct,
+  sand_pct. The remaining ~22 features are always resolved server-side.
+- Free-text chat query (ChatAssistant.tsx), scoped to whichever
+  district/season/year is currently selected.
+- Locale selection (en/si/ta) via LanguageSwitcher.tsx.
+
+Outputs rendered by this module (all sourced from POST /predict's JSON
+unless noted — see Section 2 for exactly which fields are server-computed
+vs. locally derived)
+- Predict tab: point yield estimate (MT/Ha), confidence interval, R2-based
+  confidence label, data-completeness/provenance badges (which of the 32
+  features were farmer-supplied vs. defaulted, and from where), chat panel.
+- Explain tab: top-5 grouped SHAP factors as a diverging bar list,
+  page-level + per-card ERI-derived reliability badges, one-line "Key
+  Insight" narrative.
+- Recommend tab: deterministic rule-based recommendation/risk cards,
+  reliability badges, static "consult an agronomist" contact prompt.
+- Home page: 4-district choropleth map, best/average/highest-yield stat
+  cards, click-through district-focus card.
+
+Process, as seen strictly from this module's side of the boundary
+    Farmer/officer fills form (predict/page.tsx)
+        -> POST /predict  [src/api.py — outside module boundary]
+        -> full PredictResponse JSON received, written to localStorage
+           (lib/use-local-flag.ts, key "last_prediction")
+        -> Explain tab and Recommend tab both read that SAME stored
+           object — no second network call, no client-side recomputation
+        -> Chat panel (Predict tab only) and, if wired, a recommendation
+           call are separate, on-demand POSTs against the same
+           district/season/year context.
+
+
+================================================================================
+2. ARCHITECTURE — PRESENTATION LAYER <-> SERVING LAYER
+================================================================================
+
+Stack: Next.js 15 (App Router), next-intl for i18n, Tailwind, react-leaflet
+for maps, axios for HTTP. Talks to the Flask serving layer (src/api.py,
+outside module boundary) purely over HTTP.
+
+HTTP client: lib/api.ts — `axios.create({ baseURL: API_BASE_URL })`,
+API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE, default
+"http://localhost:5050". A NEXT_PUBLIC_USE_MOCK=true env flag swaps
+predictYield() to a local mock (lib/sample-api.ts) instead of the real
+backend — worth knowing when demoing, since mock PredictResponse objects
+have no eri/per_feature_eri (typed optional specifically because of this).
+
+Endpoints this module actually calls (typed wrappers, all in lib/api.ts):
+  GET  /health                -> getHealth()          -- DEFINED, NOT CALLED
+                                                           by any page (see
+                                                           discrepancy list)
+  GET  /districts             -> getDistricts()
+  GET  /context                -> getContext()
+  GET  /baseline               -> getBaseline()
+  POST /predict                -> predictYield()        -- core call
+  POST /api/chat                -> sendChatMessage()
+  POST /api/recommend           -> getRecommendation()   -- DEFINED, NOT
+                                                             CALLED anywhere
+                                                             in dashboard/app
+                                                             (see discrepancy
+                                                             list — this one
+                                                             is significant)
+
+Endpoints that exist server-side but have NO caller anywhere in dashboard/
+(confirmed by search): GET /explanation-reliability, GET /stability,
+GET /consensus, GET /models/compare, GET /feature-importance, GET /equation.
+If your architecture diagram shows this module consuming all of the REST
+service's ~8-13 endpoints, only 6 are actually wired up live.
+
+What's computed LOCALLY in this module (in-boundary logic — cite these
+file paths directly in your chapter):
+  - convertSHAPToExplanation() [lib/api.ts] — groups/sums the 32 raw SHAP
+    values the server already returned into <=5 display factors, ranks,
+    normalises magnitude. Presentation-layer aggregation of already-computed
+    numbers, not new explanation computation.
+  - evaluateAgronomicRules() [lib/agronomy.ts] — the full agronomic
+    rule/threshold engine (5 static DOA/FAO rules) is entirely client-side
+    TypeScript; reads resolved_features/shap_values/per_feature_eri already
+    in the stored prediction; never calls the backend again.
+  - SHAP-weighted per-card ERI averaging — implemented independently
+    TWICE, once in explain/page.tsx (reliabilityItems useMemo) and once in
+    agronomy.ts (inside evaluateAgronomicRules) — worth flagging as
+    duplicated logic even before touching the ERI-value discrepancy in
+    Section 4.
+  - getYieldColor()/getYieldCategory() [lib/api.ts] — a hardcoded,
+    client-side absolute-MT/Ha choropleth colour scale.
+  - predictYieldsForAllDistricts() [lib/api.ts] — 4 parallel client-side
+    POST /predict calls; there's no backend "batch predict" endpoint, this
+    module fans the requests out and aggregates the results itself.
+
+What's CONSUMED as-is (computed entirely server-side, outside boundary,
+listed here only so you can cite it correctly as NOT this module's work):
+  - point estimate, confidence interval, R2-based confidence label
+  - the 32 raw SHAP values
+  - eri / per_feature_eri
+  - feature_sources / resolved_features / data_completeness
+  - forecast_basis (including its explanatory `note` string — see i18n
+    section, this one is server-generated English and NOT localizable by
+    this module)
+  - chat/recommend natural-language answer text itself (LLM call is
+    entirely server-side)
+
+State management: no server session; a single PredictResponse is persisted
+to localStorage (lib/use-local-flag.ts) by predict/page.tsx; explain/ and
+recommend/ pages read that SAME object rather than re-fetching — this is
+what guarantees the three tabs can never disagree about a given
+prediction's numbers, but it also means only ONE prediction is ever "live"
+at a time (no history list, no multi-prediction comparison view).
+
+
+================================================================================
+3. EXPLAINABILITY IMPLEMENTATION
+================================================================================
+
+Module-boundary reminder: SHAP itself is computed entirely server-side
+(src/api.py's TreeExplainer/KernelExplainer, out of boundary). This module
+only renders the `shap_values` dict already present in PredictResponse.
+
+What triggers computation (context, not this module's own trigger logic):
+every POST /predict recomputes SHAP fresh for that request's resolved
+feature vector — from this module's side, there's no separate "explain"
+action; explanation data simply arrives bundled with the prediction the
+Predict tab already requested. No client-side SHAP caching beyond the one
+localStorage slot described in Section 2.
+
+What this module does with shap_values (in-boundary, cite these):
+  - featureDisplayKey() [lib/api.ts, ~line 259] — hardcoded raw-feature ->
+    display-label mapping (e.g. season_mean_ndvi / season_max_ndvi /
+    season_min_ndvi all collapse to one "ndvi" label).
+  - convertSHAPToExplanation() [lib/api.ts, ~line 293] — groups by that
+    label, sums SHAP per group, ranks by |sum|, keeps top 5, normalises
+    magnitude to [0,1] against the largest group.
+  - explain/page.tsx renders each group as a card: emoji, Positive/Negative
+    impact, a High/Medium/Low "Effect" tier (magnitude cut points 0.66/
+    0.33, function effectTier(), page-local), and — behind a "Technical
+    details" toggle — the raw combined SHAP number, a diverging bar, and
+    the underlying raw feature name(s) joined by comma.
+  - The single largest group also drives a one-line "Key Insight" sentence.
+
+DISCREPANCY: ReliabilityWaterfall.tsx (components/charts/) was built to
+dual-encode SHAP magnitude (bar length) and ERI (opacity + hatch) as an
+alternative chart. Only its TypeScript type is imported by
+explain/page.tsx; the component is never mounted anywhere. If any earlier
+chapter describes a rendered "reliability waterfall" visualization as a
+shipped feature, correct that — it exists as unused code only.
+
+
+================================================================================
+4. ERI IMPLEMENTATION
+================================================================================
+
+Module-boundary reminder: ERI is computed entirely server-side
+(src/xai/eri.py + src/xai/stability.py + src/conformal.py — none of this
+is dashboard/ code). This module only consumes `eri` and `per_feature_eri`
+already present in PredictResponse. Do not cite dashboard/ file paths for
+"how ERI is calculated" — cite the src/xai/eri.py analysis instead (see
+your separate ERI_IMPLEMENTATION_ANALYSIS.txt for the full breakdown).
+
+The two components, stated briefly here only as necessary context (server-
+side, out of boundary):
+  1. cross_fold_shap_consistency — LOYO-fold vs. full-data SHAP rank
+     correlation (src/xai/stability.py), precomputed offline.
+  2. interval_reliability — conformal interval width normalised against
+     the district's historical yield range (src/xai/eri.py, src/conformal.py).
+  Combined server-side, equal-weighted: ERI = 0.5*term1 + 0.5*term2.
+
+IMPORTANT for accuracy: per_feature_eri as delivered to this module is NOT
+genuinely per-feature — the server repeats the single prediction-level
+`eri` scalar under all 32 feature keys. This module's own weighting logic
+(below) was written assuming per-feature variation; it still runs, but
+because every input is identical, it always collapses back to that same
+number. Net effect: EVERY reliability percentage this module shows for a
+given prediction — the page-level "Explanation reliability" badge, every
+per-card "Confidence" badge on Explain, every "Reliability" badge on
+Recommend — is currently numerically identical. Only the tier LABEL can
+differ, because two different threshold schemes are used (below). Flag
+this if any earlier chapter implies per-card reliability varies
+meaningfully card to card.
+
+Where THIS module's own logic lives (in-boundary — this is the part you
+can legitimately describe as your implementation):
+  - lib/api.ts: PredictResponse.eri / .per_feature_eri type declarations
+    only — no computation.
+  - explain/page.tsx:
+      - reliabilityTier() [~line 56] — 4-tier scheme for per-card badges
+        (>=90% High / >=70% Good / >=50% Moderate / else Low)
+      - a SEPARATE, independently-defined 3-tier scheme inline [~line 171]
+        for the page-level summary badge (<0.4 Low / <0.7 Medium / else
+        High)
+      - reliabilityItems useMemo [~line 119] — the SHAP-|value|-weighted
+        per-card averaging of per_feature_eri
+  - lib/agronomy.ts:
+      - reliabilityTierFor() [~line 142] — a THIRD, independently
+        re-implemented copy of the same 4-tier scheme
+      - the same SHAP-weighted averaging logic, duplicated inside
+        evaluateAgronomicRules() [~line 191-207]
+  - No High/Medium/Low thresholds exist server-side at all — this is
+    entirely a presentation-layer decision, currently duplicated across
+    two files with two different cut-point schemes.
+
+Framing suggestion for your chapter: you can honestly claim ownership of
+"how ERI is surfaced to the user" (the tiering, the badges, the two
+independent client-side weighting implementations, the choice of a 4-tier
+vs. 3-tier scheme) as Visualization & Decision Support module work — just
+not the ERI score's calculation itself.
+
+
+================================================================================
+5. RAG ASSISTANT
+================================================================================
+
+Module-boundary reminder: retrieval (explanation_context.py:
+get_prediction_context / get_historical_comparison), intent classification
+(extract_intent — keyword matching, not an NLU model), prompt templating,
+and the LLM wrapper (_call_openrouter) all live in src/, outside this
+module. This module's contribution is the client UI that triggers these
+endpoints and renders the responses.
+
+Retrieval source (context only, not in-boundary): NOT a vector store or
+document retriever — explanation_context.py's own docstring says so
+explicitly. "Retrieval" = a structured JSON assembly of data already
+served elsewhere (current prediction, top-5 SHAP features, confidence
+interval, 5-year yield history, optional historical baseline), keyed by
+(district, season, year).
+
+Template-NLG step — TWO genuinely different mechanisms exist; don't
+collapse them into one "recommendation pipeline" description:
+  (a) Recommend tab's rule/risk cards (IN-BOUNDARY): true template-NLG.
+      Deterministic TypeScript rules (lib/agronomy.ts) produce structured
+      findings; recommend/page.tsx renders them entirely through next-intl
+      key interpolation, e.g.
+        t(`recommend.rules.${rec.id}.reason`, {current, min, max})
+      Zero LLM involvement, fully reproducible, fully localized via
+      messages/*.json.
+  (b) The free-text chat/recommendation answer (OUT-of-boundary
+      generation, in-boundary rendering only): the LLM performs the NLG
+      itself, instructed by a natural-language system prompt
+      (CHAT_SYSTEM_PROMPT / RECOMMEND_SYSTEM_PROMPT_TEMPLATE, src/api.py)
+      to turn the structured JSON into 2-4 plain sentences, avoiding ML
+      jargon by INSTRUCTION rather than by a deterministic template.
+
+LLM wrapper role (context only, out-of-boundary): OpenRouter
+OpenAI-compatible chat-completions call, model configurable via
+OPENROUTER_MODEL (default a free-tier model), degrades to a static
+fallback/rate-limit string on failure rather than a 500. This module just
+renders whichever string comes back — there is currently no UI signal
+distinguishing a genuine LLM answer from a canned fallback string.
+
+Translation handling for the LLM path: the LLM is asked to answer directly
+in the target language (locale name interpolated into the prompt, e.g.
+"Respond entirely in Sinhala"), not translated client-side.
+/api/recommend additionally runs a script-ratio sanity check
+(_looks_like_target_language(), src/api.py — requires >=50% Sinhala/Tamil
+Unicode-block characters) and substitutes a static pre-translated fallback
+if the model's raw output fails it (observed failure mode: reasoning-model
+chain-of-thought leaking into the answer). /api/chat has NO equivalent
+check — its answers are returned unvalidated. Both behaviors are
+server-side but directly determine what text this module ends up
+rendering, worth a sentence in your chapter for completeness.
+
+ChatAssistant.tsx (IN-BOUNDARY, this is your own component): floating
+action button + popup panel, mounted only on predict/page.tsx (not on
+Explain or Recommend), gated on `hasPrediction` (input disabled until a
+prediction exists for the current district/season/year), with a
+collapsible "based on this data" disclosure per answer that echoes the
+structured context_used object the server grounded its answer in
+(predicted yield, interval, top SHAP factors, baseline, yield history) —
+this is the one place in the UI a user can inspect what data justified an
+LLM answer.
+
+DISCREPANCY (significant): getRecommendation() (lib/api.ts, wraps
+POST /api/recommend) is fully implemented and typed, but is NOT called
+anywhere in dashboard/app — confirmed by direct search across
+recommend/page.tsx and the rest of the app tree. The live Recommend tab
+renders ONLY the deterministic rule-based cards; no LLM-generated
+recommendation banner is actually wired into the running UI, even though
+project documentation (an internal audit doc) and prior chapter drafts may
+describe "an AI-generated recommendation banner" as a shipped feature. If
+your earlier chapters make that claim, either (a) wire the call in before
+submission, or (b) correct the chapter to describe it as
+implemented-server-side-but-not-yet-integrated-client-side.
+
+
+================================================================================
+6. MAP / SPATIAL VISUALIZATION IMPLEMENTATION
+================================================================================
+
+Library: react-leaflet + Leaflet, dynamically imported client-side only
+(`{ ssr: false }`) to avoid Leaflet's DOM/window dependency breaking SSR —
+components/DistrictMap.tsx.
+
+Data source: a static GeoJSON file in the Next.js public directory
+(/sri-lanka-target-districts-only.geojson), fetched client-side via
+`fetch()` — NOT served by the Flask backend; this is a presentation-layer
+static asset.
+
+Filtering: the raw GeoJSON is filtered client-side to the 4 study
+districts via a normalized-name allowlist (ALLOWED_TARGET_KEYS =
+matale/anuradhapura/polonnaruwa/kurunegala). Non-target districts are kept
+in the layer but rendered fully transparent (fillOpacity 0, weight 0)
+rather than removed, so Sri Lanka's outline still shows with only the 4
+target districts highlighted.
+
+Choropleth coloring: getYieldColor()/getYieldCategory() [lib/api.ts,
+~line 353] — a hardcoded, ABSOLUTE 5-bucket MT/Ha scale (Very Low <7,
+Low 7-10, Medium 10-13, High 13-16, Very High >=16). NOT derived from the
+dataset's own distribution/quantiles and not configurable — flag this if
+your report implies data-driven colour breaks.
+
+Predictions feeding the map: 4 parallel client-side POST /predict calls on
+every home-page load (predictYieldsForAllDistricts, lib/api.ts), always
+for the CURRENT calendar year and hardcoded season "Yala" (see Section 7 —
+Maha excluded). No backend batch-prediction endpoint; this module issues
+the 4 requests and aggregates best/worst/average district itself.
+
+Interaction: clicking a highlighted polygon calls back to the home page
+(onSelectDistrict), updating the "District Focus" card — pure local state
+change reading from the already-fetched batch result, no re-fetch.
+
+Failure handling: a district whose request fails is tracked in
+`failedDistricts` and shown with no colour/tooltip value ("No prediction")
+rather than a fabricated number — lib/api.ts's own comment notes this
+replaced an earlier version that silently substituted hardcoded
+per-district yields on failure.
+
+
+================================================================================
+7. i18n IMPLEMENTATION ACROSS ENGLISH / SINHALA / TAMIL, AND KNOWN GAPS
+================================================================================
+
+Library: next-intl, App Router `[locale]` dynamic segment,
+`localePrefix: "always"` — every route is always locale-prefixed
+(e.g. /en/predict) — middleware.ts, i18n/routing.ts.
+
+Locales: en (default), si, ta — i18n/routing.ts:1.
+
+Message loading & fallback (i18n/request.ts + i18n/routing.ts:
+mergeMessages): en.json always loads as the fallback base; the requested
+locale's file is DEEP-merged on top (recursive per-key merge, not a
+shallow spread) — a missing or empty-string key in si.json/ta.json falls
+back to the English string for just that one key, not the whole
+namespace. `getMessageFallback` covers any key missing from the merge
+entirely by returning the raw key.
+
+Locale switching: LanguageSwitcher.tsx — replaces the locale segment in
+the current pathname and persists the choice to localStorage ("lang") so
+it survives a reload before next-intl's own URL-based detection kicks in.
+
+Message-file parity — VERIFIED THIS SESSION by diffing every leaf key
+across en.json / si.json / ta.json: both si.json and ta.json currently
+define all 227 of en.json's leaf keys, across every namespace including
+`chat`. Zero missing keys in either locale, as of this analysis.
+
+DISCREPANCY / correction: an internal audit doc in this repo
+(docs/09_SYSTEM_AUDIT.md) states "si/ta locales missing the entire chat.*
+translation namespace (17 keys)." That gap does NOT exist in the current
+codebase — it must have been closed since that note was written. If any
+earlier chapter cites that missing-namespace finding, remove or correct
+it; the current, verified state is full key parity across all three
+locales.
+
+Server-generated text NOT covered by next-intl (a real i18n gap, distinct
+from a missing-key gap — worth its own paragraph in your chapter):
+  - `forecast_basis.note` (src/api.py run_prediction(), out of boundary)
+    is assembled as an English Python f-string server-side and returned
+    as a ready-made string inside PredictResponse. This module renders it
+    directly — there's no translation key to call `t()` on — so it always
+    displays in English regardless of the selected locale, even on an
+    otherwise fully-localized Explain tab.
+  - Chat/recommend LLM answers are generated directly in the target
+    language by prompt instruction (Section 5), not via next-intl —
+    correctness depends on the model actually complying, and (for
+    /api/recommend only) is checked with a fallback; /api/chat is not.
+
+Known structural gap tied to the seasons namespace: messages/*.json still
+carries a translation for "Maha" (matching src/config.py's
+SEASONS = ['Yala', 'Maha']), but no season selector in the live dashboard
+ever offers it — see the discrepancy below.
+
+
+================================================================================
+CONSOLIDATED DISCREPANCY LIST (for quick reference when editing earlier chapters)
+================================================================================
+
+1. Season scope: your stated study scope lists "Yala/Maha seasons," but
+   the live dashboard hardcodes Yala-only in at least two places —
+   predict/page.tsx (~line 132, explicit comment: "Yala is the only
+   season this dashboard offers (Maha was retired)") and
+   FieldInputCard.tsx (~line 51-54, `availableSeasons` filtered to
+   `s.toLowerCase() === "yala"`). Home page's batch prediction also
+   hardcodes season="Yala". Action: either lift the filter before
+   submission, or correct the scope/module-boundary chapter to note Maha
+   was deliberately descoped from the presentation layer.
+
+2. AI-generated recommendation banner: getRecommendation()/
+   POST /api/recommend exists and is fully typed/implemented, but is
+   called from NOWHERE in dashboard/app. The Recommend tab currently
+   shows only the deterministic rule-based cards. Action: wire it in, or
+   correct any chapter claiming it's a live feature.
+
+3. GET /health, /explanation-reliability, /stability, /consensus,
+   /models/compare, /equation, /feature-importance: all defined
+   server-side, none called from dashboard/. If your architecture diagram
+   shows this module consuming the REST service's full endpoint surface,
+   narrow it to the 6 endpoints actually in use (/districts, /context,
+   /baseline, /predict, /api/chat, and — once wired — /api/recommend).
+
+4. per_feature_eri is not really per-feature (server-side simplification,
+   see ERI_IMPLEMENTATION_ANALYSIS.txt) — this module's SHAP-weighted
+   per-card averaging logic (duplicated in explain/page.tsx and
+   agronomy.ts) still runs but now always returns the same number per
+   prediction. Every reliability badge on a given prediction is
+   numerically identical; only the label differs, and even the label
+   comes from two DIFFERENT threshold schemes (3-tier vs. 4-tier,
+   independently coded in two files). Action: decide whether to
+   consolidate the two schemes/implementations, or note the duplication
+   as a known limitation.
+
+5. ReliabilityWaterfall.tsx exists but is never rendered — dead code as
+   of this analysis, despite its type being imported by explain/page.tsx.
+
+6. Choropleth colour scale is a hardcoded absolute MT/Ha threshold table,
+   not data-driven — flag if your visualization chapter implies otherwise.
+
+7. forecast_basis.note is server-generated English, not localized by
+   next-intl — will not translate on the Explain tab.
+
+8. docs/09_SYSTEM_AUDIT.md's "si/ta missing the chat.* namespace"
+   finding is stale — current code has full key parity across all three
+   locales (verified this session).
+
+================================================================================
+END OF NOTES
+================================================================================
